@@ -205,123 +205,293 @@ detalhados e integrados em `docs/05-logs-auditoria-lgpd.md` (seção Gov.br/SINA
 
 ## 14. Próximos reconhecimentos sugeridos (sem automação)
 
-- Mapear a tela **"Solicitação de Serviço"** e onde entra a **Guia de Tráfego**.
+- ✅ Mapear a tela **"Solicitação de Serviço"** e onde entra a **Guia de Tráfego**
+  — **FEITO** (ver §15: Solicitação de Serviço → Pessoa Física → Preencher
+  Formulário → serviço "Emitir Guia de Tráfego Pessoa Física (CAC)").
+- **Mapear a tela de confirmação da etapa 5 "Gere GRU"** (sem confirmar) — §15.13.
 - Mapear o formulário completo do **cadastro inicial** (validações, obrigatórios,
   como latitude/longitude são preenchidas).
 - Confirmar em que etapa as **certidões/antecedentes** (`pf-antecedentes` etc.)
-  são exigidas dentro do processo — é o ponto de conexão entre M1 e M5.
+  são exigidas — na Guia de Tráfego **não foram observadas** (§15.4); confirmar
+  para **CR novo / renovação / processos maiores** (ponto de conexão M1 ↔ M5).
 
 ---
 
-## 15. Reconhecimento — Guia de Tráfego
+## 15 — Reconhecimento manual da Guia de Tráfego
 
 > **Objetivo:** mapear **onde fica a Guia de Tráfego** dentro do SINARM/CAC e
-> **quais etapas/telas** aparecem **até antes do envio final** — sem protocolar.
-> A Guia de Tráfego é o **primeiro processo do MVP comercial**, por isso precede
-> a automação de certidões.
+> **quais etapas/telas** aparecem **até antes da confirmação final** — sem
+> protocolar. A Guia de Tráfego é o **primeiro processo do MVP comercial**.
 >
-> **Status desta etapa:** ⬜ NÃO EXECUTADA (aguardando reconhecimento manual)
-> **Executor:** _______  **Data:** _______
+> **Status desta etapa:** 🟡 **PARCIALMENTE EXECUTADA** — fluxo mapeado até a
+> etapa 5 ("Gere GRU"); **falta mapear a tela de confirmação** dessa etapa
+> (ver §15.13).
+> **Data do reconhecimento:** 2026-07-17
 >
-> **Regras:** navegar só até **antes do envio final**; **não protocolar**
-> processo real; **não anexar documentos reais** só para testar; screenshots
-> **sem PII**; se para avançar for obrigatório enviar/protocolar → **parar**.
+> **Regras desta sessão de reconhecimento:**
+> - Navegar **só até antes da confirmação final**; **não protocolar** processo real.
+> - **Não anexar documentos reais** só para testar.
+> - Screenshots **sem PII** (mascarar CPF, nome, empresa, endereço, nº de série).
+> - **Não clicar na confirmação final** da etapa "Gere GRU".
+> - Copiar URLs/hash **sem tokens** (o trecho após `#/`).
+>
+> **Descoberta estrutural:** a Guia de Tráfego **não é uma tela isolada** — é
+> um serviço dentro do fluxo genérico **"Preencher Formulário (Requerimento)"**,
+> que tem **5 etapas numeradas** na mesma tela (ver §15.3).
 
-### 15.1 Caminho no menu
-| Nível | O que você clicou | Rótulo exato na tela |
-|-------|-------------------|----------------------|
-| Menu principal | | |
-| Submenu | | |
-| Tela final | | |
+---
 
-### 15.2 URL / hash de cada etapa
-Copiar da barra de endereço (o trecho após `#/`), sem tokens/PII.
-| Etapa | URL / hash |
-|-------|-----------|
-| Tela inicial do processo | |
-| Tela de formulário | |
-| Tela de anexos | |
-| Tela de confirmação | |
-| Tela de protocolo/GRU (se chegar) | |
+### 15.1 — Caminho no menu e URL/hash
 
-### 15.3 Nome exato do serviço/processo
-- Como a **Guia de Tráfego** aparece escrita no sistema (rótulo/opção): __________
-- Categoria/grupo em que ela está listada (se houver): __________
+**Caminho de menu observado:**
+1. **Solicitação de Serviço**
+2. → **Pessoa Física (PF)**
+3. → **Preencher Formulário (Requerimento)**
 
-### 15.4 Campos do formulário
-Uma linha por campo. Tipo = texto / número / data / seleção / upload / mapa / etc.
-| Campo (rótulo exato) | Obrigatório? | Tipo | Observações |
-|----------------------|--------------|------|-------------|
-| | | | |
-| | | | |
-| | | | |
-| | | | |
+**URL / hash observada:**
+`https://servicos.pf.gov.br/sisgcorp-cliente-web-externo/#/preencher-formulario`
 
-### 15.5 Documentos / anexos exigidos
-| Documento (rótulo) | Obrig.? | Formato aceito | Tam. máx. | Exige assinatura Gov.br? | Depende do cadastro inicial? |
-|--------------------|---------|----------------|-----------|--------------------------|------------------------------|
-| | | | | | |
-| | | | | | |
+- **Screenshot esperado:** `gt-01-menu.png`
 
-### 15.6 Certidões / antecedentes (ponto de conexão M1 ↔ M5)
-Responder sim/não/não observado e detalhar:
-- [ ] Aparecem como **anexos obrigatórios**? __________
-- [ ] O sistema exige **upload** da certidão pelo usuário? __________
-- [ ] O sistema **busca automaticamente** (não exige upload)? __________
-- [ ] Existe **campo específico** para certidão/antecedente? __________
-- [ ] Depende da **UF / domicílio** (pede certidão estadual específica)? __________
-- [ ] Quais certidões são citadas nominalmente (PF, TJ, eleitoral, militar…)? __________
+---
 
-### 15.7 GRU (Guia de Recolhimento da União)
-- [ ] Em que **momento** é gerada (antes do envio / após protocolo)? __________
-- [ ] Aparece **antes ou depois** do número de protocolo? __________
-- [ ] Mostra **valor**? Qual (se puder copiar)? __________
-- [ ] Mostra **vencimento**? __________
-- [ ] Permite **imprimir/baixar** (PDF)? __________
-- [ ] O **status muda para "Aguardando pagamento"** (ou equivalente)? __________
+### 15.2 — Estrutura do fluxo (5 etapas do formulário)
 
-### 15.8 Status / protocolo
-- [ ] Gera **número de protocolo** imediatamente? __________
-- [ ] **Mensagem** que aparece após o envio (transcrever): __________
-- [ ] **Status inicial** exibido (transcrever): __________
-- [ ] Existe **tela de comprovante**? Baixável? __________
+O formulário "Preencher Formulário (Requerimento)" exibe **5 etapas numeradas**:
 
-> ⚠️ Só chegue aqui se conseguir observar **sem** protocolar um processo real.
-> Se o sistema exigir envio para mostrar protocolo/GRU, **pare antes** e registre
-> "não observado — exigiria protocolo real".
+1. **Confira os dados do Solicitante**
+2. **Escolha as Atividades e os Serviços**
+3. **Preencha as Condições de Exigências**
+4. **Preencha com informações adicionais julgadas úteis**
+5. **Gere GRU**
 
-### 15.9 Erros / validações observados
-| Situação | Mensagem exata / comportamento |
-|----------|-------------------------------|
-| Campo obrigatório vazio | |
-| Documento faltante | |
-| Sessão expirada | |
-| Comportamento instável (ex.: repetição) | |
-| Outro | |
+> A Guia de Tráfego é selecionada como **serviço** na etapa 2. As etapas seguintes
+> se ajustam ao serviço escolhido.
 
-### 15.10 Observações de automação (sua leitura)
-- Parece **simples de automatizar**: __________
-- Parece **exigir humano**: __________
-- Depende de **login Gov.br**: __________
-- Depende de **cadastro inicial** (§8): __________
-- Depende de **certidões externas** (M1): __________
+---
 
-### 15.11 Registro de screenshots (Guia de Tráfego)
+### 15.3 — Etapa 2 · Escolha das Atividades e Serviços (Guia de Tráfego)
+
+Seleções observadas para gerar a Guia de Tráfego:
+
+| Campo | Valor observado |
+|-------|-----------------|
+| **Serviço** | **Emitir Guia de Tráfego Pessoa Física (CAC)** |
+| **Tipo de Taxa** | Taxas Diversas |
+| **Valor da Taxa** | **R$ 20** |
+| **Tipo de Atividade** | Tiro Desportivo - Atirador Desportivo |
+| **Tipo de PCE** | ARMA DE FOGO |
+| **Finalidade (observada)** | TREINAMENTO TIRO DESPORTIVO |
+| **Finalidade (outra opção listada)** | TIRO DESPORTIVO - MUDANÇA DE LOCAL DO ACERVO |
+
+- **Screenshot esperado:** `gt-02-servico.png`
+
+---
+
+### 15.4 — Etapa 3 · Condições de Exigências (documentos / anexos)
+
+**Item/documento observado:**
+
+| Item | Documento | Obrigatório? | Botões de anexo |
+|------|-----------|--------------|-----------------|
+| 42 | **Documento de Identificação Pessoal** | (a confirmar) | Escolher · Carregar · Cancelar |
+
+**Confirmação operacional:**
+- Para a Guia de Tráfego mapeada, o **único anexo observado** foi
+  **Documento de Identificação Pessoal**.
+- **Certidões/antecedentes NÃO apareceram** neste fluxo até o ponto mapeado.
+
+- **Screenshot esperado:** `gt-03-exigencias.png`
+
+#### Certidões / antecedentes na Guia de Tráfego
+- ✅ **Não observadas** neste fluxo até o ponto mapeado.
+- ⚠️ **Pendente confirmação final** se são exigidas em alguma etapa posterior
+  (ex.: na tela de confirmação da etapa 5 ou após o pagamento).
+- **Implicação:** o **módulo M1 (Certidões/Antecedentes) provavelmente NÃO é
+  requisito inicial** para o MVP da Guia de Tráfego (ver §15.11 e doc 00).
+
+---
+
+### 15.5 — Validade da Guia
+
+- **Validade exibida:** 17/01/2027.
+- ⚠️ **Registrar:** a validade deve ser **lida dinamicamente do sistema**, nunca
+  fixada (hardcoded) no app.
+
+---
+
+### 15.6 — Local de origem (Endereço SIGMA)
+
+- **Campo observado:** **Endereço SIGMA**.
+- **Confirmação operacional:**
+  - O Endereço SIGMA **vem de endereço já cadastrado** no cadastro/acervo do usuário.
+  - Para gerar Guia de Tráfego, a pessoa **já precisa ter arma ou CR**.
+  - Portanto, em regra, **já deve ter cadastro inicial** no SINARM/CAC.
+- **Conclusão:** **Cadastro inicial PF fica como risco/fallback**, **não** como
+  fluxo obrigatório do MVP de Guia de Tráfego.
+
+---
+
+### 15.7 — Local de destino (evento / clube)
+
+**Campos observados (informados pelo solicitante):**
+
+| Campo | Tipo |
+|-------|------|
+| Nome Evento | texto |
+| UF | seleção |
+| Cidade | seleção / texto |
+| Logradouro | texto |
+| Número | texto |
+
+- **Confirmação operacional:** o endereço de destino/clube/evento é **informado
+  pelo solicitante** para o sistema preencher.
+- **Requisito para o app:** ter **etapa própria** para coletar e validar:
+  nome do clube/evento/local, UF, cidade, logradouro, número e **dados adicionais**
+  que apareçam depois.
+
+---
+
+### 15.8 — PCE / Armamento
+
+**Tabela de PCE/armamento observada (colunas):**
+Número SIGMA · Código PCE · Espécie · Marca · Modelo · Calibre · Nº de Série ·
+Nº de Lote · Quantidade.
+
+**Controles observados:**
+- Botão **Cadastrar**
+- **Modal/lista** para selecionar armamento do acervo
+- Botão **Incluir Armamento**
+
+**Registrar:**
+- O usuário **indica qual arma/PCE** deseja usar na Guia.
+- O sistema **seleciona o armamento correto a partir do acervo** exibido.
+- ⚠️ Exige **validação forte** para evitar selecionar a **arma errada**.
+
+- **Screenshot esperado:** `gt-04-pce.png` (mascarar Nº de Série / SIGMA)
+
+---
+
+### 15.9 — Justificativa
+
+- **Campo observado:** **Justificativa** (texto livre).
+- **Confirmação operacional:** para Guia de Tráfego de treino, a justificativa
+  padrão pode ser **"Guia para treino"**.
+- **Registrar:**
+  - A justificativa pode ser **pré-preenchida** no MVP.
+  - Deve permitir **edição** se necessário.
+  - A **etapa 4** ("informações adicionais julgadas úteis") **não é necessária**
+    neste caso e **pode ser pulada** se não houver informações adicionais.
+
+---
+
+### 15.10 — Etapa 5 · Gere GRU + confirmação intermediária
+
+> **Correção importante (vs. suposição anterior):** o clique em **"Gere GRU"**
+> **NÃO gera/protocola imediatamente.**
+
+**Comportamento observado:**
+- Ao clicar na etapa 5 **"Gere GRU"**, o sistema **abre uma tela de confirmação
+  antes** de gerar/protocolar de fato.
+- A **ação realmente irreversível** é a **confirmação final** após essa tela.
+
+**Registrar:**
+- A automação futura **pode navegar até a tela de confirmação sem protocolar**.
+- A **tela de confirmação** deve ser tratada como **checkpoint final**.
+- A **confirmação final** deve ser tratada como **ação irreversível**.
+- **Não confirmar/protocolar em testes** sem intenção real.
+
+**Impacto no risco operacional:** a confirmação intermediária **reduz o risco**
+da automação. **Antes da confirmação final**, o nosso app/painel deve validar:
+serviço selecionado · finalidade · tipo de atividade · tipo de PCE · endereço de
+origem · endereço de destino · arma/PCE selecionada · documento de identificação
+anexado · justificativa · consentimento/autorização do usuário · pagamento
+confirmado · **revisão humana nos primeiros 50–100 processos**.
+
+- **Screenshot esperado:** `gt-05-gerar-gru.png` (**parar antes de confirmar**)
+
+---
+
+### 15.11 — Classificação técnica da Guia de Tráfego
+
+**Guia de Tráfego: `SEMIAUTOMATICO` — com alta chance de automação futura.**
+
+Motivos:
+- exige **login Gov.br**;
+- depende de **sessão SINARM/CAC** (~60 min);
+- possui **dados e seleção de armamento sensíveis**;
+- possui **clique final irreversível** após a confirmação;
+- **mas** o fluxo é **relativamente fixo**, **sem certidões observadas** e com
+  **taxa de R$ 20**.
+
+---
+
+### 15.12 — Fluxo MVP provável para a Guia de Tráfego
+
+1. Usuário escolhe Guia de Tráfego no app.
+2. App coleta dados do destino/clube/evento.
+3. App coleta Documento de Identificação Pessoal.
+4. App pergunta/valida qual arma/PCE será usada.
+5. App confirma que o usuário já possui CR/arma e acesso Gov.br.
+6. Usuário paga via Pix.
+7. Usuário faz login Gov.br em janela oficial.
+8. Sistema acessa SINARM/CAC.
+9. Sistema seleciona: **Serviço** = Emitir Guia de Tráfego Pessoa Física (CAC);
+   **Tipo de Atividade** = Tiro Desportivo - Atirador Desportivo;
+   **Finalidade** = TREINAMENTO TIRO DESPORTIVO; **Tipo de PCE** = ARMA DE FOGO.
+10. Sistema seleciona **Endereço SIGMA** de origem.
+11. Sistema preenche **local de destino**.
+12. Sistema seleciona **armamento do acervo**.
+13. Sistema anexa **Documento de Identificação Pessoal**.
+14. Sistema preenche **justificativa** "Guia para treino".
+15. Sistema avança para **"Gere GRU"**.
+16. Sistema chega na **tela de confirmação**.
+17. Nosso app/painel realiza **revisão final interna**.
+18. Após confirmação/autorização, sistema **confirma a geração da GRU/protocolo**.
+19. Processo é **protocolado** e **GRU é gerada**.
+20. **Empresa paga GRU manualmente.**
+21. Usuário **acompanha status**.
+
+---
+
+### 15.13 — Próximo reconhecimento recomendado
+
+**Mapear a tela de confirmação da etapa 5 "Gere GRU" — SEM clicar na confirmação
+final.**
+
+O que observar:
+- texto exibido;
+- dados resumidos;
+- se mostra **valor da GRU**;
+- se mostra **serviço / finalidade / PCE**;
+- se mostra **origem / destino**;
+- se mostra **documento anexado**;
+- **rótulo exato do botão final**;
+- se há opção **voltar / cancelar**;
+- se há **termo / declaração** antes de confirmar.
+
+- **Screenshot esperado:** `gt-06-confirmacao.png` (**parar antes de confirmar**)
+
+---
+
+### 15.14 — Não fazer agora
+
+- ❌ Não clicar na **confirmação final** em teste.
+- ❌ Não **protocolar** processo real sem intenção.
+- ❌ Não iniciar o **módulo de certidões (M1)** agora.
+- ❌ Não implementar **código** ainda.
+- ❌ Não **instalar dependências**.
+- ❌ Não **automatizar Gov.br/SINARM** ainda.
+
+---
+
+### 15.15 — Registro de screenshots (Guia de Tráfego)
+
 | Etapa | Descrição | Arquivo | Observações (sem PII) |
 |-------|-----------|---------|------------------------|
-| GT-1 | Seleção da Guia de Tráfego no menu | `gt-01-menu.png` | |
-| GT-2 | Tela inicial do processo | `gt-02-inicial.png` | |
-| GT-3 | Formulário (campos) | `gt-03-form.png` | mascarar PII |
-| GT-4 | Anexos exigidos | `gt-04-anexos.png` | |
-| GT-5 | Confirmação (antes de enviar) | `gt-05-confirmacao.png` | **parar aqui** |
-| GT-6 | GRU / protocolo (só se observável sem protocolar) | `gt-06-gru.png` | |
-
-### 15.12 Classificação após o reconhecimento (preencher depois)
-```
-- Onde fica a Guia de Tráfego:      PENDENTE
-- Certidões: upload manual / auto / não exige:  PENDENTE
-- GRU: antes/depois do protocolo:   PENDENTE
-- Etapas automatizáveis:            PENDENTE
-- Etapas que exigem humano:         PENDENTE
-- Bloqueadores para o MVP:          PENDENTE
-```
+| GT-1 | Caminho no menu até "Preencher Formulário" | `gt-01-menu.png` | |
+| GT-2 | Etapa 2 — serviço/atividade/finalidade | `gt-02-servico.png` | |
+| GT-3 | Etapa 3 — Condições de Exigências (Doc. Identificação) | `gt-03-exigencias.png` | |
+| GT-4 | Tabela PCE / armamento | `gt-04-pce.png` | mascarar Nº Série / SIGMA |
+| GT-5 | Etapa 5 — Gere GRU (antes de confirmar) | `gt-05-gerar-gru.png` | **parar antes de confirmar** |
+| GT-6 | Tela de confirmação da etapa 5 (próximo recon.) | `gt-06-confirmacao.png` | **não confirmar** |

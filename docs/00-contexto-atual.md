@@ -4,7 +4,7 @@
 > tomadas e o próximo passo, para que qualquer pessoa (ou o Claude, numa nova
 > sessão) entenda o contexto só lendo os arquivos.
 >
-> **Última atualização:** 2026-07-16
+> **Última atualização:** 2026-07-17
 > **Estado geral:** Fase 0/1 — planejamento e reconhecimento. **Sem código de
 > aplicação.** Só documentação.
 
@@ -94,6 +94,31 @@ Reconhecimento manual em 2026-07-16 (detalhes em `docs/09-reconhecimento-sinarm-
 - **Instabilidade:** a **autorização precisou ser clicada duas vezes**.
 - **Classificação técnica atual do módulo: `SEMIAUTOMATICO`.**
 
+### 5.1 Guia de Tráfego — reconhecimento parcial (2026-07-17)
+
+Fluxo mapeado até a etapa 5 (detalhes em `docs/09-reconhecimento-sinarm-cac.md §15`):
+
+- **Caminho:** Solicitação de Serviço → Pessoa Física (PF) → **Preencher
+  Formulário (Requerimento)**. URL: `.../#/preencher-formulario`.
+- **Não é tela isolada:** é um serviço dentro do formulário genérico, com
+  **5 etapas** (Solicitante → Atividades/Serviços → Condições de Exigências →
+  Info. adicionais → **Gere GRU**).
+- **Serviço:** "Emitir Guia de Tráfego Pessoa Física (CAC)" · **Taxa R$ 20** ·
+  Atividade "Tiro Desportivo - Atirador Desportivo" · PCE "ARMA DE FOGO" ·
+  Finalidade "TREINAMENTO TIRO DESPORTIVO".
+- **Único anexo observado:** Documento de Identificação Pessoal (item 42).
+- **Certidões/antecedentes NÃO observadas** neste fluxo (pendente confirmação final).
+- **Origem:** campo "Endereço SIGMA" (vem do acervo — exige CR/arma já cadastrada).
+- **Destino:** Nome Evento, UF, Cidade, Logradouro, Número (informados pelo usuário).
+- **Armamento:** tabela PCE (Nº SIGMA, Código PCE, Espécie, Marca, Modelo, Calibre,
+  Nº Série, Nº Lote, Qtde) + seleção do acervo — **exige validação forte**.
+- **Justificativa:** texto livre; padrão "Guia para treino".
+- **Validade da Guia observada:** 17/01/2027 (ler **dinamicamente**, nunca hardcoded).
+- **"Gere GRU" NÃO protocola direto:** abre **confirmação intermediária**; a ação
+  irreversível é a **confirmação final** — automação pode parar no checkpoint.
+- **Classificação da Guia de Tráfego: `SEMIAUTOMATICO`** com **alta chance de
+  automação futura** (fluxo fixo, sem certidões, taxa baixa).
+
 ## 6. Cadastro inicial PF
 
 - Tela: **"Cadastro Inicial do Solicitante de Pessoa Física (PF)"**
@@ -104,23 +129,29 @@ Reconhecimento manual em 2026-07-16 (detalhes em `docs/09-reconhecimento-sinarm-
   longitude, profissão, nome da mãe, nome do pai.
 - **Observações:** para o **primeiro processo** pode ser necessário criar o
   cadastro inicial; pode ser necessário que a conta Gov.br **tenha foto válida**.
+- **Atualização (2026-07-17):** para a **Guia de Tráfego**, o cadastro inicial PF
+  fica como **risco/fallback, NÃO como fluxo obrigatório** do MVP — quem gera Guia
+  de Tráfego **já possui CR/arma** (endereço vem do "Endereço SIGMA" do acervo) e,
+  portanto, **já deve ter cadastro inicial**.
 
 ## 7. Próximo passo planejado
 
-**Próximo reconhecimento manual: mapear a Guia de Tráfego dentro do SINARM/CAC.**
-Estrutura já preparada em `docs/09-reconhecimento-sinarm-cac.md §15`.
+**Reconhecimento da Guia de Tráfego INICIADO** — fluxo mapeado até a etapa 5
+("Gere GRU"). Detalhes em `docs/09-reconhecimento-sinarm-cac.md §15`.
 
-Roteiro (parar **antes** de enviar/protocolar):
-- Tela 1: Menu / seleção do processo.
-- Tela 2: Tela inicial do processo.
-- Tela 3: Formulário.
-- Tela 4: Anexos / documentos.
-- Tela 5: Confirmação (**parar antes de enviar**).
-- Tela 6: GRU / protocolo **apenas se observável sem protocolar**.
+**Conclusões preliminares:**
+- **Guia de Tráfego parece VIÁVEL para o MVP.**
+- **Certidões/antecedentes NÃO observadas** neste fluxo → **M1 provavelmente NÃO
+  é bloqueador** para o MVP da Guia (pode ficar para CR novo/renovação/processos
+  maiores, salvo reconhecimento posterior em contrário).
+- **Cadastro inicial PF = fallback**, não fluxo obrigatório da Guia.
+- **Confirmação intermediária antes de gerar GRU reduz o risco** da automação.
 
-Objetivo: descobrir o caminho exato da Guia de Tráfego, nome exato do serviço,
-campos, anexos, **se exige certidões**, quando aparece a **GRU**, se gera
-protocolo imediatamente, e quais partes são automatizáveis.
+**Próximo reconhecimento manual: mapear a tela de confirmação da etapa 5
+"Gere GRU" — SEM clicar na confirmação final** (ver §15.13).
+Observar: texto exibido, dados resumidos, valor da GRU, serviço/finalidade/PCE,
+origem/destino, documento anexado, rótulo exato do botão final, opção
+voltar/cancelar e eventual termo/declaração.
 
 ## 8. Regras permanentes de segurança
 
@@ -145,16 +176,28 @@ protocolo imediatamente, e quais partes são automatizáveis.
 
 ### ➡️ PRÓXIMO PASSO (explícito)
 
-> **Consolidar o reconhecimento manual da Guia de Tráfego dentro do SINARM/CAC,
-> seguindo o roteiro do §15 do `docs/09-reconhecimento-sinarm-cac.md`.**
+> **Reconhecimento da Guia de Tráfego consolidado** em
+> `docs/09-reconhecimento-sinarm-cac.md §15` (fluxo mapeado até a etapa 5
+> "Gere GRU"). **Falta apenas mapear a tela de confirmação** dessa etapa.
+>
+> **Próximo passo:** **mapear a tela de confirmação da etapa 5 "Gere GRU",
+> SEM clicar na confirmação final** (não protocolar).
 
-**Foco imediato — mapear manualmente:**
-1. **Caminho** da Guia de Tráfego (menu → submenu → tela).
-2. **Formulário** (campos, obrigatórios, tipos).
-3. **Anexos / documentos** exigidos.
-4. **Certidões** exigidas ou não (e se é upload manual, busca automática ou campo próprio).
-5. **Etapa de confirmação** (parar antes de enviar).
-6. **Momento em que a GRU aparece** (antes/depois do protocolo, valor, vencimento).
+**O que observar na tela de confirmação (§15.13):**
+1. Texto exibido.
+2. Dados resumidos.
+3. Se mostra **valor da GRU**.
+4. Se mostra **serviço / finalidade / PCE**.
+5. Se mostra **origem / destino**.
+6. Se mostra **documento anexado**.
+7. **Rótulo exato do botão final.**
+8. Se há opção **voltar / cancelar**.
+9. Se há **termo / declaração** antes de confirmar.
+
+→ Screenshot esperado: `gt-06-confirmacao.png` (**parar antes de confirmar**).
+
+**Ao voltar:** preencher §15.13 com os achados; onde não observar, "não
+observado"; onde houver dúvida, "inconclusivo — confirmar".
 
 ### Regras de retomada (permanentes nesta etapa)
 
