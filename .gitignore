@@ -1,0 +1,71 @@
+# === Dependências ===
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+
+# === Build / saída ===
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+*.tsbuildinfo
+
+# === Ambiente / segredos (NUNCA commitar) ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*.json
+
+# === Dados sensíveis / PII (LGPD — NUNCA commitar) ===
+# PDFs de certidões, comprovantes, screenshots com dados pessoais
+storage/
+labs/certidoes/storage/
+**/screenshots/
+*.pdf
+!docs/**/*-modelo.pdf
+# prints de reconhecimento podem conter CPF/nome/empresa
+docs/**/prints/
+docs/legal/screenshots/
+
+# === Playwright / automação (futuro) ===
+playwright-report/
+test-results/
+.playwright/
+traces/
+
+# === Banco local (laboratório) ===
+*.sqlite
+*.sqlite3
+*.db
+
+# === Logs ===
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Sistema operacional ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Editores / IDE ===
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+
+# === Claude Code (memória local do projeto fica fora do git por padrão) ===
+# Descomente se NÃO quiser versionar a pasta de memória:
+# .claude/
