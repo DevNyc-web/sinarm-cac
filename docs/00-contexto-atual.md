@@ -73,6 +73,7 @@ Arquivos existentes:
 - `docs/07-estrutura-pastas.md`
 - `docs/08-inventario-provedores.md`
 - `docs/09-reconhecimento-sinarm-cac.md`
+- `docs/10-mvp-guia-de-trafego.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Nenhum código de aplicação foi escrito.** Nenhuma dependência instalada.
