@@ -208,7 +208,10 @@ detalhados e integrados em `docs/05-logs-auditoria-lgpd.md` (seção Gov.br/SINA
 - ✅ Mapear a tela **"Solicitação de Serviço"** e onde entra a **Guia de Tráfego**
   — **FEITO** (ver §15: Solicitação de Serviço → Pessoa Física → Preencher
   Formulário → serviço "Emitir Guia de Tráfego Pessoa Física (CAC)").
-- **Mapear a tela de confirmação da etapa 5 "Gere GRU"** (sem confirmar) — §15.13.
+- ✅ **Mapear a tela de confirmação da etapa 5 "Gere GRU"** (sem confirmar)
+  — **FEITO** (tela "Dados da GRU", botão "Gerar GRU e Salvar" — §15.11).
+- **Mapear o pós-protocolo** (após "Gerar GRU e Salvar") — só em processo
+  real/controlado (§15.14).
 - Mapear o formulário completo do **cadastro inicial** (validações, obrigatórios,
   como latitude/longitude são preenchidas).
 - Confirmar em que etapa as **certidões/antecedentes** (`pf-antecedentes` etc.)
@@ -223,10 +226,12 @@ detalhados e integrados em `docs/05-logs-auditoria-lgpd.md` (seção Gov.br/SINA
 > **quais etapas/telas** aparecem **até antes da confirmação final** — sem
 > protocolar. A Guia de Tráfego é o **primeiro processo do MVP comercial**.
 >
-> **Status desta etapa:** 🟡 **PARCIALMENTE EXECUTADA** — fluxo mapeado até a
-> etapa 5 ("Gere GRU"); **falta mapear a tela de confirmação** dessa etapa
-> (ver §15.13).
-> **Data do reconhecimento:** 2026-07-17
+> **Status desta etapa:** 🟢 **FLUXO MAPEADO até o checkpoint final** — inclui a
+> tela de confirmação **"Dados da GRU"** e o botão final **"Gerar GRU e Salvar"**
+> (ver §15.11). **Falta apenas** mapear o **pós-protocolo** (o que aparece
+> **depois** de clicar em "Gerar GRU e Salvar"), o que **só pode ser observado em
+> processo real/controlado** (ver §15.14).
+> **Data do reconhecimento:** 2026-07-17 (confirmação da GRU consolidada no mesmo dia)
 >
 > **Regras desta sessão de reconhecimento:**
 > - Navegar **só até antes da confirmação final**; **não protocolar** processo real.
@@ -391,28 +396,87 @@ Nº de Lote · Quantidade.
 > **NÃO gera/protocola imediatamente.**
 
 **Comportamento observado:**
-- Ao clicar na etapa 5 **"Gere GRU"**, o sistema **abre uma tela de confirmação
-  antes** de gerar/protocolar de fato.
-- A **ação realmente irreversível** é a **confirmação final** após essa tela.
+- Ao clicar na etapa 5 **"Gere GRU"**, o sistema abre a tela/seção
+  **"Dados da GRU"** (detalhada em §15.11) **antes** de gerar/protocolar.
+- A ação **realmente irreversível NÃO é** apenas entrar na etapa 5 — é clicar no
+  botão **"Gerar GRU e Salvar"** dentro da tela "Dados da GRU".
 
 **Registrar:**
-- A automação futura **pode navegar até a tela de confirmação sem protocolar**.
-- A **tela de confirmação** deve ser tratada como **checkpoint final**.
-- A **confirmação final** deve ser tratada como **ação irreversível**.
-- **Não confirmar/protocolar em testes** sem intenção real.
-
-**Impacto no risco operacional:** a confirmação intermediária **reduz o risco**
-da automação. **Antes da confirmação final**, o nosso app/painel deve validar:
-serviço selecionado · finalidade · tipo de atividade · tipo de PCE · endereço de
-origem · endereço de destino · arma/PCE selecionada · documento de identificação
-anexado · justificativa · consentimento/autorização do usuário · pagamento
-confirmado · **revisão humana nos primeiros 50–100 processos**.
+- A automação futura **pode navegar até a tela "Dados da GRU" sem protocolar**.
+- A tela **"Dados da GRU"** é o **checkpoint final seguro**.
+- O botão **"Gerar GRU e Salvar"** é a **ação irreversível**.
+- **Não clicar em "Gerar GRU e Salvar" em testes** sem intenção real.
 
 - **Screenshot esperado:** `gt-05-gerar-gru.png` (**parar antes de confirmar**)
 
 ---
 
-### 15.11 — Classificação técnica da Guia de Tráfego
+### 15.11 — Tela "Dados da GRU" (checkpoint final antes do protocolo)
+
+> Esta é a tela aberta pela etapa 5 **"Gere GRU"**. É o **último ponto seguro**
+> de observação: **nada é protocolado** até clicar em **"Gerar GRU e Salvar"**.
+
+**O que faz o botão "Gerar GRU e Salvar" (observação operacional):**
+- o processo é **protocolado**;
+- o **PDF da GRU é gerado**;
+- a **GRU é salva**;
+- o **número de protocolo passa a existir**.
+
+**Campos observados em "Dados da GRU":**
+
+| Campo | Valor observado |
+|-------|-----------------|
+| Nome do Contribuinte/Recolhedor | (dado do usuário — não versionar) |
+| CPF/CNPJ Contribuinte | (PII — não versionar) |
+| **UG/Gestão** | 167086/00001 |
+| **Nome da Unidade Favorecida** | Fundo do Exército |
+| **Código de Recolhimento** | 11300-0 |
+| Número de Referência | (gerado pelo sistema) |
+| Data de Vencimento | (dinâmica — ler do sistema) |
+| **Valor Principal** | 20,00 |
+| **Valor Total** | 20,00 |
+| Instruções | ver abaixo |
+
+**Instruções observadas:**
+> "Recolhimento de Tx de Fisc Prod Contr EB"
+> "Serviço de emissão de Guia de Tráfego (CAC)"
+
+**Seção "Acompanhamento da GRU"** — tabela com colunas:
+Nr de Protocolo · Data de Vencimento · Data de Pagamento · Valor Total ·
+Situação da GRU.
+- No momento observado (**antes de gerar**): **"Não existem itens para mostrar."**
+
+**Botões observados:** **Cancelar** · **Gerar GRU e Salvar**.
+
+**⚠️ Risco crítico:** o botão **"Gerar GRU e Salvar"** deve ser tratado como
+**ação final irreversível**. **Não clicar** em ambiente de reconhecimento/teste
+sem intenção real.
+
+**Checklist de validação ANTES de clicar em "Gerar GRU e Salvar"**
+(nosso app/painel deve validar):
+- usuário **pagou via Pix**;
+- **serviço correto**: Guia de Tráfego;
+- **valor da GRU**: 20,00;
+- **contribuinte** correto;
+- **CPF** correto;
+- **UG/Gestão** (167086/00001);
+- **Fundo do Exército**;
+- **código de recolhimento** (11300-0);
+- **vencimento**;
+- **instruções**;
+- **origem** (Endereço SIGMA);
+- **destino** (evento/clube);
+- **arma/PCE** selecionada;
+- **documento anexado**;
+- **justificativa**;
+- **consentimento do usuário**;
+- **revisão humana nos primeiros 50–100 processos**.
+
+- **Screenshot esperado:** `gt-06-dados-gru.png` (**mascarar nome/CPF; não clicar em "Gerar GRU e Salvar"**)
+
+---
+
+### 15.12 — Classificação técnica da Guia de Tráfego
 
 **Guia de Tráfego: `SEMIAUTOMATICO` — com alta chance de automação futura.**
 
@@ -420,13 +484,16 @@ Motivos:
 - exige **login Gov.br**;
 - depende de **sessão SINARM/CAC** (~60 min);
 - possui **dados e seleção de armamento sensíveis**;
-- possui **clique final irreversível** após a confirmação;
+- possui **clique final irreversível** ("Gerar GRU e Salvar");
 - **mas** o fluxo é **relativamente fixo**, **sem certidões observadas** e com
   **taxa de R$ 20**.
 
+**Risco operacional:** **diminuiu** — existe a tela **"Dados da GRU"** como
+**checkpoint** antes da ação final, permitindo revisão/validação sem protocolar.
+
 ---
 
-### 15.12 — Fluxo MVP provável para a Guia de Tráfego
+### 15.13 — Fluxo MVP provável para a Guia de Tráfego
 
 1. Usuário escolhe Guia de Tráfego no app.
 2. App coleta dados do destino/clube/evento.
@@ -445,38 +512,40 @@ Motivos:
 13. Sistema anexa **Documento de Identificação Pessoal**.
 14. Sistema preenche **justificativa** "Guia para treino".
 15. Sistema avança para **"Gere GRU"**.
-16. Sistema chega na **tela de confirmação**.
-17. Nosso app/painel realiza **revisão final interna**.
-18. Após confirmação/autorização, sistema **confirma a geração da GRU/protocolo**.
-19. Processo é **protocolado** e **GRU é gerada**.
+16. Sistema chega à tela **"Dados da GRU"** (checkpoint).
+17. Sistema **valida os dados da GRU** (§15.11) + nosso app/painel faz **revisão
+    final interna** / autorização.
+18. **Somente após revisão/autorização**, sistema clica em **"Gerar GRU e Salvar"**.
+19. Processo é **protocolado** e **GRU é gerada**; sistema **captura o número de
+    protocolo e o PDF da GRU**.
 20. **Empresa paga GRU manualmente.**
 21. Usuário **acompanha status**.
 
 ---
 
-### 15.13 — Próximo reconhecimento recomendado
+### 15.14 — Próximo reconhecimento recomendado (pós-protocolo)
 
-**Mapear a tela de confirmação da etapa 5 "Gere GRU" — SEM clicar na confirmação
-final.**
+**Mapear o resultado APÓS clicar em "Gerar GRU e Salvar" — apenas em um processo
+real/controlado** (não em teste sem intenção). Isso protocola de verdade, então
+só fazer quando houver um processo legítimo a protocolar.
 
 O que observar:
-- texto exibido;
-- dados resumidos;
-- se mostra **valor da GRU**;
-- se mostra **serviço / finalidade / PCE**;
-- se mostra **origem / destino**;
-- se mostra **documento anexado**;
-- **rótulo exato do botão final**;
-- se há opção **voltar / cancelar**;
-- se há **termo / declaração** antes de confirmar.
+- **número de protocolo** gerado;
+- **PDF da GRU** (conteúdo);
+- **local onde baixar/imprimir** a GRU;
+- **status inicial** do processo;
+- se aparece em **"Listar Processo"**;
+- se aparece em **"Acompanhamento da GRU"**;
+- **como consultar depois**;
+- **como identificar compensação/pagamento** (quando a GRU é quitada).
 
-- **Screenshot esperado:** `gt-06-confirmacao.png` (**parar antes de confirmar**)
+- **Screenshot esperado:** `gt-07-pos-protocolo.png` (**só em processo real; mascarar PII**)
 
 ---
 
-### 15.14 — Não fazer agora
+### 15.15 — Não fazer agora
 
-- ❌ Não clicar na **confirmação final** em teste.
+- ❌ Não clicar em **"Gerar GRU e Salvar"** em reconhecimento/teste.
 - ❌ Não **protocolar** processo real sem intenção.
 - ❌ Não iniciar o **módulo de certidões (M1)** agora.
 - ❌ Não implementar **código** ainda.
@@ -485,7 +554,7 @@ O que observar:
 
 ---
 
-### 15.15 — Registro de screenshots (Guia de Tráfego)
+### 15.16 — Registro de screenshots (Guia de Tráfego)
 
 | Etapa | Descrição | Arquivo | Observações (sem PII) |
 |-------|-----------|---------|------------------------|
@@ -494,4 +563,5 @@ O que observar:
 | GT-3 | Etapa 3 — Condições de Exigências (Doc. Identificação) | `gt-03-exigencias.png` | |
 | GT-4 | Tabela PCE / armamento | `gt-04-pce.png` | mascarar Nº Série / SIGMA |
 | GT-5 | Etapa 5 — Gere GRU (antes de confirmar) | `gt-05-gerar-gru.png` | **parar antes de confirmar** |
-| GT-6 | Tela de confirmação da etapa 5 (próximo recon.) | `gt-06-confirmacao.png` | **não confirmar** |
+| GT-6 | Tela "Dados da GRU" (checkpoint final) | `gt-06-dados-gru.png` | mascarar nome/CPF; **não clicar em "Gerar GRU e Salvar"** |
+| GT-7 | Pós-protocolo (protocolo + PDF da GRU) | `gt-07-pos-protocolo.png` | **só em processo real**; mascarar PII |

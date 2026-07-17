@@ -94,9 +94,9 @@ Reconhecimento manual em 2026-07-16 (detalhes em `docs/09-reconhecimento-sinarm-
 - **Instabilidade:** a **autorização precisou ser clicada duas vezes**.
 - **Classificação técnica atual do módulo: `SEMIAUTOMATICO`.**
 
-### 5.1 Guia de Tráfego — reconhecimento parcial (2026-07-17)
+### 5.1 Guia de Tráfego — reconhecimento (2026-07-17)
 
-Fluxo mapeado até a etapa 5 (detalhes em `docs/09-reconhecimento-sinarm-cac.md §15`):
+Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-sinarm-cac.md §15`):
 
 - **Caminho:** Solicitação de Serviço → Pessoa Física (PF) → **Preencher
   Formulário (Requerimento)**. URL: `.../#/preencher-formulario`.
@@ -114,10 +114,17 @@ Fluxo mapeado até a etapa 5 (detalhes em `docs/09-reconhecimento-sinarm-cac.md 
   Nº Série, Nº Lote, Qtde) + seleção do acervo — **exige validação forte**.
 - **Justificativa:** texto livre; padrão "Guia para treino".
 - **Validade da Guia observada:** 17/01/2027 (ler **dinamicamente**, nunca hardcoded).
-- **"Gere GRU" NÃO protocola direto:** abre **confirmação intermediária**; a ação
-  irreversível é a **confirmação final** — automação pode parar no checkpoint.
+- **"Gere GRU" NÃO protocola direto:** abre a tela **"Dados da GRU"** (checkpoint).
+- **Tela "Dados da GRU" mapeada:** exibe contribuinte, CPF, **UG/Gestão 167086/00001**,
+  **Fundo do Exército**, **Código de Recolhimento 11300-0**, nº de referência,
+  vencimento, **Valor 20,00**, instruções e seção **"Acompanhamento da GRU"**
+  (vazia antes de gerar). Botões: **Cancelar** · **Gerar GRU e Salvar**.
+- **Botão final = "Gerar GRU e Salvar"** → ação **irreversível**: protocola, gera o
+  **PDF da GRU**, salva e cria o **número de protocolo**. É o **checkpoint seguro**
+  antes do protocolo — **não clicar em teste**.
 - **Classificação da Guia de Tráfego: `SEMIAUTOMATICO`** com **alta chance de
-  automação futura** (fluxo fixo, sem certidões, taxa baixa).
+  automação futura** (fluxo fixo, sem certidões, taxa baixa); **risco operacional
+  reduzido** pela existência do checkpoint.
 
 ## 6. Cadastro inicial PF
 
@@ -136,22 +143,25 @@ Fluxo mapeado até a etapa 5 (detalhes em `docs/09-reconhecimento-sinarm-cac.md 
 
 ## 7. Próximo passo planejado
 
-**Reconhecimento da Guia de Tráfego INICIADO** — fluxo mapeado até a etapa 5
-("Gere GRU"). Detalhes em `docs/09-reconhecimento-sinarm-cac.md §15`.
+**Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
+tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
+`docs/09-reconhecimento-sinarm-cac.md §15`.
 
-**Conclusões preliminares:**
+**Conclusões:**
 - **Guia de Tráfego parece VIÁVEL para o MVP.**
 - **Certidões/antecedentes NÃO observadas** neste fluxo → **M1 provavelmente NÃO
   é bloqueador** para o MVP da Guia (pode ficar para CR novo/renovação/processos
   maiores, salvo reconhecimento posterior em contrário).
 - **Cadastro inicial PF = fallback**, não fluxo obrigatório da Guia.
-- **Confirmação intermediária antes de gerar GRU reduz o risco** da automação.
+- **Tela "Dados da GRU" é o checkpoint seguro** antes do protocolo; o botão final
+  **"Gerar GRU e Salvar"** é **irreversível** (protocola + gera PDF + cria protocolo).
+  Isso **reduz o risco operacional** da automação futura.
 
-**Próximo reconhecimento manual: mapear a tela de confirmação da etapa 5
-"Gere GRU" — SEM clicar na confirmação final** (ver §15.13).
-Observar: texto exibido, dados resumidos, valor da GRU, serviço/finalidade/PCE,
-origem/destino, documento anexado, rótulo exato do botão final, opção
-voltar/cancelar e eventual termo/declaração.
+**Próximo reconhecimento — mapear o PÓS-PROTOCOLO** (o que aparece **depois** de
+clicar em "Gerar GRU e Salvar), **apenas em processo real/controlado** (ver §15.14).
+Observar: número de protocolo, PDF da GRU, onde baixar/imprimir, status inicial,
+se aparece em "Listar Processo" e "Acompanhamento da GRU", como consultar depois
+e como identificar compensação/pagamento. **Por enquanto NÃO seguir para automação.**
 
 ## 8. Regras permanentes de segurança
 
@@ -177,26 +187,26 @@ voltar/cancelar e eventual termo/declaração.
 ### ➡️ PRÓXIMO PASSO (explícito)
 
 > **Reconhecimento da Guia de Tráfego consolidado** em
-> `docs/09-reconhecimento-sinarm-cac.md §15` (fluxo mapeado até a etapa 5
-> "Gere GRU"). **Falta apenas mapear a tela de confirmação** dessa etapa.
+> `docs/09-reconhecimento-sinarm-cac.md §15` — **fluxo mapeado até o checkpoint
+> final** (tela "Dados da GRU" + botão "Gerar GRU e Salvar", §15.11).
 >
-> **Próximo passo:** **mapear a tela de confirmação da etapa 5 "Gere GRU",
-> SEM clicar na confirmação final** (não protocolar).
+> **Próximo passo (futuro):** **mapear o PÓS-PROTOCOLO** — o que aparece **depois**
+> de clicar em "Gerar GRU e Salvar" — **apenas em processo real/controlado**
+> (isso protocola de verdade). **Por enquanto NÃO seguir para automação.**
 
-**O que observar na tela de confirmação (§15.13):**
-1. Texto exibido.
-2. Dados resumidos.
-3. Se mostra **valor da GRU**.
-4. Se mostra **serviço / finalidade / PCE**.
-5. Se mostra **origem / destino**.
-6. Se mostra **documento anexado**.
-7. **Rótulo exato do botão final.**
-8. Se há opção **voltar / cancelar**.
-9. Se há **termo / declaração** antes de confirmar.
+**O que observar no pós-protocolo (§15.14):**
+1. **Número de protocolo** gerado.
+2. **PDF da GRU** (conteúdo).
+3. **Local onde baixar/imprimir** a GRU.
+4. **Status inicial** do processo.
+5. Se aparece em **"Listar Processo"**.
+6. Se aparece em **"Acompanhamento da GRU"**.
+7. **Como consultar depois.**
+8. **Como identificar compensação/pagamento.**
 
-→ Screenshot esperado: `gt-06-confirmacao.png` (**parar antes de confirmar**).
+→ Screenshot esperado: `gt-07-pos-protocolo.png` (**só em processo real; mascarar PII**).
 
-**Ao voltar:** preencher §15.13 com os achados; onde não observar, "não
+**Ao voltar:** preencher §15.14 com os achados; onde não observar, "não
 observado"; onde houver dúvida, "inconclusivo — confirmar".
 
 ### Regras de retomada (permanentes nesta etapa)
