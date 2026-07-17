@@ -138,14 +138,28 @@ protocolo imediatamente, e quais partes são automatizáveis.
 
 ## 9. Para retomar
 
-**Sequência de leitura ao abrir o projeto amanhã:**
+**Sequência de leitura ao abrir o projeto na próxima sessão:**
 
 1. Leia **este arquivo** (`docs/00-contexto-atual.md`) primeiro.
 2. Depois leia `docs/09-reconhecimento-sinarm-cac.md`.
-3. **Próxima tarefa provável:** preparar/consolidar o **reconhecimento manual da
-   Guia de Tráfego** (§15 do doc 09).
 
-**Regras de retomada:**
-- **Não iniciar código sem confirmação.**
-- **Não instalar dependências sem confirmação.**
-- **Continuar documentando antes de implementar.**
+### ➡️ PRÓXIMO PASSO (explícito)
+
+> **Consolidar o reconhecimento manual da Guia de Tráfego dentro do SINARM/CAC,
+> seguindo o roteiro do §15 do `docs/09-reconhecimento-sinarm-cac.md`.**
+
+**Foco imediato — mapear manualmente:**
+1. **Caminho** da Guia de Tráfego (menu → submenu → tela).
+2. **Formulário** (campos, obrigatórios, tipos).
+3. **Anexos / documentos** exigidos.
+4. **Certidões** exigidas ou não (e se é upload manual, busca automática ou campo próprio).
+5. **Etapa de confirmação** (parar antes de enviar).
+6. **Momento em que a GRU aparece** (antes/depois do protocolo, valor, vencimento).
+
+### Regras de retomada (permanentes nesta etapa)
+
+- ❌ **Não implementar código ainda.**
+- ❌ **Não instalar dependências.**
+- ❌ **Não automatizar Gov.br/SINARM ainda.**
+- ✅ **Continuar documentando antes de implementar.**
+- ✅ Nada de código/dependências/automação **sem confirmação explícita** do usuário.
