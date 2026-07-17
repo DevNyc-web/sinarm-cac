@@ -1,0 +1,77 @@
+// Schema Prisma inicial MINIMO — Fase 1 (docs/16 §11).
+// Sem PII, sem pagamento, sem documentos. Apenas o necessario para provar a stack.
+// NAO ha migrations nesta fase (schema ainda nao congelado — docs/12 §20 / docs/15 §7).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Catalogo de tipos de processo. MVP: apenas Guia de Trafego. Ver docs/12 §3.4.
+model ProcessType {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  name         String
+  baseFeeCents Int       @map("base_fee_cents")
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  processes    Process[]
+
+  @@map("process_types")
+}
+
+/// Esqueleto de processo SEM PII (Fase 1). Campos sensiveis (usuario, documento,
+/// arma/PCE, pagamento, GRU) chegam em fases posteriores. Ver docs/12 §3.3.
+model Process {
+  id               String           @id @default(uuid())
+  code             String           @unique
+  processTypeId    String           @map("process_type_id")
+  processType      ProcessType      @relation(fields: [processTypeId], references: [id])
+  internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
+  userFacingStatus UserFacingStatus @default(RECEBIDO) @map("user_facing_status")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  @@map("processes")
+}
+
+/// Status internos (operacao). Ver docs/12 §6.
+enum InternalStatus {
+  RASCUNHO
+  AGUARDANDO_PAGAMENTO
+  PAGO_EM_FILA
+  AGUARDANDO_LOGIN_GOVBR
+  SESSAO_GOVBR_EXPIRADA
+  EM_PREENCHIMENTO_SINARM
+  EM_REVISAO_HUMANA
+  BLOQUEADO_INSTABILIDADE
+  EXCECAO_DOC_INVALIDO
+  EXCECAO_ARMA_DIVERGENTE
+  EXCECAO_DESTINO_INCOMPLETO
+  PROTOCOLADO_GRU_GERADA
+  GRU_PAGA_EMPRESA
+  CONCLUIDO
+  CANCELADO_REEMBOLSADO
+
+  @@map("internal_status")
+}
+
+/// Status visiveis ao usuario. Ver docs/12 §7.
+enum UserFacingStatus {
+  RECEBIDO
+  PAGAMENTO_CONFIRMADO
+  AGUARDANDO_SEU_LOGIN_GOVBR
+  EM_ANDAMENTO
+  AGUARDANDO_SISTEMA_PF
+  PRECISAMOS_DE_UM_AJUSTE
+  PROTOCOLADO
+  CONCLUIDO
+  CANCELADO
+
+  @@map("user_facing_status")
+}

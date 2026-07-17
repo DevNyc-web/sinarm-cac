@@ -42,6 +42,38 @@ Depois, leia na ordem:
 9. [`docs/09-reconhecimento-sinarm-cac.md`](docs/09-reconhecimento-sinarm-cac.md) — reconhecimento do fluxo SINARM/CAC via Gov.br (M4/M5)
 - [`docs/legal/analise-termos-de-uso.md`](docs/legal/analise-termos-de-uso.md) — análise jurídica por provedor
 
+## Rodando o esqueleto do app (Fase 1)
+
+> **Esqueleto técnico** do produto (Next.js + TypeScript + Prisma), conforme
+> [`docs/16-fase-1-esqueleto-tecnico.md`](docs/16-fase-1-esqueleto-tecnico.md).
+> **Sem dados reais, sem PII, sem Pix, sem upload real, sem automação SINARM.**
+
+Pré-requisitos: Node 18.18+ e um **Postgres local** (opcional para navegar; o
+healthcheck degrada com elegância se o banco não estiver ativo).
+
+```bash
+# 1. Instalar dependências (roda `prisma generate` no postinstall)
+npm install
+
+# 2. Configurar ambiente local (NUNCA commitar .env)
+cp .env.example .env   # e ajuste DATABASE_URL para seu Postgres local
+
+# 3. (Opcional) criar o schema local e dados fictícios
+npm run db:push        # aplica o schema no Postgres LOCAL (sem migrations)
+npm run seed           # dados fictícios (ProcessType + processo de demo)
+
+# 4. Rodar em desenvolvimento
+npm run dev            # http://localhost:3000
+
+# Verificações
+npm run typecheck
+npm run lint
+npm run build
+```
+
+Páginas placeholder: `/` (landing), `/login`, `/dashboard`, `/processos/novo`,
+`/admin`. Healthcheck: `/api/health`.
+
 ## O que NÃO existe / NÃO será construído agora
 
 - App/telas finais
