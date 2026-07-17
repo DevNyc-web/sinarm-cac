@@ -58,7 +58,14 @@ decisões improvisadas no meio da implementação.
   **região/LGPD**.
 - **Alternativa aceitável:** Postgres gerenciado **Neon/RDS** (Storage/Auth à parte)
   ou **Postgres self-hosted** em VPS.
-- **Decisão escolhida:** `PENDENTE`
+- **Decisão escolhida (2026-07-17):** ✅ **DECIDIDO PARA A FASE 1** —
+  **Postgres local em desenvolvimento + Prisma**.
+  - **Produção:** ainda `PENDENTE` — a escolher entre **Supabase Postgres**,
+    **Neon** ou outro Postgres gerenciado.
+  - **Justificativa:** destrava o **esqueleto do app**, a **modelagem inicial** e o
+    **desenvolvimento local** sem assumir o fornecedor final de produção.
+  - **Restrição:** **não usar dados reais / PII real** ainda.
+  - **Efeito:** esta decisão **libera iniciar a Fase 1** do roadmap (doc 14).
 
 ### 3.2 Storage de documentos
 - **Recomendação padrão:** **Supabase Storage** (se o banco for Supabase), atrás de
@@ -156,61 +163,75 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
 
 **Bloqueiam apenas as fases que dependem deles — não o início geral:**
 
+0. ✅ **Banco de dados (3.1): RESOLVIDO para a Fase 1** — **Postgres local +
+   Prisma**. Deixa de ser bloqueador do **início**. Produção segue `PENDENTE`
+   (Supabase/Neon/outro), o que **não** bloqueia F1.
 1. **Provedor Pix (3.4 / §7 #8):** bloqueia **Fase 5 (Pix)**. Não bloqueia F1–F4.
 2. **Estratégia de criptografia + KMS (3.10 / §7 #9):** bloqueia **persistir PII
    real**. Não bloqueia esqueleto/estrutura, mas **precisa estar pronto antes de
    dados reais** (F4 em diante / F11).
-3. **Banco de dados (3.1):** bloqueia decisões dependentes (3.2 storage, 3.8 auth).
-   É a **primeira** escolha a fechar para destravar as demais.
+3. **Storage de documentos (3.2):** bloqueia **upload real de documentos
+   sensíveis** (F4). Não bloqueia F1–F3.
 4. **Retenção/LGPD (3.11 / §7 #4):** bloqueia **fechar política de expurgo** (F10),
    não o início.
 5. **Multi-arma (§7 #3)** e **campos Pix (§7 #8):** bloqueiam **congelar o schema**
    dessas tabelas — mas o schema pode ser modelado incrementalmente por fase.
 
-> **Nenhum** desses impede começar a **Fase 1 (esqueleto)**. Eles impõem **ordem**:
-> fechar **3.1 (banco)** primeiro, depois storage/auth; deixar **Pix** e **cifra**
-> prontos antes das fases que tocam pagamento e PII real.
+> Com **3.1 decidido**, a **Fase 1 (esqueleto)** está **destravada**. Os demais
+> itens impõem **ordem**: **Pix** e **cifra/storage** prontos **antes** das fases
+> que tocam pagamento e **PII real**.
 
 ---
 
 ## 9. O que pode começar mesmo com pendências
 
-Mesmo com decisões `PENDENTE`, é seguro avançar (após confirmação para iniciar código):
+Com **3.1 decidido (Postgres local + Prisma)**, é seguro avançar (após confirmação
+para iniciar código):
 
 - **Fase 0 restante:** estrutura de pastas (doc 07), convenções (lint/commits),
   **`.env.example`** (sem segredos), wireframes.
-- **Fase 1 (esqueleto):** Next.js + TS, camadas, healthcheck, **config Zod** — não
-  exige provedor externo definido (banco pode ser Postgres local no início).
+- **Fase 1 (esqueleto):** Next.js + TS, camadas, healthcheck, **config Zod**,
+  conexão com **Postgres local** via Prisma — sem provedor externo.
 - **Modelagem incremental** das tabelas **sem PII/pagamento** (ex.: `process_types`,
   estados) atrás do Prisma, com repositórios.
-- **UI neutra** e formulários do usuário (F3) com validação Zod, usando storage/DB
-  **local** até os provedores serem escolhidos.
+- **UI neutra** e formulários do usuário (F3) com validação Zod, usando **DB local**
+  e dados **fictícios** até os provedores serem escolhidos.
 - **Design de auditoria/eventos** (doc 12 §12) como contrato, independente do provedor.
 
-> Regra: **não** conectar provedores de produção, **não** persistir **PII real** e
-> **não** processar **Pix real** enquanto 3.1/3.4/3.10/3.11 estiverem `PENDENTE`.
+> **Regras enquanto storage/criptografia/retenção estiverem `PENDENTE`:**
+> - **Não usar dados reais / PII real.**
+> - **Não implementar pagamento** (Pix).
+> - **Não implementar upload real de documentos sensíveis** (F4).
+> - **Não implementar automação SINARM/CAC.**
+> - **Não** conectar provedores de **produção**.
+> Ou seja: Fase 1 roda **100% com Postgres local e dados fictícios**.
 
 ---
 
 ## 10. Critério para liberar início da implementação
 
-**Liberar a Fase 1 (código do esqueleto)** quando:
-- [ ] **Banco (3.1)** escolhido (ou aceite explícito de começar com Postgres local).
+**Liberar a Fase 1 (código do esqueleto):**
+- [x] **Banco (3.1)** escolhido → ✅ **Postgres local + Prisma** (2026-07-17).
 - [ ] **Ambiente de deploy (3.7)** ao menos direcionado (pode ser confirmado até F1 fechar).
 - [ ] **Estrutura de pastas** e convenções definidas.
 - [ ] **`.env.example`** rascunhado (chaves do doc 13 §16, sem valores).
 - [ ] Confirmação **explícita** do usuário para começar a codar.
 
+> **Situação:** o único bloqueador técnico do início (banco) está **resolvido para
+> a Fase 1**. Falta apenas preparar estrutura/convenções e a **confirmação
+> explícita** para começar a codar — sempre com **Postgres local e dados
+> fictícios**.
+
 **Liberar fases sensíveis:**
-- [ ] **Fase 4/PII real:** **criptografia + KMS (3.10)** definidos.
+- [ ] **Fase 4/PII real:** **storage (3.2)** + **criptografia + KMS (3.10)** definidos.
 - [ ] **Fase 5/Pix:** **provedor Pix (3.4)** e **campos/idempotência (§7 #8/#10)** definidos.
 - [ ] **Fase 10/LGPD:** **retenção (3.11)** definida.
 - [ ] **Fase 12/piloto:** **hardening (F11)** aprovado; provedores de produção ativos.
 
-> **Resumo:** dá para **começar o esqueleto** assim que **o banco** estiver
-> decidido (ou aceito Postgres local) e houver **confirmação explícita**. Pix e
-> criptografia **não** travam o início, mas **travam** as fases de pagamento e de
-> PII real — e precisam estar prontos **antes** delas.
+> **Resumo:** a **Fase 1 está liberada** (banco decidido) — falta só estrutura +
+> confirmação. **Pix, storage, criptografia e retenção** continuam `PENDENTE` e
+> **travam** as fases de pagamento, upload real e PII real — devem estar prontos
+> **antes** delas.
 
 ---
 
@@ -218,7 +239,7 @@ Mesmo com decisões `PENDENTE`, é seguro avançar (após confirmação para ini
 
 | # | Decisão | Recomendação padrão | Escolhida |
 |---|---------|---------------------|-----------|
-| 3.1 | Banco | Supabase (Postgres gerenciado) | `PENDENTE` |
+| 3.1 | Banco | Supabase (Postgres gerenciado) | ✅ **Fase 1: Postgres local + Prisma**; produção `PENDENTE` |
 | 3.2 | Storage | Supabase Storage (via adapter) | `PENDENTE` |
 | 3.3 | Redis/fila | Redis gerenciado + worker | `PENDENTE` |
 | 3.4 | Pix | PSP BR com Pix + webhook | `PENDENTE` |
