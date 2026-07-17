@@ -76,6 +76,7 @@ Arquivos existentes:
 - `docs/10-mvp-guia-de-trafego.md`
 - `docs/11-painel-admin-operacao.md`
 - `docs/12-modelo-dados-mvp.md`
+- `docs/13-stack-tecnica-mvp.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Nenhum código de aplicação foi escrito.** Nenhuma dependência instalada.
