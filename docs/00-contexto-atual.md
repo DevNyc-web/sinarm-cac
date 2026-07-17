@@ -79,6 +79,7 @@ Arquivos existentes:
 - `docs/13-stack-tecnica-mvp.md`
 - `docs/14-roadmap-implementacao-mvp.md`
 - `docs/15-decisoes-fase-0.md`
+- `docs/16-fase-1-esqueleto-tecnico.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Nenhum código de aplicação foi escrito.** Nenhuma dependência instalada.
