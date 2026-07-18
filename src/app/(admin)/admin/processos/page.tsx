@@ -12,11 +12,30 @@ import {
   PAYMENT_STATUS_LABELS,
   PRIORITY_LABELS,
 } from "@/server/processes/statusLabels";
+import {
+  READINESS_LABELS,
+  SIGNAL_LABELS,
+  SLA_LABELS,
+  type ReadinessLevel,
+  type SlaStatus,
+} from "@/server/processes/operationalSignals";
 import { getAdminQueue, type AdminQueueRow } from "@/server/services/getAdminQueue";
 import { isOperationalStatus } from "@/server/services/updateProcessOperations";
 
 const selectClass =
   "mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none";
+
+const READINESS_CLASS: Record<ReadinessLevel, string> = {
+  NAO_PRONTO: "text-neutral-600",
+  QUASE_PRONTO: "font-medium text-amber-700",
+  PRONTO_PARA_PROTOCOLO_MANUAL: "font-medium text-emerald-700",
+};
+
+const SLA_CLASS: Record<SlaStatus, string> = {
+  DENTRO_DO_PRAZO: "text-neutral-600",
+  ATENCAO: "font-medium text-amber-700",
+  ATRASADO: "font-medium text-red-700",
+};
 
 /** Fila admin com filtros — Fase 6 (docs/11 §4). */
 export default async function AdminProcessosPage({
@@ -166,7 +185,9 @@ export default async function AdminProcessosPage({
                   <th className="px-4 py-3">Responsavel</th>
                   <th className="px-4 py-3">Pagamento</th>
                   <th className="px-4 py-3">Documento</th>
-                  <th className="px-4 py-3">Criado</th>
+                  <th className="px-4 py-3">Prontidao</th>
+                  <th className="px-4 py-3">SLA</th>
+                  <th className="px-4 py-3">Sinalizadores</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -211,8 +232,38 @@ export default async function AdminProcessosPage({
                     <td className="px-4 py-3 text-neutral-600">
                       {row.documentStatus ? DOCUMENT_STATUS_LABELS[row.documentStatus] : "—"}
                     </td>
-                    <td className="px-4 py-3 text-neutral-600">
-                      {row.createdAt.toLocaleDateString("pt-BR")}
+                    <td className="px-4 py-3">
+                      <span className={READINESS_CLASS[row.readinessLevel]}>
+                        {READINESS_LABELS[row.readinessLevel]}
+                      </span>
+                      <span className="block text-xs text-neutral-500">
+                        {row.readinessMetCount}/{row.readinessTotal}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.slaStatus ? (
+                        <>
+                          <span className={SLA_CLASS[row.slaStatus]}>
+                            {SLA_LABELS[row.slaStatus]}
+                          </span>
+                          <span className="block text-xs text-neutral-500">
+                            {row.hoursSinceCreated}h · {row.createdAt.toLocaleDateString("pt-BR")}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.signals.length === 0 ? (
+                        <span className="text-neutral-400">—</span>
+                      ) : (
+                        <ul className="space-y-0.5 text-xs text-neutral-600">
+                          {row.signals.map((signal) => (
+                            <li key={signal}>· {SIGNAL_LABELS[signal]}</li>
+                          ))}
+                        </ul>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link

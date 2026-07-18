@@ -149,6 +149,10 @@ export function listAdminQueue(filters: AdminQueueFilters) {
       destination: { select: { eventName: true, city: true, uf: true } },
       payments: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
       documents: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      // Base dos indicadores derivados (Fase 6.5): ultimo evento para o SLA e
+      // itens marcados para prontidao. So chaves/grupo — nada sensivel.
+      statusEvents: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      checklistItems: { where: { checked: true }, select: { group: true } },
     },
     orderBy: { createdAt: filters.sort === "oldest" ? "asc" : "desc" },
   });

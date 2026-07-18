@@ -237,6 +237,29 @@ conferência **fictícia**, sem acessar SINARM e sem gerar GRU.
 O usuário vê, no próprio processo, um **status amigável** e apenas as
 **mensagens marcadas como visíveis** — nunca notas internas. Não escreva PII nas
 notas (docs/11 §19). Schema mudou: rode `npm run db:push`.
+
+### Indicadores operacionais (Fase 6.5)
+
+Fila e detalhe mostram, **derivados do estado atual** (nada é salvo, então nunca
+desatualiza — `src/server/processes/operationalSignals.ts`):
+
+- **Sinalizadores:** documento pendente · destino incompleto · pagamento
+  pendente · revisão pendente · pronto para checkpoint GRU · bloqueio manual
+  (este reaproveita o status `BLOQUEADO`).
+- **SLA interno (dev):** prazo **fictício** de 72h a partir da criação —
+  *dentro do prazo · atenção · atrasado*, com tempo desde a criação e desde o
+  último evento. É **interno**: não aparece para o usuário nem é promessa a ele.
+- **Prontidão operacional:** 6 critérios (documento aprovado, pagamento
+  confirmado, checklist de revisão, checkpoint GRU, sem bloqueios, responsável)
+  → *Não pronto · Quase pronto · **Pronto para protocolo manual***.
+  **Nada disso protocola** — o protocolo segue humano, manual e externo ao app.
+- **Pendências por responsável:** o que falta e o perfil sugerido (pagamento →
+  FINANCEIRO, revisão/checkpoint → OPERADOR, contato com o usuário → SUPORTE,
+  bloqueio → ADMIN), respeitando a segregação do docs/11 §3.
+- **Auditoria consolidada:** última ação/autor/perfil, entradas na trilha,
+  notas, checklist marcado e status atual de pagamento e documento.
+
+Sem mudança de schema nesta fase.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

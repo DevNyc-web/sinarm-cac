@@ -30,6 +30,10 @@ import { findMockUser, type AuthUser } from "@/server/auth/mockUsers";
 import { ROLE_LABELS, type Role } from "@/server/auth/roles";
 import { CHECKLIST_ITEMS } from "@/server/processes/checklistDefinition";
 import {
+  deriveOperationalIndicators,
+  type OperationalIndicators,
+} from "@/server/processes/operationalSignals";
+import {
   DOCUMENT_STATUS_LABELS,
   INTERNAL_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -132,6 +136,28 @@ export type AdminProcessDetail = {
   checklist: AdminChecklistView[];
   notes: AdminNoteView[];
   timeline: AdminTimelineEntry[];
+  /** Indicadores DERIVADOS (Fase 6.5) — nada persistido. */
+  indicators: OperationalIndicators;
+  audit: AdminAuditSummary;
+};
+
+/** Auditoria consolidada do processo (docs/11 §18) — contagens + ultima acao. */
+export type AdminAuditSummary = {
+  lastActionTitle: string | null;
+  lastActionAt: Date | null;
+  lastActorLabel: string | null;
+  /**
+   * Entradas da trilha consolidada — o mesmo que o operador ve no historico
+   * (docs/11 §5.10). Inclui eventos de status/operacao E as entradas derivadas
+   * de documento, checklist e pagamento; contar so `process_status_events`
+   * mostraria um numero menor do que a tela exibe.
+   */
+  eventCount: number;
+  noteCount: number;
+  checklistCheckedCount: number;
+  checklistTotal: number;
+  currentPaymentStatus: PaymentStatus | null;
+  currentDocumentStatus: DocumentStatus | null;
 };
 
 function actorLabel(mockUserId: string, role: string): string {
@@ -306,7 +332,38 @@ export async function getAdminProcessDetail(
   }
   timeline.sort((a, b) => a.at.getTime() - b.at.getTime());
 
+  // Indicadores derivados (Fase 6.5) a partir do estado ja carregado.
+  const currentPaymentStatus = paymentRows[0]?.status ?? null;
+  const currentDocumentStatus = documentRows[0]?.status ?? null;
+  const checkedItems = checklistRows.filter((row) => row.checked);
+  const indicators = deriveOperationalIndicators({
+    operationalStatus: process.operationalStatus,
+    createdAt: process.createdAt,
+    lastEventAt: statusEvents.at(-1)?.createdAt ?? null,
+    hasDestination: process.destination !== null,
+    documentStatus: currentDocumentStatus,
+    paymentStatus: currentPaymentStatus,
+    checkedRevisionCount: checkedItems.filter((row) => row.group === "REVISAO").length,
+    checkedGruCount: checkedItems.filter((row) => row.group === "GRU").length,
+    hasAssignee: process.assignedToMockUserId !== null,
+  });
+
+  const lastEntry = timeline.at(-1) ?? null;
+  const audit: AdminAuditSummary = {
+    lastActionTitle: lastEntry?.title ?? null,
+    lastActionAt: lastEntry?.at ?? null,
+    lastActorLabel: lastEntry?.detail ?? null,
+    eventCount: timeline.length,
+    noteCount: noteRows.length,
+    checklistCheckedCount: checkedItems.length,
+    checklistTotal: CHECKLIST_ITEMS.length,
+    currentPaymentStatus,
+    currentDocumentStatus,
+  };
+
   return {
+    indicators,
+    audit,
     id: process.id,
     code: process.code,
     processTypeName: process.processType.name,

@@ -17,6 +17,13 @@ import {
   PRIORITY_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
+import {
+  READINESS_LABELS,
+  SIGNAL_LABELS,
+  SLA_HOURS,
+  SLA_LABELS,
+  type SlaStatus,
+} from "@/server/processes/operationalSignals";
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
@@ -31,6 +38,12 @@ import {
 
 const controlClass =
   "mt-1 rounded-md border border-neutral-300 px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none";
+
+const SLA_CLASS: Record<SlaStatus, string> = {
+  DENTRO_DO_PRAZO: "text-neutral-700",
+  ATENCAO: "font-medium text-amber-700",
+  ATRASADO: "font-medium text-red-700",
+};
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
 const DETAIL_PERMISSIONS: readonly Permission[] = [
@@ -368,6 +381,135 @@ export default async function AdminProcessoDetalhePage({
               );
             })}
           </ul>
+        </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <Card className="text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">Prontidao operacional</p>
+            <Badge>{READINESS_LABELS[detail.indicators.readinessLevel]}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">
+            {detail.indicators.readinessMetCount} de {detail.indicators.readinessTotal} criterios.
+            <strong> Isto nao protocola nada</strong> — o protocolo no SINARM e manual, feito por
+            humano fora do app.
+          </p>
+          <ul className="mt-3 space-y-1">
+            {detail.indicators.readinessCriteria.map((criterion) => (
+              <li key={criterion.label} className="flex items-start gap-2">
+                <span className={criterion.met ? "text-emerald-600" : "text-neutral-400"}>
+                  {criterion.met ? "✓" : "✕"}
+                </span>
+                <span className={criterion.met ? "text-neutral-800" : "text-neutral-500"}>
+                  {criterion.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card className="text-sm">
+          <p className="font-medium">Sinalizadores</p>
+          {detail.indicators.signals.length === 0 ? (
+            <p className="mt-2 text-neutral-500">Nenhum sinalizador ativo.</p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {detail.indicators.signals.map((signal) => (
+                <li key={signal} className="flex items-start gap-2 text-neutral-700">
+                  <span className="text-amber-600">▲</span>
+                  {SIGNAL_LABELS[signal]}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-neutral-500">
+            Derivados do estado atual (documento, pagamento, destino, checklists, bloqueio) — nao
+            sao campos salvos, entao nunca ficam desatualizados.
+          </p>
+        </Card>
+
+        <Card className="text-sm">
+          <p className="font-medium">SLA interno (dev)</p>
+          {detail.indicators.sla ? (
+            <>
+              <p className="mt-2">
+                <span className={SLA_CLASS[detail.indicators.sla.status]}>
+                  {SLA_LABELS[detail.indicators.sla.status]}
+                </span>
+              </p>
+              <ul className="mt-2 space-y-0.5 text-xs text-neutral-600">
+                <li>Criado em {formatDateTime(detail.indicators.sla.createdAt)}</li>
+                <li>Tempo desde a criacao: {detail.indicators.sla.hoursSinceCreated}h</li>
+                <li>
+                  Tempo desde o ultimo evento:{" "}
+                  {detail.indicators.sla.hoursSinceLastEvent === null
+                    ? "—"
+                    : `${detail.indicators.sla.hoursSinceLastEvent}h`}
+                </li>
+                <li>Vencimento operacional: {formatDateTime(detail.indicators.sla.dueAt)}</li>
+              </ul>
+              <p className="mt-2 text-xs text-neutral-500">
+                Prazo <strong>ficticio e interno</strong> ({SLA_HOURS}h) para organizar a fila em
+                desenvolvimento. Nao e promessa ao usuario e nao aparece para ele.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-neutral-500">Processo encerrado — SLA nao se aplica.</p>
+          )}
+        </Card>
+
+        <Card className="text-sm">
+          <p className="font-medium">Pendencias por responsavel</p>
+          {detail.indicators.pendings.length === 0 ? (
+            <p className="mt-2 text-neutral-500">Nenhuma pendencia.</p>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {detail.indicators.pendings.map((pending) => (
+                <li key={pending.what} className="flex items-start justify-between gap-3">
+                  <span className="text-neutral-700">{pending.what}</span>
+                  <Badge>{ROLE_LABELS[pending.suggestedRole]}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-neutral-500">
+            Perfil sugerido conforme docs/11 §2/§3 — a segregacao de funcoes continua valendo.
+          </p>
+        </Card>
+
+        <Card className="text-sm md:col-span-2">
+          <p className="font-medium">Auditoria consolidada</p>
+          <div className="mt-2 grid gap-x-6 gap-y-1 text-xs text-neutral-600 sm:grid-cols-2">
+            <p>
+              Ultima acao:{" "}
+              <span className="text-neutral-900">{detail.audit.lastActionTitle ?? "—"}</span>
+            </p>
+            <p>
+              Quando:{" "}
+              {detail.audit.lastActionAt ? formatDateTime(detail.audit.lastActionAt) : "—"}
+            </p>
+            <p className="sm:col-span-2">
+              Autor/perfil: {detail.audit.lastActorLabel ?? "—"}
+            </p>
+            <p>Entradas na trilha: {detail.audit.eventCount}</p>
+            <p>Notas/mensagens: {detail.audit.noteCount}</p>
+            <p>
+              Checklist marcado: {detail.audit.checklistCheckedCount}/{detail.audit.checklistTotal}
+            </p>
+            <p>
+              Pagamento atual:{" "}
+              {detail.audit.currentPaymentStatus
+                ? PAYMENT_STATUS_LABELS[detail.audit.currentPaymentStatus]
+                : "—"}
+            </p>
+            <p>
+              Documento atual:{" "}
+              {detail.audit.currentDocumentStatus
+                ? DOCUMENT_STATUS_LABELS[detail.audit.currentDocumentStatus]
+                : "—"}
+            </p>
+          </div>
         </Card>
       </div>
 
