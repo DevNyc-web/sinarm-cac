@@ -97,7 +97,20 @@ decisões improvisadas no meio da implementação.
   Efí (Gerencianet).
 - **Alternativa aceitável:** outro PSP com Pix e webhook confiável; decisão final
   é **comercial** (doc 08).
-- **Decisão escolhida:** `PENDENTE` **(bloqueador da Fase 5 — ver §8)**
+- **Decisão escolhida (2026-07-18):** 🟡 **RECOMENDAÇÃO REGISTRADA** — ver
+  comparativo completo em **`docs/17-decisao-pix-mvp.md`**.
+  - **Recomendação: Mercado Pago** (facilidade p/ MVP, sandbox, webhook,
+    marca reconhecida pelo pagador); **alternativa aceitável: Asaas**;
+    plano B técnico: OpenPix/Woovi; **Stripe descartado** (Pix no BR só por
+    convite); Efí preterido (mTLS sem benefício neste volume).
+  - **Confirmação do usuário:** `PENDENTE` — a escolha vira **DECIDIDO** com a
+    confirmação explícita (**segue bloqueador do início da F5**).
+  - **Restrição:** F5 começa **em sandbox/dev** (nenhum Pix real); Pix real em
+    produção só após **conta validada, webhook testado, reembolso revisado e
+    termos prontos** (doc 17 §5).
+  - **Taxas:** valores citados são referência — **confirmar no site oficial**.
+  - **Arquitetura:** implementar atrás de **payment adapter** (como o storage
+    adapter da F4) para não travar a troca de PSP.
 
 ### 3.5 Provedor de e-mail (transacional)
 - **Recomendação padrão:** **Resend** (simples, DX boa) para magic link/OTP e
@@ -226,6 +239,8 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
    definitiva** seguem `PENDENTE` — obrigatórios **antes de upload real /
    documento real**.
 1. **Provedor Pix (3.4 / §7 #8):** bloqueia **Fase 5 (Pix)**. Não bloqueia F1–F4.
+   🟡 Recomendação registrada (doc 17: **Mercado Pago**; alt. Asaas) —
+   **falta confirmação do usuário**; F5 iniciará **em sandbox**.
 2. **Estratégia de criptografia + KMS (3.10 / §7 #9):** bloqueia **persistir PII
    real** e **documento real**. Não bloqueia a **F4 dev/fictícia**, mas
    **precisa estar pronta antes de dados reais** (upload real / F11).
@@ -345,7 +360,7 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 | 3.1 | Banco | Supabase (Postgres gerenciado) | ✅ **Fase 1: Postgres local + Prisma**; produção `PENDENTE` |
 | 3.2 | Storage | Supabase Storage (via adapter) | 🟡 **Fase 4: adapter + storage local/dev (arquivos fictícios)**; produção `PENDENTE` (Supabase vs. S3) |
 | 3.3 | Redis/fila | Redis gerenciado + worker | `PENDENTE` |
-| 3.4 | Pix | PSP BR com Pix + webhook | `PENDENTE` |
+| 3.4 | Pix | PSP BR com Pix + webhook | 🟡 **Recomendação: Mercado Pago (alt.: Asaas)** — doc 17; confirmação `PENDENTE`; F5 só em sandbox |
 | 3.5 | E-mail | Resend | `PENDENTE` |
 | 3.6 | Domínio | Domínio neutro (app./admin.) | `PENDENTE` |
 | 3.7 | Deploy | Vercel (web) + gerenciados / Railway | `PENDENTE` |
