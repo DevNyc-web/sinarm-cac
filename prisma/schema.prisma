@@ -44,6 +44,7 @@ model Process {
   statusEvents     ProcessStatusEvent[]
   checklistItems   ProcessChecklistItem[]
   documents        ProcessDocument[]
+  payments         Payment[]
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
 
@@ -153,6 +154,45 @@ model ProcessDocument {
 
   @@index([processId])
   @@map("process_documents")
+}
+
+/// Pagamento Pix do cliente (docs/12 §3.9) — Fase 5 em modo SANDBOX/DEV.
+/// NUNCA cobranca real nesta fase (docs/15 §3.4): provider "fake" (dev) ou
+/// Mercado Pago SANDBOX. `webhookEventId` unico garante idempotencia do webhook.
+model Payment {
+  id                String        @id @default(uuid())
+  processId         String        @map("process_id")
+  process           Process       @relation(fields: [processId], references: [id])
+  provider          String // "fake" | "mercadopago" (adapter — docs/15 §3.4)
+  providerPaymentId String?       @map("provider_payment_id")
+  status            PaymentStatus @default(PENDENTE)
+  amountCents       Int           @map("amount_cents")
+  currency          String        @default("BRL")
+  /// Payload do QR (sandbox/dev: texto claramente ficticio, nunca EMV real).
+  pixQrCode         String?       @map("pix_qr_code")
+  pixCopyPaste      String?       @map("pix_copy_paste")
+  expiresAt         DateTime?     @map("expires_at")
+  paidAt            DateTime?     @map("paid_at")
+  /// Id do evento de webhook que confirmou o pagamento (idempotencia §7 #10).
+  webhookEventId    String?       @unique @map("webhook_event_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@index([processId])
+  @@index([providerPaymentId])
+  @@map("payments")
+}
+
+/// Estados do pagamento Pix (docs/12 §8, nomes conforme decisao da F5).
+enum PaymentStatus {
+  PENDENTE
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  EXPIRADO
+  CANCELADO
+  FALHOU
+
+  @@map("payment_status")
 }
 
 /// Tipos de documento (docs/12 §3.6). MVP: so Documento de Identificacao.

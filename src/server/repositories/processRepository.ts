@@ -73,7 +73,11 @@ export async function createDraftProcess(data: CreateDraftData) {
 export function listProcessesByUser(userId: string) {
   return getPrisma().process.findMany({
     where: { userId },
-    include: { destination: true, processType: true },
+    include: {
+      destination: true,
+      processType: true,
+      payments: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

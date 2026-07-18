@@ -168,6 +168,40 @@ append-only) e as marcações de checklist. Após atualizar o schema, rode
 - Código: adapter em `src/server/storage/` (interface + implementação
   local/dev; provedor real de produção entra como nova implementação),
   services `uploadProcessDocument.ts` / `reviewProcessDocument.ts`.
+
+## Pagamento Pix sandbox/dev (Fase 5)
+
+> ⚠️ **Pagamento fictício/sandbox. Não pague Pix real.** Nenhuma cobrança
+> real existe nesta fase. PSP decidido: **Mercado Pago** (alt.: Asaas) — ver
+> docs/17. Pix real em produção segue **bloqueado** (docs/15 §3.4) até conta
+> PJ validada, credenciais de produção, webhook testado, reembolso, termos e
+> revisão de segurança.
+
+**Modo fake/dev (padrão — sem credencial nenhuma):**
+1. `.env`: `PAYMENT_PROVIDER=fake` (ou omita — é o default). Rode
+   `npm run db:push` (schema ganhou a tabela `payments`).
+2. Logado como **Usuario Exemplo**, abra a revisão do processo
+   (`/processos/[id]`) → **"Gerar cobrança Pix (sandbox/dev)"** — valor
+   fictício R$ 100,00; o "copia e cola" gerado é deliberadamente **não
+   pagável** (`PIX-FICTICIO-DEV|...`).
+3. Confirme com **"Simular pagamento aprovado (dev)"** (idempotente — clicar
+   de novo não duplica) **ou** via webhook dev:
+   `POST /api/payments/webhook` com
+   `{ "eventId": "evt-1", "providerPaymentId": "FAKE-...", "type": "payment.paid" }`.
+   Reenvio do mesmo `eventId` responde `alreadyProcessed: true`.
+4. Pagamento `PAGO` move o processo para **Pago / em fila**
+   (`PAGO_EM_FILA`), registra evento no histórico e aparece no dashboard, na
+   revisão e no detalhe admin (fila do Financeiro/Admin).
+
+**Sandbox Mercado Pago (futuro, opcional):** `PAYMENT_PROVIDER=mercadopago` +
+`MERCADO_PAGO_ACCESS_TOKEN` com token de **TESTE** (`TEST-...`; token de
+produção é **recusado** pelo código). `MERCADO_PAGO_WEBHOOK_SECRET` protege o
+webhook dev (header `x-dev-webhook-secret`); a validação de assinatura oficial
+do MP entra antes de expor o webhook publicamente. **Nunca** commitar `.env`.
+
+Código: adapter em `src/server/payments/` (`fake` e `mercadopago` — trocar de
+PSP = nova implementação), services `createPixPayment.ts` /
+`confirmPixPayment.ts`, webhook em `src/app/api/payments/webhook/route.ts`.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

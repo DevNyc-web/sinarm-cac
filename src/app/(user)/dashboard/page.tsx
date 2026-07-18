@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
-import { INTERNAL_STATUS_LABELS } from "@/server/processes/statusLabels";
+import { INTERNAL_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/server/processes/statusLabels";
 import { listProcessesByUser } from "@/server/repositories/processRepository";
 
 type ProcessRow = Awaited<ReturnType<typeof listProcessesByUser>>[number];
@@ -72,6 +72,9 @@ export default async function DashboardPage() {
                       </p>
                       <p className="mt-1 text-xs text-neutral-500">
                         Criado em {process.createdAt.toLocaleDateString("pt-BR")}
+                        {process.payments[0]
+                          ? ` · Pagamento: ${PAYMENT_STATUS_LABELS[process.payments[0].status]} (sandbox)`
+                          : ""}
                       </p>
                     </div>
                     <Badge>{INTERNAL_STATUS_LABELS[process.internalStatus]}</Badge>

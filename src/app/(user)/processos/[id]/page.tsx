@@ -9,11 +9,17 @@ import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
+import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForProcess } from "@/server/repositories/processDocumentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
-import { uploadDocumentAction } from "./actions";
+import {
+  createPixPaymentAction,
+  simulatePaymentApprovedAction,
+  uploadDocumentAction,
+} from "./actions";
 
 function formatSize(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -27,21 +33,34 @@ export default async function ProcessoRevisaoPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ erro?: string; ok?: string }>;
+  searchParams: Promise<{ erro?: string; ok?: string; pago?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { erro, ok } = await searchParams;
+  const { erro, ok, pago } = await searchParams;
 
   let process: Awaited<ReturnType<typeof findProcessByIdForUser>> = null;
   let documents: Awaited<ReturnType<typeof listDocumentsForProcess>> = [];
+  let payments: Awaited<ReturnType<typeof listPaymentsForProcess>> = [];
   try {
     process = await findProcessByIdForUser(id, user.id);
-    if (process) documents = await listDocumentsForProcess(process.id);
+    if (process) {
+      [documents, payments] = await Promise.all([
+        listDocumentsForProcess(process.id),
+        listPaymentsForProcess(process.id),
+      ]);
+    }
   } catch {
     // Banco local fora do ar: tratar como nao encontrado, com aviso generico.
   }
   if (!process) notFound();
+
+  const activePayment = payments.find((payment) => payment.status === "AGUARDANDO_PAGAMENTO");
+  const paidPayment = payments.find((payment) => payment.status === "PAGO");
+  const canCreateCharge =
+    !activePayment &&
+    !paidPayment &&
+    (process.internalStatus === "RASCUNHO" || process.internalStatus === "AGUARDANDO_PAGAMENTO");
 
   return (
     <Container>
@@ -153,9 +172,82 @@ export default async function ProcessoRevisaoPage({
           </form>
         </Card>
 
+        <Card className="mt-4 text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">Pagamento do servico</p>
+            <Badge>sandbox/dev</Badge>
+          </div>
+          <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <strong>Pagamento ficticio/sandbox. Nao pague Pix real.</strong> O codigo gerado nao e
+            pagavel; valor ficticio de R$ 100,00. Nenhuma cobranca real existe nesta fase.
+          </p>
+
+          {pago ? (
+            <p className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              Pagamento simulado confirmado. Processo em fila (mock/dev).
+            </p>
+          ) : null}
+
+          {payments.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {payments.map((payment) => (
+                <li key={payment.id} className="rounded-md border border-neutral-200 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-neutral-800">
+                      R$ {(payment.amountCents / 100).toFixed(2).replace(".", ",")} ·{" "}
+                      {payment.provider}
+                    </p>
+                    <Badge>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>
+                  </div>
+                  {payment.status === "AGUARDANDO_PAGAMENTO" && payment.pixCopyPaste ? (
+                    <>
+                      <p className="mt-2 text-xs text-neutral-500">
+                        Pix copia e cola (FICTICIO — nao pagavel):
+                      </p>
+                      <p className="mt-1 break-all rounded bg-neutral-100 px-2 py-1 font-mono text-xs text-neutral-700">
+                        {payment.pixCopyPaste}
+                      </p>
+                      {payment.expiresAt ? (
+                        <p className="mt-1 text-xs text-neutral-500">
+                          Expira em {payment.expiresAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      ) : null}
+                      <form action={simulatePaymentApprovedAction} className="mt-2">
+                        <input type="hidden" name="processId" value={process.id} />
+                        <input type="hidden" name="paymentId" value={payment.id} />
+                        <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                          Simular pagamento aprovado (dev)
+                        </Button>
+                      </form>
+                    </>
+                  ) : null}
+                  {payment.status === "PAGO" && payment.paidAt ? (
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Confirmado em {payment.paidAt.toLocaleDateString("pt-BR")}{" "}
+                      {payment.paidAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-neutral-500">Nenhuma cobranca gerada ainda.</p>
+          )}
+
+          {canCreateCharge ? (
+            <form action={createPixPaymentAction} className="mt-3">
+              <input type="hidden" name="processId" value={process.id} />
+              <Button type="submit">Gerar cobranca Pix (sandbox/dev)</Button>
+            </form>
+          ) : null}
+        </Card>
+
         <div className="mt-4 space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <p>Este rascunho ainda nao foi protocolado.</p>
-          <p>Ainda nao ha pagamento, GRU ou SINARM nesta fase; o upload e apenas ficticio/dev.</p>
+          <p>
+            Nao ha GRU nem SINARM nesta fase; upload e pagamento sao apenas ficticios/sandbox
+            (dev).
+          </p>
         </div>
 
         <div className="mt-6 flex gap-3">

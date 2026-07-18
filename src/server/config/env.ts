@@ -13,6 +13,11 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
+  // Fase 5 — Pix sandbox/dev (docs/15 §3.4). "fake" nao exige credencial;
+  // "mercadopago" usa SANDBOX e exige o access token de TESTE via env.
+  PAYMENT_PROVIDER: z.enum(["fake", "mercadopago"]).default("fake"),
+  MERCADO_PAGO_ACCESS_TOKEN: z.string().optional(),
+  MERCADO_PAGO_WEBHOOK_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

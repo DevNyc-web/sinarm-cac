@@ -6,6 +6,7 @@ import {
   type DocumentStatus,
   type DocumentType,
   type InternalStatus,
+  type PaymentStatus,
   type UserFacingStatus,
 } from "@prisma/client";
 
@@ -38,6 +39,15 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   IDENTIFICACAO_PESSOAL: "Documento de Identificacao Pessoal",
   OUTRO: "Outro",
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  PENDENTE: "Pendente",
+  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
+  PAGO: "Pago",
+  EXPIRADO: "Expirado",
+  CANCELADO: "Cancelado",
+  FALHOU: "Falhou",
 };
 
 export const USER_FACING_STATUS_LABELS: Record<UserFacingStatus, string> = {

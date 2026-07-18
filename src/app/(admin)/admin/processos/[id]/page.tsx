@@ -13,9 +13,11 @@ import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { listChecklistItems } from "@/server/repositories/checklistRepository";
+import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForProcess } from "@/server/repositories/processDocumentRepository";
 import { listStatusEvents } from "@/server/repositories/processEventRepository";
 import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
@@ -69,13 +71,15 @@ export default async function AdminProcessoDetalhePage({
   let statusEvents: Awaited<ReturnType<typeof listStatusEvents>> = [];
   let checklistRows: Awaited<ReturnType<typeof listChecklistItems>> = [];
   let documents: Awaited<ReturnType<typeof listDocumentsForProcess>> = [];
+  let payments: Awaited<ReturnType<typeof listPaymentsForProcess>> = [];
   try {
     process = await findProcessByIdForAdmin(id);
     if (process) {
-      [statusEvents, checklistRows, documents] = await Promise.all([
+      [statusEvents, checklistRows, documents, payments] = await Promise.all([
         listStatusEvents(process.id),
         listChecklistItems(process.id),
         listDocumentsForProcess(process.id),
+        listPaymentsForProcess(process.id),
       ]);
     }
   } catch {
@@ -126,6 +130,14 @@ export default async function AdminProcessoDetalhePage({
         detail: `marcado por ${actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}`,
       });
     }
+  }
+  for (const payment of payments) {
+    timeline.push({
+      id: `pay-${payment.id}`,
+      at: payment.createdAt,
+      title: `Cobranca Pix criada (sandbox/dev) — R$ ${(payment.amountCents / 100).toFixed(2).replace(".", ",")}`,
+      detail: `provider ${payment.provider} · status atual: ${PAYMENT_STATUS_LABELS[payment.status]}`,
+    });
   }
   for (const doc of documents) {
     const docName = canViewFull ? doc.originalFileName : "documento (acesso restrito)";
@@ -219,6 +231,39 @@ export default async function AdminProcessoDetalhePage({
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Justificativa</p>
           <p className="text-neutral-600">{process.justification}</p>
+        </Card>
+
+        <Card className="text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">Pagamento Pix do cliente</p>
+            <Badge>sandbox/dev</Badge>
+          </div>
+          {payments.length === 0 ? (
+            <p className="mt-2 text-neutral-500">Nenhuma cobranca gerada.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {payments.map((payment) => (
+                <li key={payment.id} className="rounded-md border border-neutral-200 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-neutral-800">
+                      R$ {(payment.amountCents / 100).toFixed(2).replace(".", ",")} ·{" "}
+                      {payment.provider}
+                    </p>
+                    <Badge>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Criada em {formatDateTime(payment.createdAt)}
+                    {payment.paidAt ? ` · paga em ${formatDateTime(payment.paidAt)}` : ""}
+                    {payment.providerPaymentId ? ` · ref ${payment.providerPaymentId.slice(0, 20)}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-neutral-500">
+            Cobrancas ficticias/sandbox — nenhum Pix real. Confirmacao de Pix e acao do
+            Financeiro/Admin (docs/11 §3); nesta fase a confirmacao vem do webhook/simulacao dev.
+          </p>
         </Card>
 
         <Card className="text-sm">
