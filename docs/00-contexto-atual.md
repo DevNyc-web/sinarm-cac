@@ -96,6 +96,7 @@ Arquivos existentes:
 - `docs/20-validacao-fase-6-5-indicadores-operacionais.md`
 - `docs/21-preparacao-fase-7-execucao-assistida-manual.md`
 - `docs/22-validacao-fase-7-execucao-manual.md`
+- `docs/23-checklist-piloto-real.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -191,15 +192,21 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > Playwright/Puppeteer/Selenium), NÃO protocola e NUNCA clica em "Gerar GRU e
 > Salvar"** — nem guarda credencial ou senha do Gov.br.
 >
-> **➡️ Próximo passo recomendado (docs/22 §13):** **não adicionar novas
-> funcionalidades sensíveis**; fazer **revisão de produto/UX e de textos**
-> (tom honesto, sem promessa de aprovação, sem aparência de órgão oficial),
-> **preparar o checklist do piloto real** e **decidir o caminho de produção**.
+> **➡️ Bloco atual: NÃO é nova funcionalidade — é PREPARAÇÃO DE PILOTO REAL.**
+> O checklist está em `docs/23-checklist-piloto-real.md` (escopo do piloto,
+> checklists técnico/jurídico/financeiro/operacional/UX/segurança/suporte,
+> critérios de aceite e recusa de cliente, fluxo controlado, responsáveis,
+> evidências, rollback e critérios de sucesso/pausa).
+> Conforme `docs/22 §13`: **não adicionar novas funcionalidades sensíveis**;
+> revisar produto/UX e textos; fechar as pendências; decidir o caminho de
+> produção.
 >
-> **Produção segue BLOQUEADA** pelas pendências do `docs/22 §12`: auth real +
-> MFA · storage de produção + KMS + retenção · Mercado Pago produção + webhook
-> público · termos/reembolso · revisão jurídica · política operacional da
-> execução humana · treinamento de operador · revisão de textos.
+> **Produção e piloto seguem BLOQUEADOS** pelas 12 pendências do `docs/23 §5`:
+> auth real · MFA admin · storage de produção · KMS/criptografia · retenção
+> final · Mercado Pago produção · webhook público · termos de uso · política de
+> reembolso · revisão jurídica · política operacional · treinamento do operador.
+> **Regra:** o piloto só começa com os 12 fechados — não há "resolve durante o
+> piloto".
 >
 > **Pendências que travam produção** (docs/20 §11): auth real + MFA, storage de
 > produção + KMS + retenção, conta Mercado Pago de produção + webhook público
