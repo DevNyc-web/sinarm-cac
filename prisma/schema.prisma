@@ -25,19 +25,65 @@ model ProcessType {
   @@map("process_types")
 }
 
-/// Esqueleto de processo SEM PII (Fase 1). Campos sensiveis (usuario, documento,
-/// arma/PCE, pagamento, GRU) chegam em fases posteriores. Ver docs/12 §3.3.
+/// Processo SEM PII (Fases 1–3). Campos sensiveis (documento, pagamento, GRU,
+/// endereco SIGMA) chegam em fases posteriores. Ver docs/12 §3.3.
+/// `userId` e o id do usuario MOCK (Fase 2) — vira FK para `users` quando a
+/// auth real entrar (docs/15 §3.8).
 model Process {
   id               String           @id @default(uuid())
   code             String           @unique
+  userId           String           @map("user_id")
   processTypeId    String           @map("process_type_id")
   processType      ProcessType      @relation(fields: [processTypeId], references: [id])
   internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
   userFacingStatus UserFacingStatus @default(RECEBIDO) @map("user_facing_status")
+  /// Padrao "Guia para treino", editavel (docs/10 §4).
+  justification    String           @map("justification")
+  destination      Destination?
+  firearm          FirearmPce?
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
+  @@index([userId])
   @@map("processes")
+}
+
+/// Destino/clube/evento informado pelo usuario (docs/12 §3.7). Dados de local
+/// de evento — ficticios nesta fase; nao ha PII de pessoa.
+model Destination {
+  id        String   @id @default(uuid())
+  processId String   @unique @map("process_id")
+  process   Process  @relation(fields: [processId], references: [id])
+  eventName String   @map("event_name")
+  uf        String
+  city      String
+  street    String
+  number    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("destinations")
+}
+
+/// Arma/PCE indicada — SUBCONJUNTO NAO SENSIVEL do docs/12 §3.8.
+/// Campos cifrados (sigma_number, serial_number, lot_number) ficam FORA ate a
+/// decisao de criptografia 3.10 (docs/15). Nesta fase, os valores vem de um
+/// catalogo MOCK 100% ficticio (src/server/processes/mockFirearms.ts).
+model FirearmPce {
+  id        String   @id @default(uuid())
+  processId String   @unique @map("process_id")
+  process   Process  @relation(fields: [processId], references: [id])
+  /// Id do item no catalogo mock — para rastrear a escolha em dev.
+  mockCatalogId String @map("mock_catalog_id")
+  species   String
+  brand     String
+  model     String
+  caliber   String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("firearms_pce")
 }
 
 /// Status internos (operacao). Ver docs/12 §6.

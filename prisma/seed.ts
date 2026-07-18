@@ -19,12 +19,34 @@ async function main() {
   });
 
   // Processo de demonstracao — dados 100% ficticios, sem PII.
+  // userId = id do usuario MOCK da Fase 2 (src/server/auth/mockUsers.ts).
   await prisma.process.upsert({
     where: { code: "GT-DEMO-001" },
     update: {},
     create: {
       code: "GT-DEMO-001",
+      userId: "mock-user",
       processTypeId: guiaTrafego.id,
+      justification: "Guia para treino",
+      destination: {
+        create: {
+          eventName: "Clube de Tiro Exemplo",
+          uf: "SP",
+          city: "Cidade Exemplo",
+          street: "Rua Exemplo",
+          number: "100",
+        },
+      },
+      firearm: {
+        create: {
+          mockCatalogId: "mock-pce-001",
+          species: "Pistola",
+          brand: "Marca Exemplo",
+          model: "Modelo Alfa",
+          caliber: "9mm (ficticio)",
+          quantity: 1,
+        },
+      },
     },
   });
 

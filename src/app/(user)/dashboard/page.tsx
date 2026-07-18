@@ -6,9 +6,21 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
+import { listProcessesByUser } from "@/server/repositories/processRepository";
+
+type ProcessRow = Awaited<ReturnType<typeof listProcessesByUser>>[number];
 
 export default async function DashboardPage() {
   const user = await requireUser();
+
+  // Banco local pode estar fora do ar em dev — degradar com aviso, sem quebrar.
+  let processes: ProcessRow[] = [];
+  let dbUnavailable = false;
+  try {
+    processes = await listProcessesByUser(user.id);
+  } catch {
+    dbUnavailable = true;
+  }
 
   return (
     <Container>
@@ -33,10 +45,39 @@ export default async function DashboardPage() {
       </Card>
 
       <div className="mt-6">
-        <EmptyState
-          title="Nenhum processo ainda"
-          description="Placeholder de dashboard. Processos reais chegam nas proximas fases."
-        />
+        {dbUnavailable ? (
+          <EmptyState
+            title="Banco local indisponivel"
+            description="Nao foi possivel listar rascunhos. Configure o Postgres local (.env + npm run db:push && npm run seed)."
+          />
+        ) : processes.length === 0 ? (
+          <EmptyState
+            title="Nenhum processo ainda"
+            description="Crie um rascunho de Guia de Trafego com dados ficticios em Novo processo."
+          />
+        ) : (
+          <ul className="space-y-3">
+            {processes.map((process) => (
+              <li key={process.id}>
+                <Card className="flex items-center justify-between">
+                  <div>
+                    <p className="font-mono text-sm font-medium">{process.code}</p>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      {process.processType.name}
+                      {process.destination
+                        ? ` · ${process.destination.eventName} — ${process.destination.city}/${process.destination.uf}`
+                        : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Criado em {process.createdAt.toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <Badge>{process.internalStatus}</Badge>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </Container>
   );

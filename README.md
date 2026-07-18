@@ -58,9 +58,12 @@ npm install
 # 2. Configurar ambiente local (NUNCA commitar .env)
 cp .env.example .env   # e ajuste DATABASE_URL para seu Postgres local
 
-# 3. (Opcional) criar o schema local e dados fictícios
+# 3. Criar o schema local e dados fictícios
+#    (necessário para salvar rascunhos de Guia de Tráfego — Fase 3;
+#     sem banco, o app navega mas não salva)
 npm run db:push        # aplica o schema no Postgres LOCAL (sem migrations)
 npm run seed           # dados fictícios (ProcessType + processo de demo)
+#    Após alterar prisma/schema.prisma, rode npm run db:push de novo.
 
 # 4. Rodar em desenvolvimento
 npm run dev            # http://localhost:3000
@@ -118,6 +121,24 @@ rotas admin exigem perfil interno permitido — quem não tem acesso volta para
 **Ponto de substituição:** ao adotar o provedor real, só `session.ts`
 (`getCurrentUser`) muda; `guards.ts` e `permissions.ts` continuam válidos.
 Páginas nunca comparam `role` diretamente — sempre via guard/permissão.
+
+## Cadastro de Guia de Tráfego — rascunho (Fase 3)
+
+> Rascunhos com **dados 100% fictícios**: destino/evento, arma/PCE de um
+> **catálogo mock** (sem nº de série, SIGMA ou lote — bloqueados até a decisão
+> de criptografia, docs/15 §3.10) e justificativa padrão "Guia para treino".
+> **Sem** upload, Pix, GRU, Gov.br, SINARM ou protocolo real — o código
+> `GT-DEV-xxxx` é só um identificador de desenvolvimento.
+
+Fluxo: entrar como **Usuario Exemplo** → `/processos/novo` → preencher →
+**Salvar rascunho** → tela de sucesso → rascunhos listados em `/dashboard`.
+Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
+`ProcessType` da Guia de Tráfego que o formulário usa).
+
+Código: validação em `src/server/processes/guiaTrafegoSchema.ts` (Zod),
+catálogo mock em `src/server/processes/mockFirearms.ts`, caso de uso em
+`src/server/services/createGuiaTrafegoDraft.ts`, persistência em
+`src/server/repositories/processRepository.ts`.
 
 ## O que NÃO existe / NÃO será construído agora
 

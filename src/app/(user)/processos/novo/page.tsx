@@ -1,61 +1,37 @@
 import { Container } from "@/components/ui/Container";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { requireUser } from "@/server/auth/guards";
+import { DEFAULT_JUSTIFICATION, UFS } from "@/server/processes/guiaTrafegoSchema";
+import { MOCK_FIREARMS, mockFirearmLabel } from "@/server/processes/mockFirearms";
+import { NovoProcessoForm } from "./NovoProcessoForm";
 
 export default async function NovoProcessoPage() {
   const user = await requireUser();
 
+  const firearmOptions = MOCK_FIREARMS.map((firearm) => ({
+    id: firearm.id,
+    label: mockFirearmLabel(firearm),
+  }));
+
   return (
     <Container>
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-semibold">Nova Guia de Trafego</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold">Nova Guia de Trafego</h1>
+          <Badge>mock/dev</Badge>
+        </div>
         <p className="mt-2 text-sm text-neutral-500">
-          Placeholder de formulario. Nenhum dado e salvo. Sem PII, sem upload, sem pagamento.
+          Cadastro de rascunho (Fase 3) com dados ficticios. Sem PII, sem upload, sem pagamento,
+          sem protocolo real.
         </p>
         <p className="mt-1 text-xs text-neutral-500">
           Solicitante (ficticio): <span className="font-medium">{user.name}</span>
         </p>
-        <Card className="mt-4 space-y-4">
-          <label className="block text-sm">
-            Nome do evento / clube
-            <input
-              disabled
-              placeholder="Ex.: Clube de Tiro Exemplo"
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-50"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              UF
-              <input
-                disabled
-                placeholder="SP"
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-50"
-              />
-            </label>
-            <label className="block text-sm">
-              Cidade
-              <input
-                disabled
-                placeholder="Cidade Exemplo"
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-50"
-              />
-            </label>
-          </div>
-          <label className="block text-sm">
-            Justificativa
-            <textarea
-              disabled
-              rows={3}
-              placeholder="Guia para treino"
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-50"
-            />
-          </label>
-          <Button type="button" disabled>
-            Salvar (indisponivel nesta fase)
-          </Button>
-        </Card>
+        <NovoProcessoForm
+          ufs={UFS}
+          firearms={firearmOptions}
+          defaultJustification={DEFAULT_JUSTIFICATION}
+        />
       </div>
     </Container>
   );
