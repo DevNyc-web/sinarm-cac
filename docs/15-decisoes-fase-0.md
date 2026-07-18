@@ -6,7 +6,7 @@
 >
 > **Ainda NÃO é código.** Só decisões e pendências.
 >
-> **Última atualização:** 2026-07-17
+> **Última atualização:** 2026-07-18
 > **Base:** `docs/10..14` (especialmente `docs/13-stack-tecnica-mvp.md` §20 e
 > `docs/12-modelo-dados-mvp.md` §20).
 >
@@ -71,7 +71,18 @@ decisões improvisadas no meio da implementação.
 - **Recomendação padrão:** **Supabase Storage** (se o banco for Supabase), atrás de
   **storage adapter**; URLs assinadas curtas; sha256.
 - **Alternativa aceitável:** **S3 / Cloudflare R2 / MinIO** (mesmo adapter).
-- **Decisão escolhida:** `PENDENTE`
+- **Decisão escolhida (2026-07-18):** 🟡 **PRELIMINAR PARA A FASE 4** —
+  criar **camada adapter de storage**, começando com **storage local/dev** para
+  **arquivos fictícios**.
+  - **Produção:** segue `PENDENTE` — a escolher entre **Supabase Storage** e
+    **S3 compatível** (mesmo adapter).
+  - **Restrição:** **não usar documento real nem PII real** enquanto storage de
+    produção, criptografia (3.10) e retenção definitiva (3.11) não estiverem
+    fechados.
+  - **Objetivo:** desenvolver **fluxo, validação, estados e painel** de upload
+    sem travar no fornecedor final.
+  - **Efeito:** libera iniciar a **Fase 4 em modo dev/fictício**. Upload real
+    fica para depois das decisões finais.
 
 ### 3.3 Redis / fila
 - **Recomendação padrão:** **Redis gerenciado** (BullMQ) — ex.: Upstash ou o que o
@@ -146,7 +157,16 @@ decisões improvisadas no meio da implementação.
   rotação de chave planejada.
 - **Alternativa aceitável:** cifra a nível de coluna no banco (pgcrypto) **se** a
   gestão de chaves for adequada; **não** substitui o segredo fora do repo.
-- **Decisão escolhida:** `PENDENTE` **(bloqueador de PII real — ver §8)**
+- **Decisão escolhida (2026-07-18):** 🟡 **PRELIMINAR PARA A FASE 4** —
+  **não usar documentos reais**; preparar a arquitetura para **metadados
+  protegidos, hashes (sha256) e storage privado**.
+  - **KMS/criptografia final:** segue `PENDENTE` — obrigatória **antes de
+    produção** (continua **bloqueador de PII real**).
+  - **Restrição:** **não armazenar CPF real, RG real, imagem real de documento
+    ou qualquer PII real**.
+  - **Produção exigirá:** bucket **privado**, controle de acesso, **URLs
+    assinadas/temporárias**, **logs de acesso** e política de retenção (3.11).
+  - **Efeito:** libera a **Fase 4 em modo dev/fictício** sem tocar em PII real.
 
 ### 3.11 Retenção de documentos
 - **Recomendação padrão:** apagar o **arquivo** do Documento de Identificação
@@ -155,7 +175,17 @@ decisões improvisadas no meio da implementação.
   `data_retention_jobs` (doc 12 §15).
 - **Alternativa aceitável:** reter o documento por prazo maior **se** houver base
   legal/necessidade operacional documentada.
-- **Decisão escolhida:** `PENDENTE` **(depende de definição jurídica/LGPD)**
+- **Decisão escolhida (2026-07-18):** 🟡 **PRELIMINAR PARA O MVP** —
+  documentos mantidos **apenas pelo tempo necessário** para execução e
+  conferência do processo.
+  - **Proposta inicial:** manter até **conclusão do processo + 30 dias** de
+    janela operacional/contestação; depois **expurgar o arquivo**, preservando
+    apenas **logs mínimos, status, protocolo e registros
+    financeiros/legalmente necessários**.
+  - **Decisão final:** segue `PENDENTE` (definição jurídica/LGPD) — obrigatória
+    **antes de produção**.
+  - **Fase 4 dev:** usar **apenas arquivos fictícios**, com liberdade de
+    **apagar/reprocessar** sem compromisso legal.
 
 ---
 
@@ -168,7 +198,7 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
 | 1 | Formato do **protocolo** e campos do **PDF da GRU**; como aparece **compensação/pagamento** | Parcial (afeta `gru_records`) | `PENDENTE` — depende de mapear pós-protocolo (doc 09 §15.14) |
 | 2 | **Certidões** entram em algum ponto? | Não (fora do MVP) | **RESOLVIDO** — fora do MVP (doc 10 §17) |
 | 3 | **Múltiplas armas por guia** (1 ou N em `firearms_pce`) | Sim | `PENDENTE` — confirmar no SINARM |
-| 4 | **Prazos de retenção** por tipo | Não (política, não schema) | `PENDENTE` — ver §3.11 |
+| 4 | **Prazos de retenção** por tipo | Não (política, não schema) | 🟡 **Preliminar (2026-07-18)** — conclusão + 30d (§3.11); final `PENDENTE` (jurídico) |
 | 5 | **Cadastro inicial PF** vira fluxo? (tabela/campos próprios) | Não no MVP (é fallback) | `PENDENTE` — adiar |
 | 6 | **Multi-perfil interno** (role único vs. tabela de papéis) | Pequeno (afeta `admin_users`) | 🟡 **Em andamento na F2** — perfis definidos (admin/operador/financeiro/suporte, §3.9); modelagem role único vs. tabela ainda a fechar |
 | 7 | **Reembolso parcial** (valor/estágio em `payments`) | Pequeno | `PENDENTE` — decidir com política de reembolso |
@@ -189,14 +219,22 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
    **auth mock/dev + RBAC estrutural**. Deixa de bloquear o **início da F2**.
    **Provedor real de auth** e **MFA** seguem `PENDENTE` — obrigatórios **antes de
    produção**.
+0c. ✅ **Storage/criptografia/retenção (3.2/3.10/3.11): RESOLVIDOS PARA A FASE 4
+   (preliminares)** — **adapter de storage local/dev + arquivos fictícios +
+   proposta de retenção**. Deixam de bloquear o **início da F4 em modo
+   dev/fictício**. **Storage de produção, KMS/criptografia final e retenção
+   definitiva** seguem `PENDENTE` — obrigatórios **antes de upload real /
+   documento real**.
 1. **Provedor Pix (3.4 / §7 #8):** bloqueia **Fase 5 (Pix)**. Não bloqueia F1–F4.
 2. **Estratégia de criptografia + KMS (3.10 / §7 #9):** bloqueia **persistir PII
-   real**. Não bloqueia esqueleto/estrutura, mas **precisa estar pronto antes de
-   dados reais** (F4 em diante / F11).
-3. **Storage de documentos (3.2):** bloqueia **upload real de documentos
-   sensíveis** (F4). Não bloqueia F1–F3.
-4. **Retenção/LGPD (3.11 / §7 #4):** bloqueia **fechar política de expurgo** (F10),
-   não o início.
+   real** e **documento real**. Não bloqueia a **F4 dev/fictícia**, mas
+   **precisa estar pronta antes de dados reais** (upload real / F11).
+3. **Storage de documentos (3.2):** o fornecedor de **produção** bloqueia o
+   **upload real de documentos sensíveis**. Não bloqueia a **F4 dev/fictícia**
+   (adapter local/dev).
+4. **Retenção/LGPD (3.11 / §7 #4):** a decisão **final** bloqueia **fechar a
+   política de expurgo** (F10) e o **upload real**; a preliminar orienta o
+   desenho desde a F4.
 5. **Multi-arma (§7 #3)** e **campos Pix (§7 #8):** bloqueiam **congelar o schema**
    dessas tabelas — mas o schema pode ser modelado incrementalmente por fase.
 6. **Provedor real de auth + MFA (3.8/3.9):** bloqueiam **ir a produção** com
@@ -226,17 +264,27 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 - **Modelagem incremental** das tabelas **sem PII/pagamento** (ex.: `process_types`,
   estados, `admin_users`/papéis) atrás do Prisma, com repositórios.
 - **UI neutra** e formulários do usuário (F3) com validação Zod, usando **DB local**
-  e dados **fictícios** até os provedores serem escolhidos.
+  e dados **fictícios** até os provedores serem escolhidos. **(FEITO — F3/F3.5/F3.6:
+  rascunho, revisão, fila admin, histórico e checklist.)**
+- **Fase 4 (upload) em modo dev/fictício:** **camada adapter de storage** com
+  **storage local/dev**, upload de **arquivos fictícios** (nunca documento real),
+  **sha256/metadados**, estados do documento (doc 12 §10) e validação no painel —
+  conforme preliminares 3.2/3.10/3.11. **Upload real** só após storage de
+  produção + KMS + retenção definitiva.
 - **Design de auditoria/eventos** (doc 12 §12) como contrato, independente do provedor.
 
-> **Regras enquanto auth real/storage/criptografia/retenção estiverem `PENDENTE`:**
-> - **Não usar dados reais / PII real** (nem CPF real).
+> **Regras enquanto auth real/storage de produção/criptografia/retenção final
+> estiverem `PENDENTE`:**
+> - **Não usar dados reais / PII real** (nem CPF real, RG real ou **imagem real
+>   de documento**).
 > - **Não** usar **provedor de auth real** nem contas reais (só mock/dev).
-> - **Não implementar pagamento** (Pix).
-> - **Não implementar upload real de documentos sensíveis** (F4).
-> - **Não implementar automação SINARM/CAC.**
-> - **Não** conectar provedores de **produção**.
-> Ou seja: Fases 1–2 rodam **100% com Postgres local, auth mock/dev e dados fictícios**.
+> - **Não implementar pagamento** (Pix) nem **GRU**.
+> - **Não implementar upload real de documentos sensíveis** — na F4, **apenas
+>   arquivos fictícios** no **storage local/dev**.
+> - **Não implementar automação SINARM/CAC** nem **Gov.br**.
+> - **Não** conectar provedores de **produção** nem **integração externa real**.
+> Ou seja: Fases 1–4 rodam **100% com Postgres local, auth mock/dev, storage
+> local/dev e dados fictícios**.
 
 ---
 
@@ -249,27 +297,44 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 - [x] Confirmação **explícita** do usuário → esqueleto Next.js implementado e versionado.
 - [ ] **Ambiente de deploy (3.7)** ao menos direcionado (segue `PENDENTE`, não bloqueia).
 
-**Liberar a Fase 2 (auth e perfis):**
+**Liberar a Fase 2 (auth e perfis):** ✅ **CONCLUÍDA**
 - [x] **Auth usuário (3.8)** definida (preliminar) → **mock/dev + estrutura interna**.
 - [x] **Auth admin (3.9)** definida (preliminar) → **RBAC estrutural + perfis**
       admin/operador/financeiro/suporte, **modo dev/mock**.
-- [ ] Confirmação **explícita** do usuário para iniciar a Fase 2.
+- [x] Confirmação **explícita** do usuário → F2 implementada e versionada
+      (seguida de F3, F3.5 e F3.6 — rascunho, revisão, fila admin, histórico,
+      checklist).
 
-> **Situação:** **Fase 1 concluída**; **Fase 2 liberada** para começar com **auth
-> mock/dev + RBAC estrutural** — sem provedor de auth real, **sem PII/CPF real**.
-> **Provedor de auth real** e **MFA** ficam **obrigatórios antes de produção**.
+**Liberar a Fase 4 (upload) em modo dev/fictício:**
+- [x] **Storage (3.2)** definido (preliminar) → **adapter + storage local/dev**;
+      produção `PENDENTE` (Supabase Storage vs. S3 compatível).
+- [x] **Criptografia (3.10)** definida (preliminar) → **sem documento real**;
+      arquitetura preparada para **metadados protegidos, hashes e storage
+      privado**; KMS final `PENDENTE`.
+- [x] **Retenção (3.11)** definida (preliminar) → **conclusão + 30 dias** e
+      expurgo (proposta); decisão final `PENDENTE`; na F4 dev, **arquivos
+      fictícios** apagáveis livremente.
+- [ ] Confirmação **explícita** do usuário para iniciar a Fase 4.
+
+> **Situação:** **Fases 1–3.6 concluídas**; **Fase 4 liberada** para começar
+> **apenas em modo dev/fictício** — storage local/dev via adapter, arquivos
+> fictícios, sem documento real, **sem CPF/PII real**, sem integração externa
+> real, sem Gov.br/SINARM, sem Pix/GRU. **Upload real de documento pessoal
+> continua bloqueado** até fechar **storage de produção (3.2)**,
+> **criptografia/KMS (3.10)** e **retenção definitiva (3.11)**.
 
 **Liberar fases sensíveis:**
 - [ ] **Produção com contas reais:** **provedor de auth real (3.8/3.9)** + **MFA** ativos.
-- [ ] **Fase 4/PII real:** **storage (3.2)** + **criptografia + KMS (3.10)** definidos.
+- [ ] **Upload real / PII real:** **storage de produção (3.2)** + **criptografia +
+      KMS (3.10)** + **retenção final (3.11)** definidos.
 - [ ] **Fase 5/Pix:** **provedor Pix (3.4)** e **campos/idempotência (§7 #8/#10)** definidos.
-- [ ] **Fase 10/LGPD:** **retenção (3.11)** definida.
+- [ ] **Fase 10/LGPD:** **retenção (3.11)** final homologada (jurídico).
 - [ ] **Fase 12/piloto:** **hardening (F11)** aprovado; provedores de produção ativos.
 
-> **Resumo:** **Fases 1 e 2 liberadas** (banco + auth preliminar). **Auth real +
-> MFA** antes de **produção**; **Pix, storage, criptografia e retenção** continuam
-> `PENDENTE` e **travam** as fases de pagamento, upload real e PII real — devem
-> estar prontos **antes** delas.
+> **Resumo:** **Fases 1–4 liberadas** (banco + auth + storage/criptografia/retenção
+> preliminares) — a F4 **só em modo dev/fictício**. **Auth real + MFA** antes de
+> **produção**; **Pix (3.4)** trava a F5; **storage de produção, KMS e retenção
+> final** travam o **upload real / PII real** — devem estar prontos **antes** deles.
 
 ---
 
@@ -278,7 +343,7 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 | # | Decisão | Recomendação padrão | Escolhida |
 |---|---------|---------------------|-----------|
 | 3.1 | Banco | Supabase (Postgres gerenciado) | ✅ **Fase 1: Postgres local + Prisma**; produção `PENDENTE` |
-| 3.2 | Storage | Supabase Storage (via adapter) | `PENDENTE` |
+| 3.2 | Storage | Supabase Storage (via adapter) | 🟡 **Fase 4: adapter + storage local/dev (arquivos fictícios)**; produção `PENDENTE` (Supabase vs. S3) |
 | 3.3 | Redis/fila | Redis gerenciado + worker | `PENDENTE` |
 | 3.4 | Pix | PSP BR com Pix + webhook | `PENDENTE` |
 | 3.5 | E-mail | Resend | `PENDENTE` |
@@ -286,8 +351,8 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 | 3.7 | Deploy | Vercel (web) + gerenciados / Railway | `PENDENTE` |
 | 3.8 | Auth usuário | Auth.js ou Supabase Auth | 🟡 **Fase 2: mock/dev + estrutura**; provedor real `PENDENTE` |
 | 3.9 | Auth admin | Mesma + RBAC + MFA, domínio separado | 🟡 **Fase 2: RBAC estrutural + mock**; auth real + MFA `PENDENTE` (antes de produção) |
-| 3.10 | Criptografia | Cifra em app + KMS + `cpf_hash` | `PENDENTE` |
-| 3.11 | Retenção docs | Apagar doc 30–90d após conclusão | `PENDENTE` |
+| 3.10 | Criptografia | Cifra em app + KMS + `cpf_hash` | 🟡 **Fase 4: sem doc real; arquitetura p/ hashes + storage privado**; KMS final `PENDENTE` (bloqueia PII real) |
+| 3.11 | Retenção docs | Apagar doc 30–90d após conclusão | 🟡 **MVP: conclusão + 30d e expurgo (proposta)**; final `PENDENTE` (jurídico/LGPD) |
 
 ---
 
