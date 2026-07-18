@@ -260,6 +260,53 @@ desatualiza — `src/server/processes/operationalSignals.ts`):
   notas, checklist marcado e status atual de pagamento e documento.
 
 Sem mudança de schema nesta fase.
+
+## Execução assistida manual (Fase 7 — dev/fictício)
+
+> ⚠️ **O sistema não acessa Gov.br. Não acessa SINARM/CAC. Não automatiza. Não
+> protocola. Nunca clica em "Gerar GRU e Salvar".** Não há Playwright, robô nem
+> credencial do Gov.br — o app **não guarda senha nem token** do órgão.
+>
+> **Quem executa é uma pessoa**, na janela oficial, **fora do app**. O painel
+> **guia, registra e audita** o que ela declara ter feito. Plano completo em
+> `docs/21-preparacao-fase-7-execucao-assistida-manual.md`.
+
+**Etapas manuais** (`manualExecutionStatus`): `EXECUCAO_MANUAL_NAO_INICIADA →
+GOVBR_ABERTO_PELO_OPERADOR → SINARM_ABERTO_PELO_OPERADOR →
+FORMULARIO_PREENCHIDO_MANUALMENTE → CHECKPOINT_DADOS_GRU_CONFERIDO →
+PROTOCOLO_MANUAL_REGISTRADO → GRU_MANUAL_REGISTRADA →
+AGUARDANDO_PAGAMENTO_GRU_EMPRESA → GRU_PAGA_MANUALMENTE_DEV`, mais
+`BLOQUEADO_OPERACIONALMENTE` (exige motivo).
+
+No detalhe admin, o bloco **"Execução assistida manual"** traz:
+
+- **avanço de etapa** com **declaração obrigatória** ("eu executei manualmente,
+  fora do app") e observação sem PII;
+- **protocolo fictício/dev** — o registro exige declarar que **a pessoa** clicou
+  em "Gerar GRU e Salvar" no site do órgão; um protocolo já registrado **não é
+  sobrescrito** (trilha append-only, correção por nova nota);
+- **GRU fictícia/dev** — referência, vencimento e valor **lidos do sistema pelo
+  operador** (o app não presume nada); a UI diz explicitamente *"o app não gerou
+  esta GRU"*; valor diferente de R$ 20,00 gera alerta na trilha;
+- **pagamento da GRU pela empresa** — só ADMIN/FINANCEIRO (segregação: quem
+  executou o protocolo não libera o pagamento);
+- **checklist pós-protocolo** (5 itens) e trilha com rótulos explícitos
+  ("Protocolo registrado manualmente", "Etapa manual (registrada)").
+
+**RBAC (Fase 7):**
+
+| Ação | ADMIN | OPERADOR | FINANCEIRO | SUPORTE | USER |
+|------|:-----:|:--------:|:----------:|:-------:|:----:|
+| Registrar etapas manuais, protocolo e GRU | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Registrar pagamento da GRU (empresa) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Acompanhar / mensagem ao usuário | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+O **usuário** vê só o status amigável (*Em execução · Protocolo registrado · GRU
+registrada · Aguardando pagamento da GRU · Em acompanhamento*) e a frase de que
+**a execução é feita por uma pessoa da equipe, não pelo aplicativo**. Ele não vê
+número de protocolo, dados da GRU nem qualquer bloco interno.
+
+Schema mudou: rode `npm run db:push`.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

@@ -6,6 +6,7 @@ import {
   type DocumentStatus,
   type DocumentType,
   type InternalStatus,
+  type ManualExecutionStatus,
   type NoteVisibility,
   type OperationalStatus,
   type PaymentStatus,
@@ -71,6 +72,40 @@ export const OPERATIONAL_STATUS_USER_LABELS: Record<OperationalStatus, string> =
   PRONTO_PARA_PROTOCOLO_MANUAL: "Em andamento",
   BLOQUEADO: "Precisamos de um ajuste",
   CANCELADO_DEV: "Cancelado",
+};
+
+/**
+ * Etapas da execucao assistida MANUAL (Fase 7) — rotulo interno.
+ * Os textos descrevem o que o OPERADOR HUMANO fez fora do app.
+ */
+export const MANUAL_EXECUTION_LABELS: Record<ManualExecutionStatus, string> = {
+  EXECUCAO_MANUAL_NAO_INICIADA: "Execucao manual nao iniciada",
+  GOVBR_ABERTO_PELO_OPERADOR: "Gov.br aberto pelo operador (fora do app)",
+  SINARM_ABERTO_PELO_OPERADOR: "SINARM aberto pelo operador (fora do app)",
+  FORMULARIO_PREENCHIDO_MANUALMENTE: "Formulario preenchido manualmente",
+  CHECKPOINT_DADOS_GRU_CONFERIDO: "Checkpoint 'Dados da GRU' conferido",
+  PROTOCOLO_MANUAL_REGISTRADO: "Protocolo registrado manualmente",
+  GRU_MANUAL_REGISTRADA: "GRU registrada manualmente",
+  AGUARDANDO_PAGAMENTO_GRU_EMPRESA: "Aguardando pagamento da GRU (empresa)",
+  GRU_PAGA_MANUALMENTE_DEV: "GRU paga manualmente (dev)",
+  BLOQUEADO_OPERACIONALMENTE: "Bloqueado operacionalmente",
+};
+
+/**
+ * Como o USUARIO ve a execucao manual (docs/21 §11).
+ * Tom neutro e honesto: nunca sugerir que o app operou o orgao.
+ */
+export const MANUAL_EXECUTION_USER_LABELS: Record<ManualExecutionStatus, string> = {
+  EXECUCAO_MANUAL_NAO_INICIADA: "Em revisao",
+  GOVBR_ABERTO_PELO_OPERADOR: "Em execucao",
+  SINARM_ABERTO_PELO_OPERADOR: "Em execucao",
+  FORMULARIO_PREENCHIDO_MANUALMENTE: "Em execucao",
+  CHECKPOINT_DADOS_GRU_CONFERIDO: "Em execucao",
+  PROTOCOLO_MANUAL_REGISTRADO: "Protocolo registrado",
+  GRU_MANUAL_REGISTRADA: "GRU registrada",
+  AGUARDANDO_PAGAMENTO_GRU_EMPRESA: "Aguardando pagamento da GRU",
+  GRU_PAGA_MANUALMENTE_DEV: "Em acompanhamento",
+  BLOQUEADO_OPERACIONALMENTE: "Bloqueado — precisa de ajuste",
 };
 
 export const PRIORITY_LABELS: Record<ProcessPriority, string> = {

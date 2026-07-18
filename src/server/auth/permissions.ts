@@ -22,6 +22,7 @@ export const PERMISSIONS = [
   "process.priority", // Alterar prioridade operacional (docs/11 §4)
   "process.operationalStatus", // Mover o status operacional da fila
   "note.internal", // Escrever nota interna (equipe) no processo
+  "manual.execution.register", // Registrar execucao MANUAL feita fora do app (docs/21)
   "gru.generate", // Clicar "Gerar GRU e Salvar" (irreversivel)
   "payment.pix.confirm", // Confirmar Pix do cliente
   "payment.gru.register", // Registrar pagamento da GRU (empresa)
@@ -48,6 +49,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "process.priority": "Alterar prioridade do processo",
   "process.operationalStatus": "Mover status operacional",
   "note.internal": "Escrever nota interna",
+  "manual.execution.register": "Registrar execucao manual (feita fora do app)",
   "gru.generate": 'Clicar "Gerar GRU e Salvar"',
   "payment.pix.confirm": "Confirmar Pix do cliente",
   "payment.gru.register": "Registrar pagamento da GRU (empresa)",
@@ -83,6 +85,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "process.priority",
     "process.operationalStatus",
     "note.internal",
+    // Registra o que FEZ manualmente fora do app — o app nao executa nada.
+    "manual.execution.register",
     "gru.generate",
     "message.send",
     "audit.view.own",

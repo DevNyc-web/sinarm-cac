@@ -11,6 +11,7 @@ import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
+  MANUAL_EXECUTION_LABELS,
   NOTE_VISIBILITY_LABELS,
   OPERATIONAL_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -27,11 +28,16 @@ import {
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
+import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
 import {
+  advanceManualExecutionAction,
   assignProcessAction,
   changeOperationalStatusAction,
   changePriorityAction,
   createNoteAction,
+  registerManualGruAction,
+  registerManualGruPaymentAction,
+  registerManualProtocolAction,
   reviewDocumentAction,
   toggleChecklistAction,
 } from "./actions";
@@ -100,8 +106,11 @@ export default async function AdminProcessoDetalhePage({
   const canWriteInternalNote = hasPermission(admin, "note.internal");
   const canMessageUser = hasPermission(admin, "message.send");
   const assignees = assignableMockUsers();
+  const canRegisterManual = hasPermission(admin, "manual.execution.register");
+  const canRegisterGruPayment = hasPermission(admin, "payment.gru.register");
   const revisionChecklist = detail.checklist.filter((item) => item.group === "REVISAO");
   const gruChecklist = detail.checklist.filter((item) => item.group === "GRU");
+  const postProtocolChecklist = detail.checklist.filter((item) => item.group === "POS_PROTOCOLO");
 
   return (
     <Container>
@@ -512,6 +521,244 @@ export default async function AdminProcessoDetalhePage({
           </div>
         </Card>
       </div>
+
+      <Card className="mt-4 text-sm">
+        <div className="flex items-center gap-2">
+          <p className="font-medium">Execucao assistida manual</p>
+          <Badge>{MANUAL_EXECUTION_LABELS[detail.manualExecutionStatus]}</Badge>
+        </div>
+        <div className="mt-2 space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p>
+            <strong>O sistema nao acessa Gov.br/SINARM.</strong>
+          </p>
+          <p>
+            <strong>O sistema nao protocola.</strong>
+          </p>
+          <p>
+            Esta tela <strong>apenas registra o que o operador fez fora do app</strong>, na janela
+            oficial. Dados ficticios/dev.
+          </p>
+        </div>
+
+        {!canRegisterManual ? (
+          <p className="mt-3 text-neutral-500">
+            Seu perfil ({ROLE_LABELS[admin.role]}) acompanha o registro, mas nao o edita
+            (docs/11 §3).
+          </p>
+        ) : (
+          <form action={advanceManualExecutionAction} className="mt-3 space-y-2">
+            <input type="hidden" name="processId" value={detail.id} />
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="block text-xs text-neutral-600">
+                Etapa manual
+                <select
+                  name="manualStatus"
+                  defaultValue={detail.manualExecutionStatus}
+                  className={controlClass}
+                >
+                  {Object.entries(MANUAL_EXECUTION_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <input
+                name="observation"
+                placeholder="Observacao (sem dados pessoais)"
+                maxLength={MAX_OBSERVATION_LENGTH}
+                className={`${controlClass} min-w-[16rem] flex-1`}
+              />
+            </div>
+            <label className="flex items-start gap-2 text-xs text-neutral-700">
+              <input type="checkbox" name="declared" className="mt-0.5" />
+              <span>
+                Declaro que <strong>eu executei esta acao manualmente, fora do app</strong>, na
+                janela oficial do Gov.br/SINARM.
+              </span>
+            </label>
+            <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+              Registrar etapa
+            </Button>
+          </form>
+        )}
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-md border border-neutral-200 px-3 py-2">
+            <p className="font-medium">Protocolo (registro manual)</p>
+            {detail.manualExecution?.protocolNumber ? (
+              <>
+                <p className="mt-1 font-mono text-neutral-900">
+                  {detail.manualExecution.protocolNumber}
+                </p>
+                <p className="text-xs text-neutral-500">
+                  Registrado por {detail.manualExecution.protocolRegisteredByLabel} em{" "}
+                  {detail.manualExecution.protocolRegisteredAt
+                    ? formatDateTime(detail.manualExecution.protocolRegisteredAt)
+                    : "—"}
+                </p>
+                {detail.manualExecution.protocolObservation ? (
+                  <p className="mt-1 text-xs text-neutral-600">
+                    {detail.manualExecution.protocolObservation}
+                  </p>
+                ) : null}
+              </>
+            ) : canRegisterManual ? (
+              <form action={registerManualProtocolAction} className="mt-2 space-y-2">
+                <input type="hidden" name="processId" value={detail.id} />
+                <input
+                  name="protocolNumber"
+                  placeholder="Nº de protocolo (ficticio/dev)"
+                  className={`${controlClass} w-full`}
+                />
+                <input
+                  name="observation"
+                  placeholder="Observacao (sem PII)"
+                  maxLength={MAX_OBSERVATION_LENGTH}
+                  className={`${controlClass} w-full`}
+                />
+                <label className="flex items-start gap-2 text-xs text-neutral-700">
+                  <input type="checkbox" name="declared" className="mt-0.5" />
+                  <span>
+                    Declaro que <strong>eu cliquei em &quot;Gerar GRU e Salvar&quot;</strong> no
+                    site do orgao — o app nao fez isso.
+                  </span>
+                </label>
+                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                  Registrar protocolo
+                </Button>
+              </form>
+            ) : (
+              <p className="mt-1 text-neutral-500">Nao registrado.</p>
+            )}
+          </div>
+
+          <div className="rounded-md border border-neutral-200 px-3 py-2">
+            <p className="font-medium">GRU (registro manual)</p>
+            <p className="text-xs text-neutral-500">O app nao gerou esta GRU.</p>
+            {detail.manualExecution?.gruReference ? (
+              <>
+                <p className="mt-1 text-neutral-900">
+                  Ref. {detail.manualExecution.gruReference}
+                  {detail.manualExecution.gruAmountCents !== null
+                    ? ` · ${formatBRL(detail.manualExecution.gruAmountCents)}`
+                    : ""}
+                </p>
+                <p className="text-xs text-neutral-600">
+                  Vencimento:{" "}
+                  {detail.manualExecution.gruDueDate
+                    ? detail.manualExecution.gruDueDate.toLocaleDateString("pt-BR")
+                    : "—"}
+                </p>
+                <p className="text-xs text-neutral-500">
+                  Registrada por {detail.manualExecution.gruRegisteredByLabel} em{" "}
+                  {detail.manualExecution.gruRegisteredAt
+                    ? formatDateTime(detail.manualExecution.gruRegisteredAt)
+                    : "—"}
+                </p>
+                {detail.manualExecution.gruPaidAt ? (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Paga pela empresa em {formatDateTime(detail.manualExecution.gruPaidAt)} ·{" "}
+                    {detail.manualExecution.gruPaymentRegisteredByLabel}
+                  </p>
+                ) : canRegisterGruPayment ? (
+                  <form action={registerManualGruPaymentAction} className="mt-2 space-y-2">
+                    <input type="hidden" name="processId" value={detail.id} />
+                    <input
+                      name="observation"
+                      placeholder="Comprovante/observacao (sem PII)"
+                      maxLength={MAX_OBSERVATION_LENGTH}
+                      className={`${controlClass} w-full`}
+                    />
+                    <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                      Registrar pagamento da GRU (empresa)
+                    </Button>
+                  </form>
+                ) : (
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Pagamento da GRU e registrado pelo Financeiro/Admin (docs/11 §9).
+                  </p>
+                )}
+              </>
+            ) : canRegisterManual ? (
+              <form action={registerManualGruAction} className="mt-2 space-y-2">
+                <input type="hidden" name="processId" value={detail.id} />
+                <input
+                  name="gruReference"
+                  placeholder="Nº de referencia (ficticio/dev)"
+                  className={`${controlClass} w-full`}
+                />
+                <div className="flex gap-2">
+                  <input type="date" name="gruDueDate" className={`${controlClass} flex-1`} />
+                  <input
+                    name="gruAmount"
+                    placeholder="Valor (ex.: 20,00)"
+                    className={`${controlClass} flex-1`}
+                  />
+                </div>
+                <input
+                  name="observation"
+                  placeholder="Observacao (sem PII)"
+                  maxLength={MAX_OBSERVATION_LENGTH}
+                  className={`${controlClass} w-full`}
+                />
+                <p className="text-xs text-neutral-500">
+                  Vencimento e valor sao <strong>lidos do sistema pelo operador</strong> — o app
+                  nao presume nada (docs/10 §4).
+                </p>
+                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                  Registrar dados da GRU
+                </Button>
+              </form>
+            ) : (
+              <p className="mt-1 text-neutral-500">Nao registrada.</p>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mt-4 text-sm">
+        <p className="font-medium">Checklist pos-protocolo (docs/21 §12)</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Conferencia do que foi <strong>registrado manualmente</strong> — ficticio/dev.
+        </p>
+        <ul className="mt-3 space-y-2">
+          {postProtocolChecklist.map((item) => (
+            <li key={item.key} className="flex items-start gap-2">
+              {canReview ? (
+                <form action={toggleChecklistAction}>
+                  <input type="hidden" name="processId" value={detail.id} />
+                  <input type="hidden" name="key" value={item.key} />
+                  <input type="hidden" name="nextChecked" value={item.checked ? "false" : "true"} />
+                  <button
+                    type="submit"
+                    aria-label={item.checked ? `Desmarcar: ${item.label}` : `Marcar: ${item.label}`}
+                    className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded border text-xs ${
+                      item.checked
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-neutral-400 bg-white text-transparent hover:border-neutral-600"
+                    }`}
+                  >
+                    ✓
+                  </button>
+                </form>
+              ) : (
+                <input type="checkbox" checked={item.checked} disabled readOnly className="mt-0.5" />
+              )}
+              <div>
+                <span className={item.checked ? "text-neutral-800" : "text-neutral-600"}>
+                  {item.label}
+                </span>
+                {item.checked && item.checkedAt && item.checkedByLabel ? (
+                  <p className="text-xs text-neutral-500">
+                    Marcado por {item.checkedByLabel} em {formatDateTime(item.checkedAt)}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <Card className="mt-4 text-sm">
         <p className="font-medium">Checklist de revisao (docs/11 §6)</p>

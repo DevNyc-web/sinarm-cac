@@ -8,6 +8,7 @@ import { requireUser } from "@/server/auth/guards";
 import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
+  MANUAL_EXECUTION_USER_LABELS,
   OPERATIONAL_STATUS_USER_LABELS,
   PAYMENT_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
@@ -77,12 +78,16 @@ export default async function ProcessoRevisaoPage({
         <Card className="mt-4 space-y-1 text-sm">
           <p className="font-medium">Status</p>
           <p className="text-neutral-800">
-            {OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]}
+            {/* Depois que a execucao manual comeca, ela e a visao mais atual. */}
+            {process.manualExecutionStatus === "EXECUCAO_MANUAL_NAO_INICIADA"
+              ? OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]
+              : MANUAL_EXECUTION_USER_LABELS[process.manualExecutionStatus]}
           </p>
           <p className="text-neutral-600">{process.processType.name}</p>
           <p className="text-xs text-neutral-500">
-            Acompanhe por aqui. Nenhum processo foi protocolado — este e um ambiente de
-            desenvolvimento com dados ficticios.
+            Quando houver execucao, ela e feita por uma pessoa da nossa equipe na janela oficial —
+            este aplicativo nao opera os sistemas do orgao. Ambiente de desenvolvimento com dados
+            ficticios; nada foi protocolado.
           </p>
         </Card>
 

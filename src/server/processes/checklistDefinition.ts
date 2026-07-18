@@ -27,6 +27,13 @@ export const CHECKLIST_ITEMS = [
   { key: "gru_document_approved", group: "GRU", label: "Documento aprovado" },
   { key: "gru_payment_confirmed", group: "GRU", label: "Pagamento confirmado (sandbox/dev)" },
   { key: "gru_internal_review", group: "GRU", label: "Autorizacao/revisao interna registrada" },
+
+  // --- Grupo POS_PROTOCOLO (docs/21 §12) — conferencia do registro manual ---
+  { key: "post_protocol_registered", group: "POS_PROTOCOLO", label: "Protocolo registrado (ficticio/dev)" },
+  { key: "post_gru_registered", group: "POS_PROTOCOLO", label: "GRU registrada (ficticia/dev)" },
+  { key: "post_gru_data_checked", group: "POS_PROTOCOLO", label: "Dados da GRU conferidos" },
+  { key: "post_awaiting_company_payment", group: "POS_PROTOCOLO", label: "Aguardando pagamento da GRU pela empresa" },
+  { key: "post_company_payment_registered", group: "POS_PROTOCOLO", label: "Pagamento da GRU registrado manualmente" },
 ] as const;
 
 export type ChecklistKey = (typeof CHECKLIST_ITEMS)[number]["key"];

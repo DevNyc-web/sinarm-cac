@@ -9,6 +9,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminRole, requirePermission } from "@/server/auth/guards";
 import { createProcessNote } from "@/server/services/createProcessNote";
+import {
+  advanceManualExecution,
+  registerManualGru,
+  registerManualGruPayment,
+  registerManualProtocol,
+} from "@/server/services/manualExecution";
 import { reviewProcessDocument, type ReviewDecision } from "@/server/services/reviewProcessDocument";
 import { toggleChecklistItem } from "@/server/services/toggleChecklistItem";
 import {
@@ -97,6 +103,72 @@ export async function changeOperationalStatusAction(formData: FormData) {
     actor,
     processId,
     String(formData.get("operationalStatus") ?? ""),
+  );
+  backTo(processId, result.ok ? undefined : result.error);
+}
+
+/**
+ * Fase 7 — registrar avanco da EXECUCAO MANUAL feita fora do app.
+ * Exige "manual.execution.register" (ADMIN/OPERADOR). O app nao executa nada.
+ */
+export async function advanceManualExecutionAction(formData: FormData) {
+  const actor = await requirePermission("manual.execution.register");
+  const processId = String(formData.get("processId") ?? "");
+
+  const result = await advanceManualExecution(
+    actor,
+    processId,
+    String(formData.get("manualStatus") ?? ""),
+    String(formData.get("observation") ?? ""),
+    formData.get("declared") === "on",
+  );
+  backTo(processId, result.ok ? undefined : result.error);
+}
+
+/** Fase 7 — registrar o protocolo obtido pelo humano no orgao (ficticio/dev). */
+export async function registerManualProtocolAction(formData: FormData) {
+  const actor = await requirePermission("manual.execution.register");
+  const processId = String(formData.get("processId") ?? "");
+
+  const result = await registerManualProtocol(
+    actor,
+    processId,
+    String(formData.get("protocolNumber") ?? ""),
+    String(formData.get("observation") ?? ""),
+    formData.get("declared") === "on",
+  );
+  backTo(processId, result.ok ? undefined : result.error);
+}
+
+/** Fase 7 — registrar os dados da GRU lidos pelo humano (ficticios/dev). */
+export async function registerManualGruAction(formData: FormData) {
+  const actor = await requirePermission("manual.execution.register");
+  const processId = String(formData.get("processId") ?? "");
+
+  const result = await registerManualGru(
+    actor,
+    processId,
+    String(formData.get("gruReference") ?? ""),
+    String(formData.get("gruDueDate") ?? ""),
+    String(formData.get("gruAmount") ?? ""),
+    String(formData.get("observation") ?? ""),
+  );
+  backTo(processId, result.ok ? undefined : result.error);
+}
+
+/**
+ * Fase 7 — registrar o pagamento da GRU pela EMPRESA (docs/11 §9).
+ * Exige "payment.gru.register" (ADMIN/FINANCEIRO) — segregacao de funcoes:
+ * quem executou o protocolo nao e quem libera o pagamento.
+ */
+export async function registerManualGruPaymentAction(formData: FormData) {
+  const actor = await requirePermission("payment.gru.register");
+  const processId = String(formData.get("processId") ?? "");
+
+  const result = await registerManualGruPayment(
+    actor,
+    processId,
+    String(formData.get("observation") ?? ""),
   );
   backTo(processId, result.ok ? undefined : result.error);
 }

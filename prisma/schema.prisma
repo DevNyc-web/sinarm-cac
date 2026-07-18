@@ -46,6 +46,11 @@ model Process {
   /// Responsavel atual (usuario MOCK — docs/11 §4). Vira FK com auth real.
   assignedToMockUserId String?             @map("assigned_to_mock_user_id")
   notes             ProcessNote[]
+  /// Etapa da EXECUCAO ASSISTIDA MANUAL (Fase 7, docs/21). Descreve o que o
+  /// OPERADOR HUMANO declarou ter feito FORA do app. O sistema nao acessa
+  /// Gov.br/SINARM, nao automatiza e nao protocola.
+  manualExecutionStatus ManualExecutionStatus @default(EXECUCAO_MANUAL_NAO_INICIADA) @map("manual_execution_status")
+  manualExecution   ManualExecution?
   /// Padrao "Guia para treino", editavel (docs/10 §4).
   justification    String                 @map("justification")
   destination      Destination?
@@ -80,6 +85,61 @@ enum OperationalStatus {
   CANCELADO_DEV
 
   @@map("operational_status")
+}
+
+/// Etapas da execucao assistida MANUAL (docs/21 §8).
+/// Cada estado descreve uma DECLARACAO do operador humano sobre algo feito
+/// fora do app. Nenhum estado faz o sistema agir no orgao.
+enum ManualExecutionStatus {
+  EXECUCAO_MANUAL_NAO_INICIADA
+  GOVBR_ABERTO_PELO_OPERADOR
+  SINARM_ABERTO_PELO_OPERADOR
+  FORMULARIO_PREENCHIDO_MANUALMENTE
+  CHECKPOINT_DADOS_GRU_CONFERIDO
+  PROTOCOLO_MANUAL_REGISTRADO
+  GRU_MANUAL_REGISTRADA
+  AGUARDANDO_PAGAMENTO_GRU_EMPRESA
+  GRU_PAGA_MANUALMENTE_DEV
+  BLOQUEADO_OPERACIONALMENTE
+
+  @@map("manual_execution_status")
+}
+
+/// Registro do que o HUMANO fez fora do app (docs/21 §6) — protocolo, dados da
+/// GRU e pagamento da GRU pela empresa. Em modo dev/ficticio: NUNCA protocolo
+/// real, NUNCA GRU real de producao. O app nao gerou nada disso.
+model ManualExecution {
+  id        String  @id @default(uuid())
+  processId String  @unique @map("process_id")
+  process   Process @relation(fields: [processId], references: [id])
+
+  /// --- Protocolo registrado manualmente (ficticio/dev) ---
+  protocolNumber                 String?   @map("protocol_number")
+  protocolObservation            String?   @map("protocol_observation")
+  protocolRegisteredByMockUserId String?   @map("protocol_registered_by_mock_user_id")
+  protocolRegisteredByRole       String?   @map("protocol_registered_by_role")
+  protocolRegisteredAt           DateTime? @map("protocol_registered_at")
+
+  /// --- Dados da GRU registrados manualmente (ficticios/dev) ---
+  gruReference              String?   @map("gru_reference")
+  /// Vencimento LIDO do sistema pelo operador — nunca fixado pelo app (docs/10 §4).
+  gruDueDate                DateTime? @map("gru_due_date")
+  gruAmountCents            Int?      @map("gru_amount_cents")
+  gruObservation            String?   @map("gru_observation")
+  gruRegisteredByMockUserId String?   @map("gru_registered_by_mock_user_id")
+  gruRegisteredByRole       String?   @map("gru_registered_by_role")
+  gruRegisteredAt           DateTime? @map("gru_registered_at")
+
+  /// --- Pagamento da GRU pela empresa (docs/11 §9), registrado pelo Financeiro ---
+  gruPaidAt                        DateTime? @map("gru_paid_at")
+  gruPaymentObservation            String?   @map("gru_payment_observation")
+  gruPaymentRegisteredByMockUserId String?   @map("gru_payment_registered_by_mock_user_id")
+  gruPaymentRegisteredByRole       String?   @map("gru_payment_registered_by_role")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("manual_executions")
 }
 
 /// Prioridade operacional da fila (docs/11 §4).
@@ -148,6 +208,11 @@ enum ProcessEventKind {
   PRIORIDADE
   RESPONSAVEL
   NOTA
+  /// Fase 7 — registros da execucao assistida MANUAL (docs/21 §9).
+  EXECUCAO_MANUAL
+  PROTOCOLO_MANUAL
+  GRU_MANUAL
+  PAGAMENTO_GRU_MANUAL
 
   @@map("process_event_kind")
 }
@@ -180,6 +245,8 @@ model ProcessChecklistItem {
 enum ChecklistGroup {
   REVISAO
   GRU
+  /// Fase 7 — conferencia POS-PROTOCOLO do que o humano registrou (docs/21 §12).
+  POS_PROTOCOLO
 
   @@map("checklist_group")
 }

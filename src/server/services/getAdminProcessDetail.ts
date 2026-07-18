@@ -19,6 +19,7 @@ import {
   type DocumentStatus,
   type DocumentType,
   type InternalStatus,
+  type ManualExecutionStatus,
   type NoteVisibility,
   type OperationalStatus,
   type PaymentStatus,
@@ -39,6 +40,7 @@ import {
   PAYMENT_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { listChecklistItems } from "@/server/repositories/checklistRepository";
+import { findManualExecution } from "@/server/repositories/manualExecutionRepository";
 import { listNotesForProcess } from "@/server/repositories/processNoteRepository";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForAdmin } from "@/server/repositories/processDocumentRepository";
@@ -139,6 +141,26 @@ export type AdminProcessDetail = {
   /** Indicadores DERIVADOS (Fase 6.5) — nada persistido. */
   indicators: OperationalIndicators;
   audit: AdminAuditSummary;
+  /** Execucao assistida MANUAL (Fase 7) — o que o humano registrou. */
+  manualExecutionStatus: ManualExecutionStatus;
+  manualExecution: AdminManualExecutionView | null;
+};
+
+/** Registro manual (docs/21 §6) — tudo digitado por humano, nada gerado pelo app. */
+export type AdminManualExecutionView = {
+  protocolNumber: string | null;
+  protocolObservation: string | null;
+  protocolRegisteredByLabel: string | null;
+  protocolRegisteredAt: Date | null;
+  gruReference: string | null;
+  gruDueDate: Date | null;
+  gruAmountCents: number | null;
+  gruObservation: string | null;
+  gruRegisteredByLabel: string | null;
+  gruRegisteredAt: Date | null;
+  gruPaidAt: Date | null;
+  gruPaymentObservation: string | null;
+  gruPaymentRegisteredByLabel: string | null;
 };
 
 /** Auditoria consolidada do processo (docs/11 §18) — contagens + ultima acao. */
@@ -183,14 +205,16 @@ export async function getAdminProcessDetail(
   const process = await findProcessByIdForAdmin(processId, canViewFull);
   if (!process) return null;
 
-  const [statusEvents, checklistRows, documentRows, paymentRows, noteRows] = await Promise.all([
-    listStatusEvents(process.id),
-    listChecklistItems(process.id),
-    listDocumentsForAdmin(process.id, canViewFull),
-    listPaymentsForProcess(process.id),
-    // Perfis internos leem notas internas e mensagens; o dono le so as visiveis.
-    listNotesForProcess(process.id, false),
-  ]);
+  const [statusEvents, checklistRows, documentRows, paymentRows, noteRows, manualRow] =
+    await Promise.all([
+      listStatusEvents(process.id),
+      listChecklistItems(process.id),
+      listDocumentsForAdmin(process.id, canViewFull),
+      listPaymentsForProcess(process.id),
+      // Perfis internos leem notas internas e mensagens; o dono le so as visiveis.
+      listNotesForProcess(process.id, false),
+      findManualExecution(process.id),
+    ]);
 
   // Documentos: sem visao completa, so tipo e status saem do servidor.
   const documents: AdminDocumentView[] = documentRows.map((doc) => {
@@ -283,6 +307,12 @@ export async function getAdminProcessDetail(
         PRIORIDADE: "Prioridade",
         RESPONSAVEL: "Responsavel",
         NOTA: "Registro",
+        // Fase 7 — deixa explicito que foi registro de acao MANUAL, feita fora
+        // do app; nunca sugerir que o sistema executou algo no orgao.
+        EXECUCAO_MANUAL: "Etapa manual (registrada)",
+        PROTOCOLO_MANUAL: "Protocolo registrado manualmente",
+        GRU_MANUAL: "GRU registrada manualmente",
+        PAGAMENTO_GRU_MANUAL: "Pagamento da GRU registrado",
       };
       title = `${prefix[event.kind] ?? "Evento"}: ${transition}`;
     }
@@ -361,9 +391,41 @@ export async function getAdminProcessDetail(
     currentDocumentStatus,
   };
 
+  const manualExecution: AdminManualExecutionView | null = manualRow
+    ? {
+        protocolNumber: manualRow.protocolNumber,
+        protocolObservation: manualRow.protocolObservation,
+        protocolRegisteredByLabel: manualRow.protocolRegisteredByMockUserId
+          ? actorLabel(
+              manualRow.protocolRegisteredByMockUserId,
+              manualRow.protocolRegisteredByRole ?? "?",
+            )
+          : null,
+        protocolRegisteredAt: manualRow.protocolRegisteredAt,
+        gruReference: manualRow.gruReference,
+        gruDueDate: manualRow.gruDueDate,
+        gruAmountCents: manualRow.gruAmountCents,
+        gruObservation: manualRow.gruObservation,
+        gruRegisteredByLabel: manualRow.gruRegisteredByMockUserId
+          ? actorLabel(manualRow.gruRegisteredByMockUserId, manualRow.gruRegisteredByRole ?? "?")
+          : null,
+        gruRegisteredAt: manualRow.gruRegisteredAt,
+        gruPaidAt: manualRow.gruPaidAt,
+        gruPaymentObservation: manualRow.gruPaymentObservation,
+        gruPaymentRegisteredByLabel: manualRow.gruPaymentRegisteredByMockUserId
+          ? actorLabel(
+              manualRow.gruPaymentRegisteredByMockUserId,
+              manualRow.gruPaymentRegisteredByRole ?? "?",
+            )
+          : null,
+      }
+    : null;
+
   return {
     indicators,
     audit,
+    manualExecutionStatus: process.manualExecutionStatus,
+    manualExecution,
     id: process.id,
     code: process.code,
     processTypeName: process.processType.name,

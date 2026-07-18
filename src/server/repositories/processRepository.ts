@@ -1,5 +1,6 @@
 import {
   type DocumentStatus,
+  type ManualExecutionStatus,
   type OperationalStatus,
   type PaymentStatus,
   type ProcessPriority,
@@ -168,6 +169,11 @@ export type UpdateProcessOperationsData = {
 /** Atualiza campos operacionais do processo (Fase 6). */
 export function updateProcessOperations(id: string, data: UpdateProcessOperationsData) {
   return getPrisma().process.update({ where: { id }, data });
+}
+
+/** Atualiza a etapa da execucao assistida MANUAL (Fase 7, docs/21 §8). */
+export function updateManualExecutionStatus(id: string, status: ManualExecutionStatus) {
+  return getPrisma().process.update({ where: { id }, data: { manualExecutionStatus: status } });
 }
 
 /**
