@@ -43,6 +43,7 @@ model Process {
   firearm          FirearmPce?
   statusEvents     ProcessStatusEvent[]
   checklistItems   ProcessChecklistItem[]
+  documents        ProcessDocument[]
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
 
@@ -125,6 +126,52 @@ model FirearmPce {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("firearms_pce")
+}
+
+/// Documento anexado ao processo (docs/12 §3.6) — Fase 4 em modo DEV/FICTICIO.
+/// Os BYTES ficam no storage local/dev (adapter), NUNCA no banco. Apenas
+/// metadados + sha256 aqui. SEM documento real, SEM PII real (docs/15 §3.2/§3.10).
+model ProcessDocument {
+  id                   String         @id @default(uuid())
+  processId            String         @map("process_id")
+  process              Process        @relation(fields: [processId], references: [id])
+  type                 DocumentType   @default(IDENTIFICACAO_PESSOAL)
+  status               DocumentStatus @default(ENVIADO)
+  originalFileName     String         @map("original_file_name")
+  mimeType             String         @map("mime_type")
+  sizeBytes            Int            @map("size_bytes")
+  sha256               String
+  storageKey           String         @map("storage_key")
+  uploadedByMockUserId String         @map("uploaded_by_mock_user_id")
+  reviewedByMockUserId String?        @map("reviewed_by_mock_user_id")
+  reviewedByRole       String?        @map("reviewed_by_role")
+  reviewedAt           DateTime?      @map("reviewed_at")
+  /// Motivo curto, SEM reproduzir PII do documento (docs/11 §14).
+  rejectionReason      String?        @map("rejection_reason")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  @@index([processId])
+  @@map("process_documents")
+}
+
+/// Tipos de documento (docs/12 §3.6). MVP: so Documento de Identificacao.
+enum DocumentType {
+  IDENTIFICACAO_PESSOAL
+  OUTRO
+
+  @@map("document_type")
+}
+
+/// Estados do documento (docs/12 §10, nomes conforme decisao da F4).
+enum DocumentStatus {
+  PENDENTE
+  ENVIADO
+  EM_ANALISE
+  APROVADO
+  REJEITADO
+
+  @@map("document_status")
 }
 
 /// Status internos (operacao). Ver docs/12 §6.

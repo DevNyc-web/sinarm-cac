@@ -26,6 +26,8 @@ credentials*.json
 # === Dados sensíveis / PII (LGPD — NUNCA commitar) ===
 # PDFs de certidões, comprovantes, screenshots com dados pessoais
 storage/
+# storage local/dev do app (uploads fictícios da Fase 4 — docs/15 §3.2)
+storage-local/
 labs/certidoes/storage/
 **/screenshots/
 *.pdf

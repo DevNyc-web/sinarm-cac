@@ -146,6 +146,28 @@ marcam o checklist de revisão (cada marcação grava quem/perfil/quando —
 mostra a criação do rascunho, eventos de status (`process_status_events`,
 append-only) e as marcações de checklist. Após atualizar o schema, rode
 `npm run db:push` de novo.
+
+## Upload fictício de documento (Fase 4 — modo dev)
+
+> ⚠️ **NÃO envie documento real.** Nada de RG, CPF, CNH ou foto/scan de
+> documento verdadeiro — nem do próprio time. Use somente arquivos
+> **fictícios** (um PDF/JPG/PNG qualquer, sem PII). Decisões preliminares em
+> docs/15 §3.2/§3.10/§3.11: storage de produção, criptografia/KMS e retenção
+> final seguem PENDENTES e **bloqueiam upload real**.
+
+- Onde: tela de revisão do processo (`/processos/[id]`), logado como
+  **Usuario Exemplo**. Aceita PDF/JPG/PNG até **2 MB**.
+- Os **bytes** vão para **`storage-local/`** (raiz do projeto, **git-ignored**
+  — nunca commitado); o banco guarda só **metadados + sha256**
+  (`process_documents`). Pode apagar a pasta livremente (dev).
+- Estados: `PENDENTE → ENVIADO → EM_ANALISE → APROVADO/REJEITADO`.
+- Revisão: ADMIN/OPERADOR aprovam/rejeitam no detalhe admin (rejeição exige
+  motivo, sem reproduzir dados do documento); FINANCEIRO/SUPORTE não revisam
+  (SUPORTE vê só o status). Envio e revisão aparecem no histórico.
+- Schema mudou: rode `npm run db:push` antes de usar.
+- Código: adapter em `src/server/storage/` (interface + implementação
+  local/dev; provedor real de produção entra como nova implementação),
+  services `uploadProcessDocument.ts` / `reviewProcessDocument.ts`.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

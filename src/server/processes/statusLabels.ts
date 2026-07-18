@@ -2,7 +2,12 @@
  * Rotulos em portugues para os status do processo (docs/11 §10/§11).
  * Identificadores em ingles/enum; texto de UI em portugues (docs/16 §5).
  */
-import { type InternalStatus, type UserFacingStatus } from "@prisma/client";
+import {
+  type DocumentStatus,
+  type DocumentType,
+  type InternalStatus,
+  type UserFacingStatus,
+} from "@prisma/client";
 
 export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   RASCUNHO: "Rascunho",
@@ -20,6 +25,19 @@ export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   GRU_PAGA_EMPRESA: "GRU paga (empresa)",
   CONCLUIDO: "Concluido",
   CANCELADO_REEMBOLSADO: "Cancelado / reembolsado",
+};
+
+export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
+  PENDENTE: "Pendente",
+  ENVIADO: "Enviado",
+  EM_ANALISE: "Em analise",
+  APROVADO: "Aprovado",
+  REJEITADO: "Rejeitado",
+};
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  IDENTIFICACAO_PESSOAL: "Documento de Identificacao Pessoal",
+  OUTRO: "Outro",
 };
 
 export const USER_FACING_STATUS_LABELS: Record<UserFacingStatus, string> = {

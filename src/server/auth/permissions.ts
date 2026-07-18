@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   "process.pii.viewMinimal", // Ver apenas o minimo necessario de PII
   "sinarm.execute", // Executar fluxo no SINARM/CAC
   "review.checklist", // Aplicar/registrar checklist de revisao
+  "document.review", // Aprovar/rejeitar documento do processo (docs/11 §14)
   "gru.generate", // Clicar "Gerar GRU e Salvar" (irreversivel)
   "payment.pix.confirm", // Confirmar Pix do cliente
   "payment.gru.register", // Registrar pagamento da GRU (empresa)
@@ -38,6 +39,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "process.pii.viewMinimal": "Ver PII — minimo necessario",
   "sinarm.execute": "Executar fluxo no SINARM/CAC",
   "review.checklist": "Aplicar checklist de revisao",
+  "document.review": "Aprovar/rejeitar documento do processo",
   "gru.generate": 'Clicar "Gerar GRU e Salvar"',
   "payment.pix.confirm": "Confirmar Pix do cliente",
   "payment.gru.register": "Registrar pagamento da GRU (empresa)",
@@ -68,6 +70,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "process.pii.viewFull",
     "sinarm.execute",
     "review.checklist",
+    "document.review",
     "gru.generate",
     "message.send",
     "audit.view.own",

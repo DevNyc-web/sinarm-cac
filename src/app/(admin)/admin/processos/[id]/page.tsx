@@ -10,19 +10,23 @@ import { PERMISSION_LABELS, type Permission } from "@/server/auth/permissions";
 import { ROLE_LABELS, type Role } from "@/server/auth/roles";
 import { CHECKLIST_ITEMS } from "@/server/processes/checklistDefinition";
 import {
+  DOCUMENT_STATUS_LABELS,
+  DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { listChecklistItems } from "@/server/repositories/checklistRepository";
+import { listDocumentsForProcess } from "@/server/repositories/processDocumentRepository";
 import { listStatusEvents } from "@/server/repositories/processEventRepository";
 import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
-import { toggleChecklistAction } from "./actions";
+import { reviewDocumentAction, toggleChecklistAction } from "./actions";
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
 const DETAIL_PERMISSIONS: readonly Permission[] = [
   "process.pii.viewFull",
   "sinarm.execute",
   "review.checklist",
+  "document.review",
   "gru.generate",
   "payment.pix.confirm",
   "payment.gru.register",
@@ -64,12 +68,14 @@ export default async function AdminProcessoDetalhePage({
   let process: Awaited<ReturnType<typeof findProcessByIdForAdmin>> = null;
   let statusEvents: Awaited<ReturnType<typeof listStatusEvents>> = [];
   let checklistRows: Awaited<ReturnType<typeof listChecklistItems>> = [];
+  let documents: Awaited<ReturnType<typeof listDocumentsForProcess>> = [];
   try {
     process = await findProcessByIdForAdmin(id);
     if (process) {
-      [statusEvents, checklistRows] = await Promise.all([
+      [statusEvents, checklistRows, documents] = await Promise.all([
         listStatusEvents(process.id),
         listChecklistItems(process.id),
+        listDocumentsForProcess(process.id),
       ]);
     }
   } catch {
@@ -80,6 +86,7 @@ export default async function AdminProcessoDetalhePage({
   const owner = findMockUser(process.userId);
   const canViewFull = hasPermission(admin, "process.pii.viewFull");
   const canReview = hasPermission(admin, "review.checklist");
+  const canReviewDocument = hasPermission(admin, "document.review");
 
   // Checklist: definicao fixa + estado persistido (itens nascem na 1a marcacao).
   const checklist = CHECKLIST_ITEMS.map((definition) => ({
@@ -117,6 +124,25 @@ export default async function AdminProcessoDetalhePage({
         at: item.row.checkedAt,
         title: `Checklist: ${item.label}`,
         detail: `marcado por ${actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}`,
+      });
+    }
+  }
+  for (const doc of documents) {
+    const docName = canViewFull ? doc.originalFileName : "documento (acesso restrito)";
+    timeline.push({
+      id: `doc-up-${doc.id}`,
+      at: doc.createdAt,
+      title: `Documento enviado: ${docName}`,
+      detail: `por ${actorLabel(doc.uploadedByMockUserId, "USER")}`,
+    });
+    if (doc.reviewedAt && doc.reviewedByMockUserId) {
+      timeline.push({
+        id: `doc-rev-${doc.id}`,
+        at: doc.reviewedAt,
+        title: `Documento ${DOCUMENT_STATUS_LABELS[doc.status].toLowerCase()}: ${docName}`,
+        detail: `por ${actorLabel(doc.reviewedByMockUserId, doc.reviewedByRole ?? "?")}${
+          doc.rejectionReason ? ` · motivo: ${doc.rejectionReason}` : ""
+        }`,
       });
     }
   }
@@ -193,6 +219,74 @@ export default async function AdminProcessoDetalhePage({
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Justificativa</p>
           <p className="text-neutral-600">{process.justification}</p>
+        </Card>
+
+        <Card className="text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">Documentos</p>
+            <Badge>ficticios</Badge>
+          </div>
+          {documents.length === 0 ? (
+            <p className="mt-2 text-neutral-500">Nenhum documento enviado.</p>
+          ) : !canViewFull ? (
+            <ul className="mt-2 space-y-1">
+              {documents.map((doc) => (
+                <li key={doc.id} className="text-neutral-600">
+                  {DOCUMENT_TYPE_LABELS[doc.type]} —{" "}
+                  <span className="font-medium">{DOCUMENT_STATUS_LABELS[doc.status]}</span>
+                </li>
+              ))}
+              <li className="text-xs text-neutral-500">
+                Metadados restritos — seu perfil ({ROLE_LABELS[admin.role]}) ve apenas o status
+                (docs/11 §3).
+              </li>
+            </ul>
+          ) : (
+            <ul className="mt-2 space-y-3">
+              {documents.map((doc) => (
+                <li key={doc.id} className="rounded-md border border-neutral-200 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate font-medium text-neutral-800">{doc.originalFileName}</p>
+                    <Badge>{DOCUMENT_STATUS_LABELS[doc.status]}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {DOCUMENT_TYPE_LABELS[doc.type]} · {doc.mimeType} ·{" "}
+                    {Math.max(1, Math.round(doc.sizeBytes / 1024))} KB · sha256{" "}
+                    {doc.sha256.slice(0, 12)}…
+                  </p>
+                  {doc.rejectionReason ? (
+                    <p className="mt-1 text-xs text-red-700">Motivo: {doc.rejectionReason}</p>
+                  ) : null}
+                  {canReviewDocument &&
+                  (doc.status === "ENVIADO" || doc.status === "EM_ANALISE" || doc.status === "PENDENTE") ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <form action={reviewDocumentAction}>
+                        <input type="hidden" name="processId" value={process.id} />
+                        <input type="hidden" name="documentId" value={doc.id} />
+                        <input type="hidden" name="decision" value="APROVADO" />
+                        <Button type="submit" className="px-3 py-1 text-xs">
+                          Aprovar
+                        </Button>
+                      </form>
+                      <form action={reviewDocumentAction} className="flex items-center gap-2">
+                        <input type="hidden" name="processId" value={process.id} />
+                        <input type="hidden" name="documentId" value={doc.id} />
+                        <input type="hidden" name="decision" value="REJEITADO" />
+                        <input
+                          name="rejectionReason"
+                          placeholder="Motivo (sem dados do doc)"
+                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                        />
+                        <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                          Rejeitar
+                        </Button>
+                      </form>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         <Card className="space-y-2 text-sm">
