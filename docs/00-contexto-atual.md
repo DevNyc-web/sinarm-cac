@@ -5,17 +5,18 @@
 > sessão) entenda o contexto só lendo os arquivos.
 >
 > **Última atualização:** 2026-07-18
-> **Estado geral:** **Fases 1–6.5 implementadas e validadas localmente** com
-> **Postgres real** e **dados 100% fictícios** (ver
-> `docs/18-validacao-integrada-fases-1-5.md`,
-> `docs/19-validacao-fase-6-operacao-admin.md` e
-> `docs/20-validacao-fase-6-5-indicadores-operacionais.md`). Auth mock/dev,
-> upload fictício, Pix sandbox, operação assistida no painel (fila com filtros,
-> responsável, prioridade, status operacional, notas/mensagens, checkpoint GRU
-> fictício) e **indicadores operacionais** (sinalizadores, SLA interno,
-> prontidão, pendências por perfil, auditoria consolidada) — **nada real**: sem
-> PII, sem documento real, sem cobrança real, **sem Gov.br/SINARM, sem GRU real,
-> sem protocolo real**.
+> **Estado geral:** **Fases 1–7 implementadas e validadas localmente** com
+> **Postgres real** e **dados 100% fictícios** (ver `docs/18`, `docs/19`,
+> `docs/20` e `docs/22`). O **ciclo dev/fictício está completo de ponta a
+> ponta**: rascunho → documento fictício → Pix sandbox/fake → operação admin
+> (fila, responsável, prioridade, checklists, indicadores) → **execução manual
+> auditável** (etapas, protocolo, GRU e pagamento da GRU registrados por
+> humano).
+>
+> **Nada real:** sem PII, sem documento real, sem cobrança real, **sem
+> Gov.br/SINARM, sem GRU real, sem protocolo real**. Na Fase 7 o app **não
+> executa atos no órgão** — ele **registra o trabalho humano feito fora do
+> app**, com trilha auditável.
 
 ---
 
@@ -94,14 +95,16 @@ Arquivos existentes:
 - `docs/19-validacao-fase-6-operacao-admin.md`
 - `docs/20-validacao-fase-6-5-indicadores-operacionais.md`
 - `docs/21-preparacao-fase-7-execucao-assistida-manual.md`
+- `docs/22-validacao-fase-7-execucao-manual.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
-com as **Fases 1–6.5** implementadas e **validadas localmente com dados
-fictícios** (`docs/18`, `docs/19` e `docs/20`). Roda com **Postgres local**,
-**auth mock/dev**, **storage local/dev** e **Pix em modo fake/sandbox** — nenhum
-provedor de produção conectado. **Gov.br, SINARM/CAC, GRU real e protocolo real
-continuam FORA** do app: o protocolo é humano, manual e externo.
+com as **Fases 1–7** implementadas e **validadas localmente com dados
+fictícios** (`docs/18`, `docs/19`, `docs/20` e `docs/22`). Roda com **Postgres
+local**, **auth mock/dev**, **storage local/dev** e **Pix em modo fake/sandbox**
+— nenhum provedor de produção conectado. **Gov.br, SINARM/CAC, GRU real e
+protocolo real continuam FORA** do app: o protocolo é humano, manual e externo,
+e o painel apenas **registra e audita** o que a pessoa fez.
 
 ## 5. O que já foi descoberto sobre o SINARM/CAC
 
@@ -169,25 +172,34 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 
 ## 7. Próximo passo planejado
 
-> **Estado da implementação (2026-07-18):** Fases 1–6.5 concluídas, testadas e
-> versionadas — ver `docs/18`, `docs/19` (commit `4634e5b`) e `docs/20`
-> (commit `79bc3b8`).
+> **Estado da implementação (2026-07-18):** Fases 1–7 concluídas, testadas e
+> versionadas — ver `docs/18`, `docs/19` (commit `4634e5b`), `docs/20`
+> (commit `79bc3b8`) e `docs/22` (commit `75a78b0`).
 > Fluxo fictício completo: login mock → rascunho → revisão → documento fictício
 > → fila admin **com filtros e indicadores** → aprovação/rejeição → checklists
 > (revisão e checkpoint GRU fictício) → Pix sandbox → processo em fila, com
 > **responsável, prioridade, status operacional, notas/mensagens**, histórico
-> auditável e **prontidão operacional** (o que falta, quem atua, quão perto
-> está).
+> auditável, **prontidão operacional** (o que falta, quem atua, quão perto está)
+> e, por fim, **execução manual auditável** — etapas, protocolo, GRU e pagamento
+> da GRU **registrados por humano**, nunca executados pelo app.
 >
-> **➡️ Próximo passo: F7 — EXECUÇÃO ASSISTIDA MANUAL, ainda em modo
-> dev/fictício.** O plano está em
-> `docs/21-preparacao-fase-7-execucao-assistida-manual.md` (preparação escrita,
-> **aguardando aprovação** — nenhum código da F7 foi escrito).
-> **Conceito:** o app **guia**, o **humano executa fora do app** na janela
-> oficial, o humano **registra** no painel e o app **audita**.
-> **O sistema NÃO acessa Gov.br, NÃO acessa SINARM/CAC, NÃO automatiza, NÃO
-> protocola e NUNCA clica em "Gerar GRU e Salvar"** — nem guarda credencial ou
-> senha do Gov.br. Dados seguem **fictícios/dev**; sem GRU real de produção.
+> **F7 — EXECUÇÃO ASSISTIDA MANUAL: implementada, testada e versionada**
+> (commit `75a78b0`; plano em `docs/21`, validação em `docs/22`).
+> **Conceito em vigor:** o app **guia**, o **humano executa fora do app** na
+> janela oficial, o humano **registra** no painel e o app **audita**.
+> **O sistema NÃO acessa Gov.br, NÃO acessa SINARM/CAC, NÃO automatiza (sem
+> Playwright/Puppeteer/Selenium), NÃO protocola e NUNCA clica em "Gerar GRU e
+> Salvar"** — nem guarda credencial ou senha do Gov.br.
+>
+> **➡️ Próximo passo recomendado (docs/22 §13):** **não adicionar novas
+> funcionalidades sensíveis**; fazer **revisão de produto/UX e de textos**
+> (tom honesto, sem promessa de aprovação, sem aparência de órgão oficial),
+> **preparar o checklist do piloto real** e **decidir o caminho de produção**.
+>
+> **Produção segue BLOQUEADA** pelas pendências do `docs/22 §12`: auth real +
+> MFA · storage de produção + KMS + retenção · Mercado Pago produção + webhook
+> público · termos/reembolso · revisão jurídica · política operacional da
+> execução humana · treinamento de operador · revisão de textos.
 >
 > **Pendências que travam produção** (docs/20 §11): auth real + MFA, storage de
 > produção + KMS + retenção, conta Mercado Pago de produção + webhook público
@@ -232,10 +244,9 @@ e como identificar compensação/pagamento. **Por enquanto NÃO seguir para auto
 **Sequência de leitura ao abrir o projeto na próxima sessão:**
 
 1. Leia **este arquivo** (`docs/00-contexto-atual.md`) primeiro.
-2. Depois `docs/18-validacao-integrada-fases-1-5.md`,
-   `docs/19-validacao-fase-6-operacao-admin.md` e
-   `docs/20-validacao-fase-6-5-indicadores-operacionais.md` (o que já está
-   pronto e validado, e o que trava produção).
+2. Depois as validações, na ordem: `docs/18` (Fases 1–5), `docs/19` (Fase 6),
+   `docs/20` (Fase 6.5) e `docs/22` (Fase 7) — o que já está pronto e validado,
+   e o que trava produção.
 3. Depois `docs/15-decisoes-fase-0.md` (decisões e pendências) e
    `docs/09-reconhecimento-sinarm-cac.md` (fluxo SINARM).
 
