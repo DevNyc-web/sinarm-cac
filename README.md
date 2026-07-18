@@ -74,6 +74,51 @@ npm run build
 Páginas placeholder: `/` (landing), `/login`, `/dashboard`, `/processos/novo`,
 `/admin`. Healthcheck: `/api/health`.
 
+## Autenticação mock/dev e RBAC (Fase 2)
+
+> **Isto não é autenticação.** Não há senha, token assinado, MFA nem provedor
+> real — apenas um cookie com o id de um usuário **fictício**, para destravar
+> guards, layout autenticado e navegação. Decisão preliminar em
+> [`docs/15-decisoes-fase-0.md`](docs/15-decisoes-fase-0.md) §3.8/§3.9.
+>
+> **Antes de produção são obrigatórios:** provedor real de auth + **MFA** para
+> perfis internos. Nunca usar dados reais, CPF real ou PII real neste modo.
+
+### Como usar
+
+1. Abra `/login`.
+2. Escolha um dos perfis fictícios — nenhum campo é preenchido:
+
+| Perfil mock | Papel | Acesso |
+|-------------|-------|--------|
+| Usuario Exemplo | `USER` | `/dashboard`, `/processos/novo` |
+| Admin Exemplo | `ADMIN` | `/admin` — vê tudo |
+| Operador Exemplo | `OPERADOR` | `/admin` — revisão/execução SINARM |
+| Financeiro Exemplo | `FINANCEIRO` | `/admin` — Pix/GRU/reembolso |
+| Suporte Exemplo | `SUPORTE` | `/admin` — atendimento/status |
+
+3. O cabeçalho mostra o perfil ativo e um botão **Sair**.
+4. `/admin` lista as permissões concedidas e negadas do perfil ativo.
+
+Trocar de perfil = sair e entrar com outro. Rotas de usuário exigem sessão;
+rotas admin exigem perfil interno permitido — quem não tem acesso volta para
+`/login` com o motivo.
+
+### Onde fica o código
+
+| Arquivo | Papel |
+|---------|-------|
+| `src/server/auth/roles.ts` | Perfis (`USER` + internos) e rótulos |
+| `src/server/auth/permissions.ts` | Matriz RBAC por perfil (docs/11 §3) |
+| `src/server/auth/mockUsers.ts` | Usuários fictícios — **deletar** ao entrar auth real |
+| `src/server/auth/session.ts` | Leitura/escrita do cookie de sessão mock |
+| `src/server/auth/guards.ts` | `getCurrentUser`, `requireUser`, `requireAdminRole`, `requirePermission`, `hasRole`, `hasPermission` |
+| `src/server/auth/config.ts` | `AUTH_MODE` — hoje sempre `"mock"` |
+
+**Ponto de substituição:** ao adotar o provedor real, só `session.ts`
+(`getCurrentUser`) muda; `guards.ts` e `permissions.ts` continuam válidos.
+Páginas nunca comparam `role` diretamente — sempre via guard/permissão.
+
 ## O que NÃO existe / NÃO será construído agora
 
 - App/telas finais

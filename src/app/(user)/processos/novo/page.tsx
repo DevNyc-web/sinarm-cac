@@ -1,15 +1,20 @@
 import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { requireUser } from "@/server/auth/guards";
 
-export default function NovoProcessoPage() {
+export default async function NovoProcessoPage() {
+  const user = await requireUser();
+
   return (
     <Container>
       <div className="max-w-2xl">
         <h1 className="text-2xl font-semibold">Nova Guia de Trafego</h1>
         <p className="mt-2 text-sm text-neutral-500">
-          Placeholder de formulario (Fase 1). Nenhum dado e salvo. Sem PII, sem upload, sem
-          pagamento.
+          Placeholder de formulario. Nenhum dado e salvo. Sem PII, sem upload, sem pagamento.
+        </p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Solicitante (ficticio): <span className="font-medium">{user.name}</span>
         </p>
         <Card className="mt-4 space-y-4">
           <label className="block text-sm">
@@ -48,7 +53,7 @@ export default function NovoProcessoPage() {
             />
           </label>
           <Button type="button" disabled>
-            Salvar (indisponivel na Fase 1)
+            Salvar (indisponivel nesta fase)
           </Button>
         </Card>
       </div>
