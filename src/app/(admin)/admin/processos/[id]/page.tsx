@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/Button";
 import { hasPermission, requireAdminRole } from "@/server/auth/guards";
 import { findMockUser } from "@/server/auth/mockUsers";
 import { PERMISSION_LABELS, type Permission } from "@/server/auth/permissions";
-import { ROLE_LABELS } from "@/server/auth/roles";
+import { ROLE_LABELS, type Role } from "@/server/auth/roles";
+import { CHECKLIST_ITEMS } from "@/server/processes/checklistDefinition";
 import {
   INTERNAL_STATUS_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
+import { listChecklistItems } from "@/server/repositories/checklistRepository";
+import { listStatusEvents } from "@/server/repositories/processEventRepository";
 import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
+import { toggleChecklistAction } from "./actions";
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
 const DETAIL_PERMISSIONS: readonly Permission[] = [
@@ -25,30 +29,49 @@ const DETAIL_PERMISSIONS: readonly Permission[] = [
   "message.send",
 ];
 
-/** Checklist de revisao (docs/11 §6) — VISUAL, nao interativo nesta fase. */
-const REVIEW_CHECKLIST: readonly string[] = [
-  "Pre-requisitos do usuario confirmados (Gov.br ativo; CR/arma)",
-  "Pagamento Pix do cliente confirmado",
-  "Consentimentos/LGPD registrados",
-  "Servico correto: Emitir Guia de Trafego Pessoa Fisica (CAC)",
-  "Documento de Identificacao Pessoal anexado e legivel",
-  "Destino completo e coerente",
-  "Arma/PCE selecionada do acervo e a certa",
-  "Justificativa preenchida",
-];
+type TimelineEntry = {
+  id: string;
+  at: Date;
+  title: string;
+  detail: string;
+};
 
-/** Detalhe admin do processo — Fase 3.5 (docs/11 §5, versao minima). */
+function actorLabel(mockUserId: string, role: string): string {
+  const mockUser = findMockUser(mockUserId);
+  const roleLabel = ROLE_LABELS[role as Role] ?? role;
+  return `${mockUser ? mockUser.name : mockUserId} (${roleLabel})`;
+}
+
+function formatDateTime(date: Date): string {
+  return `${date.toLocaleDateString("pt-BR")} ${date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+/** Detalhe admin do processo — Fases 3.5/3.6 (docs/11 §5, versao minima). */
 export default async function AdminProcessoDetalhePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ erro?: string }>;
 }) {
   const admin = await requireAdminRole();
   const { id } = await params;
+  const { erro } = await searchParams;
 
   let process: Awaited<ReturnType<typeof findProcessByIdForAdmin>> = null;
+  let statusEvents: Awaited<ReturnType<typeof listStatusEvents>> = [];
+  let checklistRows: Awaited<ReturnType<typeof listChecklistItems>> = [];
   try {
     process = await findProcessByIdForAdmin(id);
+    if (process) {
+      [statusEvents, checklistRows] = await Promise.all([
+        listStatusEvents(process.id),
+        listChecklistItems(process.id),
+      ]);
+    }
   } catch {
     // Banco local fora do ar: tratar como nao encontrado.
   }
@@ -56,6 +79,48 @@ export default async function AdminProcessoDetalhePage({
 
   const owner = findMockUser(process.userId);
   const canViewFull = hasPermission(admin, "process.pii.viewFull");
+  const canReview = hasPermission(admin, "review.checklist");
+
+  // Checklist: definicao fixa + estado persistido (itens nascem na 1a marcacao).
+  const checklist = CHECKLIST_ITEMS.map((definition) => ({
+    ...definition,
+    row: checklistRows.find((row) => row.key === definition.key) ?? null,
+  }));
+
+  // Linha do tempo: criacao + eventos de status + marcacoes de checklist.
+  const timeline: TimelineEntry[] = [];
+  const hasCreationEvent = statusEvents.some((event) => event.fromStatus === null);
+  if (!hasCreationEvent) {
+    // Rascunhos criados antes da Fase 3.6 nao tem evento de criacao persistido.
+    timeline.push({
+      id: `creation-${process.id}`,
+      at: process.createdAt,
+      title: "Rascunho criado",
+      detail: owner ? `por ${owner.name} (Usuario)` : `por ${process.userId}`,
+    });
+  }
+  for (const event of statusEvents) {
+    timeline.push({
+      id: event.id,
+      at: event.createdAt,
+      title:
+        event.fromStatus === null
+          ? `Rascunho criado — status ${INTERNAL_STATUS_LABELS[event.toStatus]}`
+          : `Status: ${INTERNAL_STATUS_LABELS[event.fromStatus]} → ${INTERNAL_STATUS_LABELS[event.toStatus]}`,
+      detail: `por ${actorLabel(event.actorMockUserId, event.actorRole)}${event.note ? ` · ${event.note}` : ""}`,
+    });
+  }
+  for (const item of checklist) {
+    if (item.row?.checked && item.row.checkedAt && item.row.checkedByMockUserId) {
+      timeline.push({
+        id: `check-${item.row.id}`,
+        at: item.row.checkedAt,
+        title: `Checklist: ${item.label}`,
+        detail: `marcado por ${actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}`,
+      });
+    }
+  }
+  timeline.sort((a, b) => a.at.getTime() - b.at.getTime());
 
   return (
     <Container>
@@ -64,6 +129,12 @@ export default async function AdminProcessoDetalhePage({
         <Badge>mock/dev</Badge>
       </div>
       <p className="mt-1 font-mono text-sm text-neutral-500">{process.code}</p>
+
+      {erro ? (
+        <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {erro}
+        </p>
+      ) : null}
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Card className="space-y-1 text-sm">
@@ -145,16 +216,66 @@ export default async function AdminProcessoDetalhePage({
       </div>
 
       <Card className="mt-4 text-sm">
-        <p className="font-medium">Checklist de revisao (docs/11 §6)</p>
+        <p className="font-medium">Checklist de revisao (docs/11 §6 — versao desta fase)</p>
         <p className="mt-1 text-xs text-neutral-500">
-          Visual apenas — marcacao interativa e registro (quem/quando) chegam em fase posterior.
-          Itens de pagamento/documento dependem de fases ainda nao implementadas.
+          {canReview
+            ? "Cada marcacao registra quem marcou, o perfil e a data/hora."
+            : `Seu perfil (${ROLE_LABELS[admin.role]}) pode visualizar, mas nao marcar (docs/11 §3).`}
         </p>
-        <ul className="mt-3 space-y-1.5">
-          {REVIEW_CHECKLIST.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-neutral-600">
-              <input type="checkbox" disabled className="mt-0.5" />
-              <span>{item}</span>
+        <ul className="mt-3 space-y-2">
+          {checklist.map((item) => {
+            const checked = item.row?.checked ?? false;
+            return (
+              <li key={item.key} className="flex items-start gap-2">
+                {canReview ? (
+                  <form action={toggleChecklistAction}>
+                    <input type="hidden" name="processId" value={process.id} />
+                    <input type="hidden" name="key" value={item.key} />
+                    <input type="hidden" name="nextChecked" value={checked ? "false" : "true"} />
+                    <button
+                      type="submit"
+                      aria-label={checked ? `Desmarcar: ${item.label}` : `Marcar: ${item.label}`}
+                      className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded border text-xs ${
+                        checked
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-neutral-400 bg-white text-transparent hover:border-neutral-600"
+                      }`}
+                    >
+                      ✓
+                    </button>
+                  </form>
+                ) : (
+                  <input type="checkbox" checked={checked} disabled readOnly className="mt-0.5" />
+                )}
+                <div>
+                  <span className={checked ? "text-neutral-800" : "text-neutral-600"}>
+                    {item.label}
+                  </span>
+                  {item.row?.checked && item.row.checkedAt && item.row.checkedByMockUserId ? (
+                    <p className="text-xs text-neutral-500">
+                      Marcado por {actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}{" "}
+                      em {formatDateTime(item.row.checkedAt)}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      <Card className="mt-4 text-sm">
+        <p className="font-medium">Historico do processo</p>
+        <ul className="mt-3 space-y-2">
+          {timeline.map((entry) => (
+            <li key={entry.id} className="flex items-start gap-3">
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-neutral-400" />
+              <div>
+                <p className="text-neutral-800">{entry.title}</p>
+                <p className="text-xs text-neutral-500">
+                  {formatDateTime(entry.at)} · {entry.detail}
+                </p>
+              </div>
             </li>
           ))}
         </ul>

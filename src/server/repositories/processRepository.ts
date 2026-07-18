@@ -54,6 +54,16 @@ export async function createDraftProcess(data: CreateDraftData) {
           quantity: data.firearm.quantity,
         },
       },
+      // Primeiro evento da linha do tempo (docs/12 §3.5): criacao do rascunho.
+      statusEvents: {
+        create: {
+          fromStatus: null,
+          toStatus: "RASCUNHO",
+          actorMockUserId: data.userId,
+          actorRole: "USER",
+          note: "Rascunho criado pelo usuario (mock/dev)",
+        },
+      },
     },
     include: { destination: true, firearm: true },
   });

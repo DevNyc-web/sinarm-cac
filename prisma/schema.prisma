@@ -38,14 +38,55 @@ model Process {
   internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
   userFacingStatus UserFacingStatus @default(RECEBIDO) @map("user_facing_status")
   /// Padrao "Guia para treino", editavel (docs/10 §4).
-  justification    String           @map("justification")
+  justification    String                 @map("justification")
   destination      Destination?
   firearm          FirearmPce?
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  statusEvents     ProcessStatusEvent[]
+  checklistItems   ProcessChecklistItem[]
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
 
   @@index([userId])
   @@map("processes")
+}
+
+/// Historico imutavel de mudancas de status (docs/12 §3.5). APPEND-ONLY:
+/// nunca editar/apagar. `actorMockUserId`/`actorRole` referem-se aos usuarios
+/// MOCK da Fase 2 — viram FK/enum reais quando a auth real entrar.
+model ProcessStatusEvent {
+  id              String          @id @default(uuid())
+  processId       String          @map("process_id")
+  process         Process         @relation(fields: [processId], references: [id])
+  fromStatus      InternalStatus? @map("from_status")
+  toStatus        InternalStatus  @map("to_status")
+  actorMockUserId String          @map("actor_mock_user_id")
+  actorRole       String          @map("actor_role")
+  /// Texto curto, SEM PII (docs/12 §3.5).
+  note            String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@index([processId])
+  @@map("process_status_events")
+}
+
+/// Itens do checklist de revisao admin (docs/11 §6, versao dev/mock).
+/// Registra quem marcou (usuario mock + perfil) e quando — base da futura
+/// auditoria (docs/11 §18). Um item por (processo, key).
+model ProcessChecklistItem {
+  id                  String    @id @default(uuid())
+  processId           String    @map("process_id")
+  process             Process   @relation(fields: [processId], references: [id])
+  key                 String
+  label               String
+  checked             Boolean   @default(false)
+  checkedByMockUserId String?   @map("checked_by_mock_user_id")
+  checkedByRole       String?   @map("checked_by_role")
+  checkedAt           DateTime? @map("checked_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([processId, key])
+  @@map("process_checklist_items")
 }
 
 /// Destino/clube/evento informado pelo usuario (docs/12 §3.7). Dados de local

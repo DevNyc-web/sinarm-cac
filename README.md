@@ -136,9 +136,16 @@ Fluxo: entrar como **Usuario Exemplo** → `/processos/novo` → preencher →
 
 **Fila admin (Fase 3.5):** perfis internos veem a fila em `/admin/processos` e
 o detalhe em `/admin/processos/[id]` (dados, destino, arma fictícia,
-justificativa, permissões do perfil e checklist visual não interativo).
+justificativa, permissões do perfil e checklist).
 Need-to-know: SUPORTE não vê o bloco de arma/PCE (mínimo necessário,
 docs/11 §3). Nenhuma ação de protocolo/pagamento existe nesta fase.
+
+**Checklist e histórico (Fase 3.6):** no detalhe admin, ADMIN e OPERADOR
+marcam o checklist de revisão (cada marcação grava quem/perfil/quando —
+`process_checklist_items`); FINANCEIRO e SUPORTE só visualizam. O histórico
+mostra a criação do rascunho, eventos de status (`process_status_events`,
+append-only) e as marcações de checklist. Após atualizar o schema, rode
+`npm run db:push` de novo.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 
