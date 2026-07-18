@@ -93,6 +93,7 @@ Arquivos existentes:
 - `docs/18-validacao-integrada-fases-1-5.md`
 - `docs/19-validacao-fase-6-operacao-admin.md`
 - `docs/20-validacao-fase-6-5-indicadores-operacionais.md`
+- `docs/21-preparacao-fase-7-execucao-assistida-manual.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -178,11 +179,15 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > auditável e **prontidão operacional** (o que falta, quem atua, quão perto
 > está).
 >
-> **➡️ Próximo passo recomendado (docs/20 §12): preparar a F7 — EXECUÇÃO
-> ASSISTIDA MANUAL.** O painel deve **apenas registrar** o que o operador faz
-> **fora do app** (roteiro do docs/09 §15, etapas cumpridas, protocolo/GRU
-> digitados por humano). **Sem automação, sem Playwright, sem credenciais
-> Gov.br, e o sistema NUNCA protocola.**
+> **➡️ Próximo passo: F7 — EXECUÇÃO ASSISTIDA MANUAL, ainda em modo
+> dev/fictício.** O plano está em
+> `docs/21-preparacao-fase-7-execucao-assistida-manual.md` (preparação escrita,
+> **aguardando aprovação** — nenhum código da F7 foi escrito).
+> **Conceito:** o app **guia**, o **humano executa fora do app** na janela
+> oficial, o humano **registra** no painel e o app **audita**.
+> **O sistema NÃO acessa Gov.br, NÃO acessa SINARM/CAC, NÃO automatiza, NÃO
+> protocola e NUNCA clica em "Gerar GRU e Salvar"** — nem guarda credencial ou
+> senha do Gov.br. Dados seguem **fictícios/dev**; sem GRU real de produção.
 >
 > **Pendências que travam produção** (docs/20 §11): auth real + MFA, storage de
 > produção + KMS + retenção, conta Mercado Pago de produção + webhook público
