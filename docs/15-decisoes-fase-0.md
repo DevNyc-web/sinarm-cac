@@ -97,20 +97,25 @@ decisões improvisadas no meio da implementação.
   Efí (Gerencianet).
 - **Alternativa aceitável:** outro PSP com Pix e webhook confiável; decisão final
   é **comercial** (doc 08).
-- **Decisão escolhida (2026-07-18):** 🟡 **RECOMENDAÇÃO REGISTRADA** — ver
-  comparativo completo em **`docs/17-decisao-pix-mvp.md`**.
-  - **Recomendação: Mercado Pago** (facilidade p/ MVP, sandbox, webhook,
-    marca reconhecida pelo pagador); **alternativa aceitável: Asaas**;
-    plano B técnico: OpenPix/Woovi; **Stripe descartado** (Pix no BR só por
-    convite); Efí preterido (mTLS sem benefício neste volume).
-  - **Confirmação do usuário:** `PENDENTE` — a escolha vira **DECIDIDO** com a
-    confirmação explícita (**segue bloqueador do início da F5**).
-  - **Restrição:** F5 começa **em sandbox/dev** (nenhum Pix real); Pix real em
-    produção só após **conta validada, webhook testado, reembolso revisado e
-    termos prontos** (doc 17 §5).
-  - **Taxas:** valores citados são referência — **confirmar no site oficial**.
-  - **Arquitetura:** implementar atrás de **payment adapter** (como o storage
-    adapter da F4) para não travar a troca de PSP.
+- **Decisão escolhida (2026-07-18):** ✅ **DECIDIDO PARA O MVP** —
+  **Mercado Pago** como PSP principal (comparativo: `docs/17-decisao-pix-mvp.md`).
+  - **Alternativa aceitável: Asaas** — acionar caso o Mercado Pago apresente
+    **bloqueio operacional, de conta, de aprovação, de taxas ou limitação
+    técnica**.
+  - **Arquitetura obrigatória:** implementar por **payment adapter** (mesmo
+    padrão do storage adapter da F4), para permitir **trocar de PSP no futuro
+    sem reescrever o domínio**.
+  - **Restrição:** a **Fase 5 começa apenas em sandbox/dev** — nenhuma cobrança
+    Pix real, sem CPF real, sem dados reais de cliente, sem pagamento em
+    produção.
+  - **Pix real em produção segue BLOQUEADO** até: **conta PJ validada** ·
+    **credenciais de produção disponíveis** · **webhook testado com reentrega e
+    idempotência** · **política de reembolso revisada** (doc 10 §15) ·
+    **termos de uso/pagamento prontos** (doc 10 §16) · **revisão mínima de
+    segurança**.
+  - **Taxas:** valores citados no doc 17 são referência — **confirmar no site
+    oficial** antes de contratar.
+  - **Efeito:** libera iniciar a **Fase 5 em modo sandbox/dev**.
 
 ### 3.5 Provedor de e-mail (transacional)
 - **Recomendação padrão:** **Resend** (simples, DX boa) para magic link/OTP e
@@ -238,9 +243,11 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
    dev/fictício**. **Storage de produção, KMS/criptografia final e retenção
    definitiva** seguem `PENDENTE` — obrigatórios **antes de upload real /
    documento real**.
-1. **Provedor Pix (3.4 / §7 #8):** bloqueia **Fase 5 (Pix)**. Não bloqueia F1–F4.
-   🟡 Recomendação registrada (doc 17: **Mercado Pago**; alt. Asaas) —
-   **falta confirmação do usuário**; F5 iniciará **em sandbox**.
+1. ✅ **Provedor Pix (3.4 / §7 #8): DECIDIDO — Mercado Pago (alt.: Asaas)**.
+   Deixa de bloquear o **início da F5 em sandbox/dev**. Continuam bloqueados o
+   **Pix real/produção** (condições do §3.4: conta PJ, credenciais, webhook
+   testado, reembolso, termos, revisão de segurança) e os **campos/idempotência
+   do schema** (§7 #8/#10 — modelar na própria F5).
 2. **Estratégia de criptografia + KMS (3.10 / §7 #9):** bloqueia **persistir PII
    real** e **documento real**. Não bloqueia a **F4 dev/fictícia**, mas
    **precisa estar pronta antes de dados reais** (upload real / F11).
@@ -285,7 +292,12 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
   **storage local/dev**, upload de **arquivos fictícios** (nunca documento real),
   **sha256/metadados**, estados do documento (doc 12 §10) e validação no painel —
   conforme preliminares 3.2/3.10/3.11. **Upload real** só após storage de
-  produção + KMS + retenção definitiva.
+  produção + KMS + retenção definitiva. **(FEITO — F4 dev.)**
+- **Fase 5 (Pix) em modo sandbox/dev:** integração **Mercado Pago** atrás de
+  **payment adapter**, cobrança dinâmica (QR/copia e cola) e **webhook
+  idempotente** — tudo **em sandbox**, com dados fictícios; modelar `payments`
+  e estados (doc 12 §3.9/§8) nessa fase. **Nenhuma cobrança real**; sem CPF
+  real; sem credenciais de produção; **não protocolar**; sem GRU/Gov.br/SINARM.
 - **Design de auditoria/eventos** (doc 12 §12) como contrato, independente do provedor.
 
 > **Regras enquanto auth real/storage de produção/criptografia/retenção final
@@ -293,13 +305,16 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 > - **Não usar dados reais / PII real** (nem CPF real, RG real ou **imagem real
 >   de documento**).
 > - **Não** usar **provedor de auth real** nem contas reais (só mock/dev).
-> - **Não implementar pagamento** (Pix) nem **GRU**.
+> - **Pix somente em sandbox** (F5): **nenhuma cobrança real**, sem credenciais
+>   de produção, sem dados reais de cliente. **GRU não se implementa** (registro
+>   manual pela operação, fases próprias).
 > - **Não implementar upload real de documentos sensíveis** — na F4, **apenas
 >   arquivos fictícios** no **storage local/dev**.
-> - **Não implementar automação SINARM/CAC** nem **Gov.br**.
-> - **Não** conectar provedores de **produção** nem **integração externa real**.
-> Ou seja: Fases 1–4 rodam **100% com Postgres local, auth mock/dev, storage
-> local/dev e dados fictícios**.
+> - **Não implementar automação SINARM/CAC** nem **Gov.br**. **Não protocolar.**
+> - **Não** conectar provedores de **produção** nem **integração externa real**
+>   (exceto o **sandbox** do PSP decidido em 3.4).
+> Ou seja: Fases 1–5 rodam **100% com Postgres local, auth mock/dev, storage
+> local/dev, Pix sandbox e dados fictícios**.
 
 ---
 
@@ -329,27 +344,41 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 - [x] **Retenção (3.11)** definida (preliminar) → **conclusão + 30 dias** e
       expurgo (proposta); decisão final `PENDENTE`; na F4 dev, **arquivos
       fictícios** apagáveis livremente.
-- [ ] Confirmação **explícita** do usuário para iniciar a Fase 4.
+- [x] Confirmação **explícita** do usuário → F4 dev implementada e versionada
+      (adapter local, upload fictício, revisão admin, histórico).
 
-> **Situação:** **Fases 1–3.6 concluídas**; **Fase 4 liberada** para começar
-> **apenas em modo dev/fictício** — storage local/dev via adapter, arquivos
-> fictícios, sem documento real, **sem CPF/PII real**, sem integração externa
-> real, sem Gov.br/SINARM, sem Pix/GRU. **Upload real de documento pessoal
-> continua bloqueado** até fechar **storage de produção (3.2)**,
-> **criptografia/KMS (3.10)** e **retenção definitiva (3.11)**.
+**Liberar a Fase 5 (Pix) em modo sandbox/dev:**
+- [x] **Provedor Pix (3.4)** decidido → ✅ **Mercado Pago** (alt.: Asaas) —
+      `docs/17-decisao-pix-mvp.md`.
+- [x] **Arquitetura** definida → **payment adapter** obrigatório; webhook
+      **idempotente** (§7 #10 modelado na F5).
+- [ ] Conta/credenciais de **sandbox** criadas no Mercado Pago (fora do repo).
+- [ ] Confirmação **explícita** do usuário para iniciar a Fase 5.
+
+> **Situação:** **Fases 1–4 (dev) concluídas**; **Fase 5 liberada** para
+> começar **apenas em modo sandbox/dev** com **Mercado Pago** — nenhuma
+> cobrança Pix real, **sem CPF real**, sem dados reais de cliente, sem
+> pagamento em produção, **sem protocolar**, sem GRU/Gov.br/SINARM.
+> **Pix real em produção continua bloqueado** até: conta PJ validada,
+> credenciais de produção, webhook testado (reentrega + idempotência),
+> reembolso revisado, termos prontos e revisão mínima de segurança.
+> **Upload real de documento pessoal** segue bloqueado (3.2/3.10/3.11 finais).
 
 **Liberar fases sensíveis:**
 - [ ] **Produção com contas reais:** **provedor de auth real (3.8/3.9)** + **MFA** ativos.
 - [ ] **Upload real / PII real:** **storage de produção (3.2)** + **criptografia +
       KMS (3.10)** + **retenção final (3.11)** definidos.
-- [ ] **Fase 5/Pix:** **provedor Pix (3.4)** e **campos/idempotência (§7 #8/#10)** definidos.
+- [ ] **Pix real/produção:** conta PJ validada + credenciais de produção +
+      **webhook testado (reentrega/idempotência)** + reembolso revisado +
+      termos prontos + revisão de segurança (3.4 ✅ decidido; sandbox liberado).
 - [ ] **Fase 10/LGPD:** **retenção (3.11)** final homologada (jurídico).
 - [ ] **Fase 12/piloto:** **hardening (F11)** aprovado; provedores de produção ativos.
 
-> **Resumo:** **Fases 1–4 liberadas** (banco + auth + storage/criptografia/retenção
-> preliminares) — a F4 **só em modo dev/fictício**. **Auth real + MFA** antes de
-> **produção**; **Pix (3.4)** trava a F5; **storage de produção, KMS e retenção
-> final** travam o **upload real / PII real** — devem estar prontos **antes** deles.
+> **Resumo:** **Fases 1–5 liberadas** (banco + auth + storage preliminares +
+> **Pix decidido: Mercado Pago**) — F4 **só dev/fictício**, F5 **só
+> sandbox/dev**. **Auth real + MFA** antes de **produção**; **Pix real** trava
+> na conta/webhook/reembolso/termos/segurança; **storage de produção, KMS e
+> retenção final** travam o **upload real / PII real** — prontos **antes** deles.
 
 ---
 
@@ -360,7 +389,7 @@ mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para inic
 | 3.1 | Banco | Supabase (Postgres gerenciado) | ✅ **Fase 1: Postgres local + Prisma**; produção `PENDENTE` |
 | 3.2 | Storage | Supabase Storage (via adapter) | 🟡 **Fase 4: adapter + storage local/dev (arquivos fictícios)**; produção `PENDENTE` (Supabase vs. S3) |
 | 3.3 | Redis/fila | Redis gerenciado + worker | `PENDENTE` |
-| 3.4 | Pix | PSP BR com Pix + webhook | 🟡 **Recomendação: Mercado Pago (alt.: Asaas)** — doc 17; confirmação `PENDENTE`; F5 só em sandbox |
+| 3.4 | Pix | PSP BR com Pix + webhook | ✅ **DECIDIDO: Mercado Pago (alt.: Asaas)** via payment adapter — doc 17; **F5 só em sandbox**; Pix real bloqueado (conta/webhook/reembolso/termos/segurança) |
 | 3.5 | E-mail | Resend | `PENDENTE` |
 | 3.6 | Domínio | Domínio neutro (app./admin.) | `PENDENTE` |
 | 3.7 | Deploy | Vercel (web) + gerenciados / Railway | `PENDENTE` |
