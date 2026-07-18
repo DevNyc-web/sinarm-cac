@@ -97,6 +97,7 @@ Arquivos existentes:
 - `docs/21-preparacao-fase-7-execucao-assistida-manual.md`
 - `docs/22-validacao-fase-7-execucao-manual.md`
 - `docs/23-checklist-piloto-real.md`
+- `docs/24-revisao-ux-textos-conformidade.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -192,14 +193,20 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > Playwright/Puppeteer/Selenium), NÃO protocola e NUNCA clica em "Gerar GRU e
 > Salvar"** — nem guarda credencial ou senha do Gov.br.
 >
-> **➡️ Bloco atual: NÃO é nova funcionalidade — é PREPARAÇÃO DE PILOTO REAL.**
-> O checklist está em `docs/23-checklist-piloto-real.md` (escopo do piloto,
-> checklists técnico/jurídico/financeiro/operacional/UX/segurança/suporte,
-> critérios de aceite e recusa de cliente, fluxo controlado, responsáveis,
-> evidências, rollback e critérios de sucesso/pausa).
-> Conforme `docs/22 §13`: **não adicionar novas funcionalidades sensíveis**;
-> revisar produto/UX e textos; fechar as pendências; decidir o caminho de
-> produção.
+> **➡️ Bloco atual: NÃO é nova funcionalidade — é PREPARAÇÃO DE PILOTO REAL +
+> REVISÃO DE COMUNICAÇÃO.** Não é hora de adicionar funcionalidade sensível
+> (`docs/22 §13`).
+> - `docs/23-checklist-piloto-real.md` — escopo do piloto, checklists
+>   (técnico/jurídico/financeiro/operacional/UX/segurança/suporte), critérios de
+>   aceite e recusa de cliente, fluxo controlado, responsáveis, evidências,
+>   rollback e critérios de sucesso/pausa.
+> - `docs/24-revisao-ux-textos-conformidade.md` — **revisão de UX e textos tela
+>   a tela** (feita, nenhuma tela alterada): frases proibidas/recomendadas,
+>   microcopy proposta e **7 avisos obrigatórios**. Achados de prioridade alta a
+>   corrigir antes do piloto: **termos/privacidade/reembolso ausentes nas telas**,
+>   **composição de preço (serviço + GRU) não explicada**, **jargão dev e status
+>   cru visíveis ao usuário**, **erro técnico exposto no dashboard** e
+>   **"protocolado ≠ aprovado"** não dito.
 >
 > **Produção e piloto seguem BLOQUEADOS** pelas 12 pendências do `docs/23 §5`:
 > auth real · MFA admin · storage de produção · KMS/criptografia · retenção
