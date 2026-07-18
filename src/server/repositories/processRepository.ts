@@ -106,10 +106,14 @@ export function listProcessesForAdmin() {
   });
 }
 
-/** Detalhe admin: processo por id, sem restricao de dono (docs/11 §5). */
-export function findProcessByIdForAdmin(id: string) {
+/**
+ * Detalhe admin: processo por id, sem restricao de dono (docs/11 §5).
+ * `includeFirearm` false => os dados da arma/PCE nem sao lidos do banco
+ * (need-to-know por perfil — docs/11 §3).
+ */
+export function findProcessByIdForAdmin(id: string, includeFirearm = true) {
   return getPrisma().process.findUnique({
     where: { id },
-    include: { destination: true, firearm: true, processType: true },
+    include: { destination: true, firearm: includeFirearm, processType: true },
   });
 }

@@ -5,10 +5,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { hasPermission, requireAdminRole } from "@/server/auth/guards";
-import { findMockUser } from "@/server/auth/mockUsers";
 import { PERMISSION_LABELS, type Permission } from "@/server/auth/permissions";
-import { ROLE_LABELS, type Role } from "@/server/auth/roles";
-import { CHECKLIST_ITEMS } from "@/server/processes/checklistDefinition";
+import { ROLE_LABELS } from "@/server/auth/roles";
 import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
@@ -16,11 +14,7 @@ import {
   PAYMENT_STATUS_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
-import { listChecklistItems } from "@/server/repositories/checklistRepository";
-import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
-import { listDocumentsForProcess } from "@/server/repositories/processDocumentRepository";
-import { listStatusEvents } from "@/server/repositories/processEventRepository";
-import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
+import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
 import { reviewDocumentAction, toggleChecklistAction } from "./actions";
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
@@ -35,19 +29,6 @@ const DETAIL_PERMISSIONS: readonly Permission[] = [
   "message.send",
 ];
 
-type TimelineEntry = {
-  id: string;
-  at: Date;
-  title: string;
-  detail: string;
-};
-
-function actorLabel(mockUserId: string, role: string): string {
-  const mockUser = findMockUser(mockUserId);
-  const roleLabel = ROLE_LABELS[role as Role] ?? role;
-  return `${mockUser ? mockUser.name : mockUserId} (${roleLabel})`;
-}
-
 function formatDateTime(date: Date): string {
   return `${date.toLocaleDateString("pt-BR")} ${date.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -55,7 +36,15 @@ function formatDateTime(date: Date): string {
   })}`;
 }
 
-/** Detalhe admin do processo — Fases 3.5/3.6 (docs/11 §5, versao minima). */
+function formatBRL(amountCents: number): string {
+  return `R$ ${(amountCents / 100).toFixed(2).replace(".", ",")}`;
+}
+
+/**
+ * Detalhe admin do processo — Fases 3.5/3.6/4/5.
+ * Os dados chegam JA REDIGIDOS por `getAdminProcessDetail` (need-to-know na
+ * camada de servico — docs/11 §3/§19); a pagina so apresenta.
+ */
 export default async function AdminProcessoDetalhePage({
   params,
   searchParams,
@@ -67,98 +56,15 @@ export default async function AdminProcessoDetalhePage({
   const { id } = await params;
   const { erro } = await searchParams;
 
-  let process: Awaited<ReturnType<typeof findProcessByIdForAdmin>> = null;
-  let statusEvents: Awaited<ReturnType<typeof listStatusEvents>> = [];
-  let checklistRows: Awaited<ReturnType<typeof listChecklistItems>> = [];
-  let documents: Awaited<ReturnType<typeof listDocumentsForProcess>> = [];
-  let payments: Awaited<ReturnType<typeof listPaymentsForProcess>> = [];
+  let detail: AdminProcessDetail | null = null;
   try {
-    process = await findProcessByIdForAdmin(id);
-    if (process) {
-      [statusEvents, checklistRows, documents, payments] = await Promise.all([
-        listStatusEvents(process.id),
-        listChecklistItems(process.id),
-        listDocumentsForProcess(process.id),
-        listPaymentsForProcess(process.id),
-      ]);
-    }
+    detail = await getAdminProcessDetail(admin, id);
   } catch {
     // Banco local fora do ar: tratar como nao encontrado.
   }
-  if (!process) notFound();
+  if (!detail) notFound();
 
-  const owner = findMockUser(process.userId);
-  const canViewFull = hasPermission(admin, "process.pii.viewFull");
   const canReview = hasPermission(admin, "review.checklist");
-  const canReviewDocument = hasPermission(admin, "document.review");
-
-  // Checklist: definicao fixa + estado persistido (itens nascem na 1a marcacao).
-  const checklist = CHECKLIST_ITEMS.map((definition) => ({
-    ...definition,
-    row: checklistRows.find((row) => row.key === definition.key) ?? null,
-  }));
-
-  // Linha do tempo: criacao + eventos de status + marcacoes de checklist.
-  const timeline: TimelineEntry[] = [];
-  const hasCreationEvent = statusEvents.some((event) => event.fromStatus === null);
-  if (!hasCreationEvent) {
-    // Rascunhos criados antes da Fase 3.6 nao tem evento de criacao persistido.
-    timeline.push({
-      id: `creation-${process.id}`,
-      at: process.createdAt,
-      title: "Rascunho criado",
-      detail: owner ? `por ${owner.name} (Usuario)` : `por ${process.userId}`,
-    });
-  }
-  for (const event of statusEvents) {
-    timeline.push({
-      id: event.id,
-      at: event.createdAt,
-      title:
-        event.fromStatus === null
-          ? `Rascunho criado — status ${INTERNAL_STATUS_LABELS[event.toStatus]}`
-          : `Status: ${INTERNAL_STATUS_LABELS[event.fromStatus]} → ${INTERNAL_STATUS_LABELS[event.toStatus]}`,
-      detail: `por ${actorLabel(event.actorMockUserId, event.actorRole)}${event.note ? ` · ${event.note}` : ""}`,
-    });
-  }
-  for (const item of checklist) {
-    if (item.row?.checked && item.row.checkedAt && item.row.checkedByMockUserId) {
-      timeline.push({
-        id: `check-${item.row.id}`,
-        at: item.row.checkedAt,
-        title: `Checklist: ${item.label}`,
-        detail: `marcado por ${actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}`,
-      });
-    }
-  }
-  for (const payment of payments) {
-    timeline.push({
-      id: `pay-${payment.id}`,
-      at: payment.createdAt,
-      title: `Cobranca Pix criada (sandbox/dev) — R$ ${(payment.amountCents / 100).toFixed(2).replace(".", ",")}`,
-      detail: `provider ${payment.provider} · status atual: ${PAYMENT_STATUS_LABELS[payment.status]}`,
-    });
-  }
-  for (const doc of documents) {
-    const docName = canViewFull ? doc.originalFileName : "documento (acesso restrito)";
-    timeline.push({
-      id: `doc-up-${doc.id}`,
-      at: doc.createdAt,
-      title: `Documento enviado: ${docName}`,
-      detail: `por ${actorLabel(doc.uploadedByMockUserId, "USER")}`,
-    });
-    if (doc.reviewedAt && doc.reviewedByMockUserId) {
-      timeline.push({
-        id: `doc-rev-${doc.id}`,
-        at: doc.reviewedAt,
-        title: `Documento ${DOCUMENT_STATUS_LABELS[doc.status].toLowerCase()}: ${docName}`,
-        detail: `por ${actorLabel(doc.reviewedByMockUserId, doc.reviewedByRole ?? "?")}${
-          doc.rejectionReason ? ` · motivo: ${doc.rejectionReason}` : ""
-        }`,
-      });
-    }
-  }
-  timeline.sort((a, b) => a.at.getTime() - b.at.getTime());
 
   return (
     <Container>
@@ -166,7 +72,7 @@ export default async function AdminProcessoDetalhePage({
         <h1 className="text-2xl font-semibold">Detalhe do processo</h1>
         <Badge>mock/dev</Badge>
       </div>
-      <p className="mt-1 font-mono text-sm text-neutral-500">{process.code}</p>
+      <p className="mt-1 font-mono text-sm text-neutral-500">{detail.code}</p>
 
       {erro ? (
         <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -177,33 +83,33 @@ export default async function AdminProcessoDetalhePage({
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Resumo</p>
-          <p className="text-neutral-600">{process.processType.name}</p>
+          <p className="text-neutral-600">{detail.processTypeName}</p>
           <p className="text-neutral-600">
-            Status interno: {INTERNAL_STATUS_LABELS[process.internalStatus]}
+            Status interno: {INTERNAL_STATUS_LABELS[detail.internalStatus]}
           </p>
           <p className="text-neutral-600">
-            Status visivel: {USER_FACING_STATUS_LABELS[process.userFacingStatus]}
+            Status visivel: {USER_FACING_STATUS_LABELS[detail.userFacingStatus]}
           </p>
           <p className="text-neutral-600">
-            Criado em {process.createdAt.toLocaleDateString("pt-BR")}
+            Criado em {detail.createdAt.toLocaleDateString("pt-BR")}
           </p>
         </Card>
 
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Usuario (mock)</p>
-          <p className="text-neutral-600">{owner ? owner.name : process.userId}</p>
-          {owner ? <p className="text-neutral-600">{owner.email}</p> : null}
+          <p className="text-neutral-600">{detail.owner ? detail.owner.name : detail.ownerFallbackId}</p>
+          {detail.owner ? <p className="text-neutral-600">{detail.owner.email}</p> : null}
           <p className="text-xs text-neutral-500">Usuario ficticio de desenvolvimento. Sem PII.</p>
         </Card>
 
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Destino / evento</p>
-          {process.destination ? (
+          {detail.destination ? (
             <>
-              <p className="text-neutral-600">{process.destination.eventName}</p>
+              <p className="text-neutral-600">{detail.destination.eventName}</p>
               <p className="text-neutral-600">
-                {process.destination.street}, {process.destination.number} —{" "}
-                {process.destination.city}/{process.destination.uf}
+                {detail.destination.street}, {detail.destination.number} —{" "}
+                {detail.destination.city}/{detail.destination.uf}
               </p>
             </>
           ) : (
@@ -213,15 +119,15 @@ export default async function AdminProcessoDetalhePage({
 
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Arma/PCE (ficticia)</p>
-          {!canViewFull ? (
+          {detail.firearmRestricted ? (
             <p className="text-neutral-500">
               Acesso restrito — seu perfil ({ROLE_LABELS[admin.role]}) ve apenas o minimo
               necessario (docs/11 §3).
             </p>
-          ) : process.firearm ? (
+          ) : detail.firearm ? (
             <p className="text-neutral-600">
-              {process.firearm.species} {process.firearm.brand} {process.firearm.model} —{" "}
-              {process.firearm.caliber} · qtd. {process.firearm.quantity}
+              {detail.firearm.species} {detail.firearm.brand} {detail.firearm.model} —{" "}
+              {detail.firearm.caliber} · qtd. {detail.firearm.quantity}
             </p>
           ) : (
             <p className="text-neutral-500">Nao informada.</p>
@@ -230,7 +136,7 @@ export default async function AdminProcessoDetalhePage({
 
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Justificativa</p>
-          <p className="text-neutral-600">{process.justification}</p>
+          <p className="text-neutral-600">{detail.justification}</p>
         </Card>
 
         <Card className="text-sm">
@@ -238,23 +144,22 @@ export default async function AdminProcessoDetalhePage({
             <p className="font-medium">Pagamento Pix do cliente</p>
             <Badge>sandbox/dev</Badge>
           </div>
-          {payments.length === 0 ? (
+          {detail.payments.length === 0 ? (
             <p className="mt-2 text-neutral-500">Nenhuma cobranca gerada.</p>
           ) : (
             <ul className="mt-2 space-y-2">
-              {payments.map((payment) => (
+              {detail.payments.map((payment) => (
                 <li key={payment.id} className="rounded-md border border-neutral-200 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium text-neutral-800">
-                      R$ {(payment.amountCents / 100).toFixed(2).replace(".", ",")} ·{" "}
-                      {payment.provider}
+                      {formatBRL(payment.amountCents)} · {payment.provider}
                     </p>
                     <Badge>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-neutral-500">
                     Criada em {formatDateTime(payment.createdAt)}
                     {payment.paidAt ? ` · paga em ${formatDateTime(payment.paidAt)}` : ""}
-                    {payment.providerPaymentId ? ` · ref ${payment.providerPaymentId.slice(0, 20)}` : ""}
+                    {payment.providerRefShort ? ` · ref ${payment.providerRefShort}` : ""}
                   </p>
                 </li>
               ))}
@@ -271,11 +176,11 @@ export default async function AdminProcessoDetalhePage({
             <p className="font-medium">Documentos</p>
             <Badge>ficticios</Badge>
           </div>
-          {documents.length === 0 ? (
+          {detail.documents.length === 0 ? (
             <p className="mt-2 text-neutral-500">Nenhum documento enviado.</p>
-          ) : !canViewFull ? (
+          ) : detail.documentsRestricted ? (
             <ul className="mt-2 space-y-1">
-              {documents.map((doc) => (
+              {detail.documents.map((doc) => (
                 <li key={doc.id} className="text-neutral-600">
                   {DOCUMENT_TYPE_LABELS[doc.type]} —{" "}
                   <span className="font-medium">{DOCUMENT_STATUS_LABELS[doc.status]}</span>
@@ -288,25 +193,23 @@ export default async function AdminProcessoDetalhePage({
             </ul>
           ) : (
             <ul className="mt-2 space-y-3">
-              {documents.map((doc) => (
+              {detail.documents.map((doc) => (
                 <li key={doc.id} className="rounded-md border border-neutral-200 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="truncate font-medium text-neutral-800">{doc.originalFileName}</p>
                     <Badge>{DOCUMENT_STATUS_LABELS[doc.status]}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-neutral-500">
-                    {DOCUMENT_TYPE_LABELS[doc.type]} · {doc.mimeType} ·{" "}
-                    {Math.max(1, Math.round(doc.sizeBytes / 1024))} KB · sha256{" "}
-                    {doc.sha256.slice(0, 12)}…
+                    {DOCUMENT_TYPE_LABELS[doc.type]} · {doc.mimeType} · {doc.sizeKb} KB · sha256{" "}
+                    {doc.sha256Short}…
                   </p>
                   {doc.rejectionReason ? (
                     <p className="mt-1 text-xs text-red-700">Motivo: {doc.rejectionReason}</p>
                   ) : null}
-                  {canReviewDocument &&
-                  (doc.status === "ENVIADO" || doc.status === "EM_ANALISE" || doc.status === "PENDENTE") ? (
+                  {doc.canBeReviewed ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <form action={reviewDocumentAction}>
-                        <input type="hidden" name="processId" value={process.id} />
+                        <input type="hidden" name="processId" value={detail.id} />
                         <input type="hidden" name="documentId" value={doc.id} />
                         <input type="hidden" name="decision" value="APROVADO" />
                         <Button type="submit" className="px-3 py-1 text-xs">
@@ -314,7 +217,7 @@ export default async function AdminProcessoDetalhePage({
                         </Button>
                       </form>
                       <form action={reviewDocumentAction} className="flex items-center gap-2">
-                        <input type="hidden" name="processId" value={process.id} />
+                        <input type="hidden" name="processId" value={detail.id} />
                         <input type="hidden" name="documentId" value={doc.id} />
                         <input type="hidden" name="decision" value="REJEITADO" />
                         <input
@@ -362,51 +265,47 @@ export default async function AdminProcessoDetalhePage({
             : `Seu perfil (${ROLE_LABELS[admin.role]}) pode visualizar, mas nao marcar (docs/11 §3).`}
         </p>
         <ul className="mt-3 space-y-2">
-          {checklist.map((item) => {
-            const checked = item.row?.checked ?? false;
-            return (
-              <li key={item.key} className="flex items-start gap-2">
-                {canReview ? (
-                  <form action={toggleChecklistAction}>
-                    <input type="hidden" name="processId" value={process.id} />
-                    <input type="hidden" name="key" value={item.key} />
-                    <input type="hidden" name="nextChecked" value={checked ? "false" : "true"} />
-                    <button
-                      type="submit"
-                      aria-label={checked ? `Desmarcar: ${item.label}` : `Marcar: ${item.label}`}
-                      className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded border text-xs ${
-                        checked
-                          ? "border-emerald-600 bg-emerald-600 text-white"
-                          : "border-neutral-400 bg-white text-transparent hover:border-neutral-600"
-                      }`}
-                    >
-                      ✓
-                    </button>
-                  </form>
-                ) : (
-                  <input type="checkbox" checked={checked} disabled readOnly className="mt-0.5" />
-                )}
-                <div>
-                  <span className={checked ? "text-neutral-800" : "text-neutral-600"}>
-                    {item.label}
-                  </span>
-                  {item.row?.checked && item.row.checkedAt && item.row.checkedByMockUserId ? (
-                    <p className="text-xs text-neutral-500">
-                      Marcado por {actorLabel(item.row.checkedByMockUserId, item.row.checkedByRole ?? "?")}{" "}
-                      em {formatDateTime(item.row.checkedAt)}
-                    </p>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
+          {detail.checklist.map((item) => (
+            <li key={item.key} className="flex items-start gap-2">
+              {canReview ? (
+                <form action={toggleChecklistAction}>
+                  <input type="hidden" name="processId" value={detail.id} />
+                  <input type="hidden" name="key" value={item.key} />
+                  <input type="hidden" name="nextChecked" value={item.checked ? "false" : "true"} />
+                  <button
+                    type="submit"
+                    aria-label={item.checked ? `Desmarcar: ${item.label}` : `Marcar: ${item.label}`}
+                    className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded border text-xs ${
+                      item.checked
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-neutral-400 bg-white text-transparent hover:border-neutral-600"
+                    }`}
+                  >
+                    ✓
+                  </button>
+                </form>
+              ) : (
+                <input type="checkbox" checked={item.checked} disabled readOnly className="mt-0.5" />
+              )}
+              <div>
+                <span className={item.checked ? "text-neutral-800" : "text-neutral-600"}>
+                  {item.label}
+                </span>
+                {item.checked && item.checkedAt && item.checkedByLabel ? (
+                  <p className="text-xs text-neutral-500">
+                    Marcado por {item.checkedByLabel} em {formatDateTime(item.checkedAt)}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
         </ul>
       </Card>
 
       <Card className="mt-4 text-sm">
         <p className="font-medium">Historico do processo</p>
         <ul className="mt-3 space-y-2">
-          {timeline.map((entry) => (
+          {detail.timeline.map((entry) => (
             <li key={entry.id} className="flex items-start gap-3">
               <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-neutral-400" />
               <div>

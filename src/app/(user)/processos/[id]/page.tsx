@@ -13,7 +13,7 @@ import {
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
-import { listDocumentsForProcess } from "@/server/repositories/processDocumentRepository";
+import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
 import {
   createPixPaymentAction,
@@ -40,13 +40,13 @@ export default async function ProcessoRevisaoPage({
   const { erro, ok, pago } = await searchParams;
 
   let process: Awaited<ReturnType<typeof findProcessByIdForUser>> = null;
-  let documents: Awaited<ReturnType<typeof listDocumentsForProcess>> = [];
+  let documents: Awaited<ReturnType<typeof listDocumentsForOwner>> = [];
   let payments: Awaited<ReturnType<typeof listPaymentsForProcess>> = [];
   try {
     process = await findProcessByIdForUser(id, user.id);
     if (process) {
       [documents, payments] = await Promise.all([
-        listDocumentsForProcess(process.id),
+        listDocumentsForOwner(process.id),
         listPaymentsForProcess(process.id),
       ]);
     }
