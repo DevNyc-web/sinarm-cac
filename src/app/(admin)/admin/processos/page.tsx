@@ -162,8 +162,8 @@ export default async function AdminProcessosPage({
       <div className="mt-6">
         {dbUnavailable ? (
           <EmptyState
-            title="Banco local indisponivel"
-            description="Configure o Postgres local (.env + npm run db:push && npm run seed) para ver a fila."
+            title="Não foi possível carregar a fila"
+            description="Tente novamente em instantes. Se continuar assim, avise o time técnico."
           />
         ) : rows.length === 0 ? (
           <EmptyState

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { requireUser } from "@/server/auth/guards";
+import { OPERATIONAL_STATUS_USER_LABELS } from "@/server/processes/statusLabels";
 import { findProcessByCodeForUser } from "@/server/repositories/processRepository";
 
 export default async function SucessoPage({
@@ -19,19 +19,17 @@ export default async function SucessoPage({
   return (
     <Container>
       <div className="mx-auto max-w-xl">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Rascunho salvo</h1>
-          <Badge>mock/dev</Badge>
-        </div>
+        <h1 className="text-2xl font-semibold">Rascunho salvo</h1>
 
         {process ? (
           <Card className="mt-4 space-y-2 text-sm">
             <p>
-              Codigo do rascunho:{" "}
+              Código do rascunho:{" "}
               <span className="font-mono font-medium text-neutral-900">{process.code}</span>
             </p>
             <p className="text-neutral-600">
-              Status: {process.internalStatus} · {process.processType.name}
+              Status: {OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]} ·{" "}
+              {process.processType.name}
             </p>
             {process.destination ? (
               <p className="text-neutral-600">
@@ -41,18 +39,19 @@ export default async function SucessoPage({
             ) : null}
             {process.firearm ? (
               <p className="text-neutral-600">
-                Arma/PCE (ficticia): {process.firearm.species} {process.firearm.brand}{" "}
+                Arma/PCE indicada: {process.firearm.species} {process.firearm.brand}{" "}
                 {process.firearm.model} — {process.firearm.caliber}
               </p>
             ) : null}
             <p className="pt-2 text-xs text-neutral-500">
-              Isto NAO e um protocolo. E um rascunho de desenvolvimento com dados ficticios. As
-              proximas etapas (documento, pagamento, protocolo) chegam nas fases seguintes.
+              <strong>Isto não é um protocolo.</strong> É apenas o rascunho do seu pedido. As
+              próximas etapas (documento, pagamento e execução) ficam disponíveis conforme o
+              processo avança.
             </p>
           </Card>
         ) : (
           <Card className="mt-4">
-            <p className="text-sm text-neutral-600">Rascunho nao encontrado.</p>
+            <p className="text-sm text-neutral-600">Rascunho não encontrado.</p>
           </Card>
         )}
 

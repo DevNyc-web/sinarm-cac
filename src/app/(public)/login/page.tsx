@@ -1,6 +1,5 @@
 import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/server/auth/guards";
 import { MOCK_USERS } from "@/server/auth/mockUsers";
@@ -8,10 +7,10 @@ import { ROLE_LABELS } from "@/server/auth/roles";
 import { signInMockAction, signOutAction } from "./actions";
 
 const MOTIVOS: Record<string, string> = {
-  sessao: "Entre com um perfil ficticio para acessar esta area.",
-  perfil: "Seu perfil ficticio nao tem acesso a area administrativa.",
-  permissao: "Seu perfil ficticio nao tem a permissao necessaria.",
-  invalido: "Perfil mock/dev invalido.",
+  sessao: "Entre para acessar esta área.",
+  perfil: "Seu perfil não tem acesso à área administrativa.",
+  permissao: "Seu perfil não tem a permissão necessária para esta ação.",
+  invalido: "Perfil inválido.",
 };
 
 export default async function LoginPage({
@@ -26,13 +25,14 @@ export default async function LoginPage({
   return (
     <Container>
       <div className="mx-auto max-w-md">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Entrar</h1>
-          <Badge>mock/dev</Badge>
-        </div>
+        <h1 className="text-2xl font-semibold">Entrar</h1>
         <p className="mt-2 text-sm text-neutral-500">
-          Autenticacao de desenvolvimento (Fase 2). Escolha um perfil ficticio. Sem senha, sem MFA,
-          sem provedor real e sem dados reais — o provedor definitivo entra antes de producao.
+          Escolha um perfil para navegar pela demonstração. O acesso com conta própria (e
+          verificação em duas etapas para a equipe) entra antes do atendimento real.
+        </p>
+        <p className="mt-2 text-xs text-neutral-500">
+          Este login <strong>não é o Gov.br</strong>. Quando o processo exigir autenticação no
+          órgão, você fará isso na <strong>janela oficial</strong> — e nunca vemos sua senha.
         </p>
 
         {aviso ? (
@@ -56,7 +56,7 @@ export default async function LoginPage({
         ) : null}
 
         <Card className="mt-4">
-          <p className="text-sm font-medium">Perfis ficticios</p>
+          <p className="text-sm font-medium">Perfis de demonstração</p>
           <div className="mt-3 space-y-2">
             {MOCK_USERS.map((mockUser) => (
               <form key={mockUser.id} action={signInMockAction}>

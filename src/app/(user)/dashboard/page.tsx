@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/server/auth/guards";
-import { ROLE_LABELS } from "@/server/auth/roles";
 import {
   OPERATIONAL_STATUS_USER_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -36,28 +35,25 @@ export default async function DashboardPage() {
       </div>
 
       <Card className="mt-4">
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-neutral-600">
-            Sessao de: <span className="font-medium text-neutral-900">{user.name}</span> ·{" "}
-            {user.email} · {ROLE_LABELS[user.role]}
-          </p>
-          <Badge>mock/dev</Badge>
-        </div>
+        <p className="text-sm text-neutral-600">
+          Conta: <span className="font-medium text-neutral-900">{user.name}</span> · {user.email}
+        </p>
         <p className="mt-2 text-xs text-neutral-500">
-          Usuario ficticio de desenvolvimento (Fase 2). Sem conta real, sem CPF, sem PII.
+          Acompanhe seus processos por aqui. A execução é feita por uma pessoa da nossa equipe —{" "}
+          <strong>não garantimos aprovação</strong>.
         </p>
       </Card>
 
       <div className="mt-6">
         {dbUnavailable ? (
           <EmptyState
-            title="Banco local indisponivel"
-            description="Nao foi possivel listar rascunhos. Configure o Postgres local (.env + npm run db:push && npm run seed)."
+            title="Não foi possível carregar seus processos"
+            description="Tente novamente em instantes. Se continuar assim, fale com o suporte."
           />
         ) : processes.length === 0 ? (
           <EmptyState
             title="Nenhum processo ainda"
-            description="Crie um rascunho de Guia de Trafego com dados ficticios em Novo processo."
+            description="Comece criando uma Guia de Tráfego em “Novo processo”."
           />
         ) : (
           <ul className="space-y-3">
@@ -76,7 +72,7 @@ export default async function DashboardPage() {
                       <p className="mt-1 text-xs text-neutral-500">
                         Criado em {process.createdAt.toLocaleDateString("pt-BR")}
                         {process.payments[0]
-                          ? ` · Pagamento: ${PAYMENT_STATUS_LABELS[process.payments[0].status]} (sandbox)`
+                          ? ` · Pagamento: ${PAYMENT_STATUS_LABELS[process.payments[0].status]}`
                           : ""}
                       </p>
                     </div>

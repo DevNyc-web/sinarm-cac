@@ -1,26 +1,34 @@
-# Plataforma CAC / SINARM
+# Assistente CAC — serviço privado de assistência
 
-Plataforma web responsiva / PWA para CACs (Colecionadores, Atiradores e Caçadores)
-iniciarem e acompanharem processos junto ao SINARM/CAC.
+Plataforma web responsiva / PWA que ajuda CACs (Colecionadores, Atiradores e
+Caçadores) a **preparar, conferir e acompanhar** processos — no MVP, a **Guia de
+Tráfego**.
 
-> **Status atual:** Fase 0 — planejamento e arquitetura.
-> Nenhum código de aplicação foi construído ainda. Este repositório contém,
-> por enquanto, **apenas documentação**.
+> **Serviço privado.** Não somos órgão público e não temos vínculo com Gov.br,
+> Polícia Federal ou Exército. **Não garantimos aprovação** — a análise e a
+> decisão são do órgão competente. A execução no sistema oficial é **assistida
+> por um operador humano**: o aplicativo **não acessa Gov.br/SINARM
+> automaticamente** e **não protocola**.
+
+> **Status atual (2026-07-18):** **Fases 1–7 implementadas e validadas
+> localmente em modo dev/fictício** (Postgres local, auth mock, storage
+> local/dev, Pix sandbox/fake, execução manual auditável).
+> **Produção está BLOQUEADA** pelas 12 pendências do
+> [`docs/23-checklist-piloto-real.md`](docs/23-checklist-piloto-real.md) §5 —
+> entre elas auth real + MFA, storage de produção + KMS + retenção, conta Pix de
+> produção, termos/reembolso e revisão jurídica.
+> **Sem dados reais:** nada de CPF/RG, documento real, cobrança real ou
+> protocolo real.
 
 ## Princípio do projeto
 
-O produto será construído **por módulos independentes**, validando primeiro as
-partes mais difíceis. A parte mais arriscada e prioritária é a **automação de
-emissão de certidões/antecedentes** — por isso ela é a **Fase 1**.
+O produto é construído **por módulos independentes**, validando primeiro as
+partes mais difíceis, e cada fase valida uma hipótese antes de investir na
+próxima. O MVP é **assistido**: o painel reduz erro humano e registra tudo —
+**nunca** empurra um protocolo no escuro.
 
-Não construímos o produto inteiro de uma vez. Cada fase valida uma hipótese
-técnica antes de investir na próxima.
-
-## Fase atual: Fase 1 — Laboratório de Certidões
-
-Objetivo: provar se é **tecnicamente e juridicamente viável** automatizar a
-emissão de certidões/antecedentes, de forma isolada, sem pagamento, Gov.br,
-scanner ou SINARM.
+**Laboratório de certidões** (automação de certidões/antecedentes) segue **fora
+do MVP** — ver [`docs/10 §17`](docs/10-mvp-guia-de-trafego.md).
 
 ## Documentação
 

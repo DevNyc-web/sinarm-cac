@@ -104,7 +104,7 @@ export function NovoProcessoForm({
         </div>
 
         <label className="block text-sm">
-          Arma/PCE (catalogo ficticio)
+          Arma/PCE
           <select name="firearmId" defaultValue={values.firearmId ?? ""} className={inputClass}>
             <option value="">Selecione…</option>
             {firearms.map((firearm) => (
@@ -115,7 +115,8 @@ export function NovoProcessoForm({
           </select>
           <FieldError message={errors.firearmId} />
           <p className="mt-1 text-xs text-neutral-500">
-            Dados 100% ficticios (mock/dev). O acervo real do SINARM nao e acessado.
+            Opções de demonstração. <strong>O acervo do SINARM não é acessado por este
+            aplicativo</strong> — a conferência do armamento é feita por uma pessoa da equipe.
           </p>
         </label>
 

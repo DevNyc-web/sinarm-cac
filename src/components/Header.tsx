@@ -12,7 +12,7 @@ export async function Header() {
       <Container>
         <nav className="flex h-14 items-center justify-between">
           <Link href="/" className="font-semibold">
-            Plataforma CAC
+            Assistente CAC
           </Link>
           <div className="flex items-center gap-4 text-sm text-neutral-600">
             {user && !isInternalRole(user.role) ? (

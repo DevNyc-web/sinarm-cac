@@ -15,7 +15,7 @@ export const PERMISSIONS = [
   "process.detail.view", // Ver detalhe do processo
   "process.pii.viewFull", // Ver PII completa (CPF, docs)
   "process.pii.viewMinimal", // Ver apenas o minimo necessario de PII
-  "sinarm.execute", // Executar fluxo no SINARM/CAC
+  "sinarm.execute", // Registrar a execucao manual feita fora do app (docs/11 §3)
   "review.checklist", // Aplicar/registrar checklist de revisao
   "document.review", // Aprovar/rejeitar documento do processo (docs/11 §14)
   "process.assign", // Atribuir/trocar responsavel pelo processo (docs/11 §4)
@@ -42,7 +42,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "process.detail.view": "Ver detalhe do processo",
   "process.pii.viewFull": "Ver PII completa (CPF, documentos)",
   "process.pii.viewMinimal": "Ver PII — minimo necessario",
-  "sinarm.execute": "Executar fluxo no SINARM/CAC",
+  // O app NAO executa nada no orgao — o rotulo descreve quem pode REGISTRAR a
+  // execucao feita manualmente fora do app (docs/24 §7/§11).
+  "sinarm.execute": "Registrar execucao manual assistida (fora do app)",
   "review.checklist": "Aplicar checklist de revisao",
   "document.review": "Aprovar/rejeitar documento do processo",
   "process.assign": "Atribuir responsavel pelo processo",

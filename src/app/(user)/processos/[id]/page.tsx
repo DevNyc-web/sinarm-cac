@@ -12,6 +12,12 @@ import {
   OPERATIONAL_STATUS_USER_LABELS,
   PAYMENT_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
+import {
+  formatBRL,
+  GRU_ESTIMATED_CENTS,
+  SERVICE_FEE_CENTS,
+  SERVICE_TOTAL_CENTS,
+} from "@/server/processes/pricing";
 import { listNotesForProcess } from "@/server/repositories/processNoteRepository";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
@@ -69,10 +75,7 @@ export default async function ProcessoRevisaoPage({
   return (
     <Container>
       <div className="mx-auto max-w-2xl">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Revisao do processo</h1>
-          <Badge>mock/dev</Badge>
-        </div>
+        <h1 className="text-2xl font-semibold">Seu processo</h1>
         <p className="mt-1 font-mono text-sm text-neutral-500">{process.code}</p>
 
         <Card className="mt-4 space-y-1 text-sm">
@@ -85,10 +88,18 @@ export default async function ProcessoRevisaoPage({
           </p>
           <p className="text-neutral-600">{process.processType.name}</p>
           <p className="text-xs text-neutral-500">
-            Quando houver execucao, ela e feita por uma pessoa da nossa equipe na janela oficial —
-            este aplicativo nao opera os sistemas do orgao. Ambiente de desenvolvimento com dados
-            ficticios; nada foi protocolado.
+            A execução é feita por uma <strong>pessoa da nossa equipe</strong> na janela oficial —
+            este aplicativo <strong>não opera os sistemas do órgão</strong>.
           </p>
+          {process.manualExecutionStatus === "PROTOCOLO_MANUAL_REGISTRADO" ||
+          process.manualExecutionStatus === "GRU_MANUAL_REGISTRADA" ||
+          process.manualExecutionStatus === "AGUARDANDO_PAGAMENTO_GRU_EMPRESA" ||
+          process.manualExecutionStatus === "GRU_PAGA_MANUALMENTE_DEV" ? (
+            <p className="mt-2 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+              <strong>Protocolo registrado não significa aprovação.</strong> A análise e a decisão
+              dependem do órgão competente — <strong>não garantimos deferimento</strong>.
+            </p>
+          ) : null}
         </Card>
 
         {messages.length > 0 ? (
@@ -122,19 +133,19 @@ export default async function ProcessoRevisaoPage({
               </p>
             </>
           ) : (
-            <p className="text-neutral-500">Nao informado.</p>
+            <p className="text-neutral-500">Não informado.</p>
           )}
         </Card>
 
         <Card className="mt-4 space-y-1 text-sm">
-          <p className="font-medium">Arma/PCE (ficticia)</p>
+          <p className="font-medium">Arma/PCE indicada</p>
           {process.firearm ? (
             <p className="text-neutral-600">
               {process.firearm.species} {process.firearm.brand} {process.firearm.model} —{" "}
               {process.firearm.caliber} · qtd. {process.firearm.quantity}
             </p>
           ) : (
-            <p className="text-neutral-500">Nao informada.</p>
+            <p className="text-neutral-500">Não informada.</p>
           )}
         </Card>
 
@@ -144,14 +155,11 @@ export default async function ProcessoRevisaoPage({
         </Card>
 
         <Card className="mt-4 text-sm">
-          <div className="flex items-center gap-2">
-            <p className="font-medium">Documento de Identificacao</p>
-            <Badge>ficticio</Badge>
-          </div>
+          <p className="font-medium">Documento de identificação</p>
           <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Ambiente de desenvolvimento. <strong>Nao envie documento real</strong> — nada de RG,
-            CPF, CNH ou foto de documento verdadeiro. Use um PDF/JPG/PNG ficticio (max. 2 MB). O
-            arquivo fica apenas no storage local/dev e pode ser apagado livremente.
+            <strong>Ambiente de demonstração: não envie documento real</strong> — nada de RG, CPF,
+            CNH ou foto de documento verdadeiro. Envie um PDF/JPG/PNG de teste (até 2 MB). O envio
+            definitivo só será aberto em ambiente de produção seguro.
           </p>
 
           {erro ? (
@@ -161,7 +169,7 @@ export default async function ProcessoRevisaoPage({
           ) : null}
           {ok ? (
             <p className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              Arquivo ficticio enviado. Status: Enviado — aguardando revisao (mock/dev).
+              Arquivo enviado. Status: Enviado — aguardando conferência da nossa equipe.
             </p>
           ) : null}
 
@@ -196,24 +204,47 @@ export default async function ProcessoRevisaoPage({
               className="text-xs text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-neutral-50"
             />
             <Button type="submit" variant="secondary">
-              Enviar arquivo ficticio
+              Enviar arquivo
             </Button>
           </form>
         </Card>
 
         <Card className="mt-4 text-sm">
           <div className="flex items-center gap-2">
-            <p className="font-medium">Pagamento do servico</p>
-            <Badge>sandbox/dev</Badge>
+            <p className="font-medium">Pagamento do serviço</p>
+          </div>
+          <div className="mt-2 rounded-md border border-neutral-200 px-3 py-2 text-xs text-neutral-700">
+            <p className="font-medium text-neutral-900">
+              {formatBRL(SERVICE_TOTAL_CENTS)} — serviço de assistência
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              <li>· Assistência (nosso trabalho): {formatBRL(SERVICE_FEE_CENTS)}</li>
+              <li>
+                · GRU — <strong>taxa do órgão competente</strong>: {formatBRL(GRU_ESTIMATED_CENTS)}
+              </li>
+            </ul>
+            <p className="mt-1">
+              O Pix é do <strong>nosso serviço</strong> e <strong>não é a GRU</strong>. Você{" "}
+              <strong>não precisa</strong> pagar a GRU por fora: nós recolhemos por você. Este
+              pagamento <strong>não garante aprovação</strong> — veja a{" "}
+              <Link href="/reembolso" className="underline underline-offset-2">
+                política de reembolso
+              </Link>{" "}
+              e os{" "}
+              <Link href="/termos" className="underline underline-offset-2">
+                termos
+              </Link>
+              .
+            </p>
           </div>
           <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <strong>Pagamento ficticio/sandbox. Nao pague Pix real.</strong> O codigo gerado nao e
-            pagavel; valor ficticio de R$ 100,00. Nenhuma cobranca real existe nesta fase.
+            <strong>Ambiente de demonstração: não pague nada.</strong> O código gerado{" "}
+            <strong>não é pagável</strong> e nenhuma cobrança real existe aqui.
           </p>
 
           {pago ? (
             <p className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              Pagamento simulado confirmado. Processo em fila (mock/dev).
+              Pagamento confirmado. Seu processo entrou na fila de operação.
             </p>
           ) : null}
 
@@ -245,7 +276,7 @@ export default async function ProcessoRevisaoPage({
                         <input type="hidden" name="processId" value={process.id} />
                         <input type="hidden" name="paymentId" value={payment.id} />
                         <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                          Simular pagamento aprovado (dev)
+                          Simular pagamento aprovado (demonstração)
                         </Button>
                       </form>
                     </>
@@ -266,16 +297,29 @@ export default async function ProcessoRevisaoPage({
           {canCreateCharge ? (
             <form action={createPixPaymentAction} className="mt-3">
               <input type="hidden" name="processId" value={process.id} />
-              <Button type="submit">Gerar cobranca Pix (sandbox/dev)</Button>
+              <Button type="submit">Gerar cobrança Pix</Button>
             </form>
           ) : null}
         </Card>
 
-        <div className="mt-4 space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <p>Este rascunho ainda nao foi protocolado.</p>
+        <div className="mt-4 space-y-1 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
           <p>
-            Nao ha GRU nem SINARM nesta fase; upload e pagamento sao apenas ficticios/sandbox
-            (dev).
+            <strong>Não garantimos aprovação.</strong> Quem analisa e decide é o órgão competente.
+          </p>
+          <p className="text-xs">
+            Dúvidas sobre valores e devolução: veja{" "}
+            <Link href="/reembolso" className="underline underline-offset-2">
+              reembolso
+            </Link>
+            ,{" "}
+            <Link href="/termos" className="underline underline-offset-2">
+              termos
+            </Link>{" "}
+            e{" "}
+            <Link href="/privacidade" className="underline underline-offset-2">
+              privacidade
+            </Link>
+            .
           </p>
         </div>
 
