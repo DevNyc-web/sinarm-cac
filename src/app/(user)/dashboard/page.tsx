@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
-import { INTERNAL_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/server/processes/statusLabels";
+import {
+  OPERATIONAL_STATUS_USER_LABELS,
+  PAYMENT_STATUS_LABELS,
+} from "@/server/processes/statusLabels";
 import { listProcessesByUser } from "@/server/repositories/processRepository";
 
 type ProcessRow = Awaited<ReturnType<typeof listProcessesByUser>>[number];
@@ -77,7 +80,7 @@ export default async function DashboardPage() {
                           : ""}
                       </p>
                     </div>
-                    <Badge>{INTERNAL_STATUS_LABELS[process.internalStatus]}</Badge>
+                    <Badge>{OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]}</Badge>
                   </Card>
                 </Link>
               </li>

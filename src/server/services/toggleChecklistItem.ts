@@ -5,7 +5,11 @@
  * pelo guard na server action; aqui validamos entrada e registramos quem/quando.
  */
 import { type AuthUser } from "@/server/auth/mockUsers";
-import { checklistLabel, isChecklistKey } from "@/server/processes/checklistDefinition";
+import {
+  checklistGroup,
+  checklistLabel,
+  isChecklistKey,
+} from "@/server/processes/checklistDefinition";
 import { setChecklistItem } from "@/server/repositories/checklistRepository";
 import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
 
@@ -28,6 +32,7 @@ export async function toggleChecklistItem(
     await setChecklistItem({
       processId,
       key,
+      group: checklistGroup(key),
       label: checklistLabel(key),
       checked,
       actorMockUserId: actor.id,

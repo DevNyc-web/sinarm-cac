@@ -6,7 +6,10 @@ import {
   type DocumentStatus,
   type DocumentType,
   type InternalStatus,
+  type NoteVisibility,
+  type OperationalStatus,
   type PaymentStatus,
+  type ProcessPriority,
   type UserFacingStatus,
 } from "@prisma/client";
 
@@ -39,6 +42,47 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   IDENTIFICACAO_PESSOAL: "Documento de Identificacao Pessoal",
   OUTRO: "Outro",
+};
+
+/** Status operacional da fila (Fase 6) — rotulo para a equipe interna. */
+export const OPERATIONAL_STATUS_LABELS: Record<OperationalStatus, string> = {
+  RASCUNHO: "Rascunho",
+  DOCUMENTO_ENVIADO: "Documento enviado",
+  DOCUMENTO_APROVADO: "Documento aprovado",
+  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
+  PAGO_EM_FILA: "Pago / em fila",
+  EM_REVISAO_OPERACIONAL: "Em revisao operacional",
+  PRONTO_PARA_PROTOCOLO_MANUAL: "Pronto para protocolo manual",
+  BLOQUEADO: "Bloqueado",
+  CANCELADO_DEV: "Cancelado (dev)",
+};
+
+/**
+ * Como o USUARIO ve cada status operacional (docs/11 §11: tom amigavel, sem a
+ * granularidade interna e sem prometer aprovacao).
+ */
+export const OPERATIONAL_STATUS_USER_LABELS: Record<OperationalStatus, string> = {
+  RASCUNHO: "Recebido",
+  DOCUMENTO_ENVIADO: "Documento em analise",
+  DOCUMENTO_APROVADO: "Documento aprovado",
+  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
+  PAGO_EM_FILA: "Pagamento confirmado — em fila",
+  EM_REVISAO_OPERACIONAL: "Em andamento",
+  PRONTO_PARA_PROTOCOLO_MANUAL: "Em andamento",
+  BLOQUEADO: "Precisamos de um ajuste",
+  CANCELADO_DEV: "Cancelado",
+};
+
+export const PRIORITY_LABELS: Record<ProcessPriority, string> = {
+  BAIXA: "Baixa",
+  NORMAL: "Normal",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
+};
+
+export const NOTE_VISIBILITY_LABELS: Record<NoteVisibility, string> = {
+  INTERNA: "Nota interna",
+  VISIVEL_USUARIO: "Mensagem ao usuario",
 };
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {

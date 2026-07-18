@@ -45,10 +45,16 @@ export async function confirmPixPayment(
     await markPaid(payment.id, eventId);
 
     // Processo: RASCUNHO/AGUARDANDO_PAGAMENTO -> PAGO_EM_FILA (docs/11 §8).
+    // Move as tres visoes juntas: interna (docs/12 §6), operacional (fila) e a
+    // visivel ao usuario — para nao divergirem.
     const fromStatus = payment.process.internalStatus;
     await getPrisma().process.update({
       where: { id: payment.processId },
-      data: { internalStatus: "PAGO_EM_FILA", userFacingStatus: "PAGAMENTO_CONFIRMADO" },
+      data: {
+        internalStatus: "PAGO_EM_FILA",
+        operationalStatus: "PAGO_EM_FILA",
+        userFacingStatus: "PAGAMENTO_CONFIRMADO",
+      },
     });
     await recordStatusEvent({
       processId: payment.processId,

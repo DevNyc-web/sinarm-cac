@@ -202,6 +202,41 @@ do MP entra antes de expor o webhook publicamente. **Nunca** commitar `.env`.
 Código: adapter em `src/server/payments/` (`fake` e `mercadopago` — trocar de
 PSP = nova implementação), services `createPixPayment.ts` /
 `confirmPixPayment.ts`, webhook em `src/app/api/payments/webhook/route.ts`.
+
+## Operação assistida no painel (Fase 6 — dev/fictício)
+
+> Nada aqui protocola: **o protocolo no SINARM é manual e externo ao app**.
+> O status `PRONTO_PARA_PROTOCOLO_MANUAL` apenas sinaliza a fila.
+
+**Fila** (`/admin/processos`) — filtros por status operacional, pagamento e
+documento, busca por código `GT-DEV-…`, ordenação por data, e destaque (●) para
+processos pagos aguardando operação.
+
+**Status operacional** (trilha da fila, `operationalStatus`):
+`RASCUNHO → DOCUMENTO_ENVIADO → DOCUMENTO_APROVADO → AGUARDANDO_PAGAMENTO →
+PAGO_EM_FILA → EM_REVISAO_OPERACIONAL → PRONTO_PARA_PROTOCOLO_MANUAL`, mais
+`BLOQUEADO` e `CANCELADO_DEV`. Avança sozinho no upload, na aprovação do
+documento e na confirmação do Pix; ADMIN/OPERADOR movem manualmente. É um campo
+**separado** do `internalStatus` (docs/12 §6, canônico) — as transições
+sincronizam o status visível ao usuário para as visões não divergirem.
+
+**No detalhe admin** (`/admin/processos/[id]`): responsável, prioridade
+(Baixa/Normal/Alta/Urgente), status operacional, notas/mensagens, o checklist
+de revisão (docs/11 §6) e o **checkpoint "Dados da GRU"** (docs/11 §7) —
+conferência **fictícia**, sem acessar SINARM e sem gerar GRU.
+
+**RBAC das novas ações** (docs/11 §3):
+
+| Ação | ADMIN | OPERADOR | FINANCEIRO | SUPORTE |
+|------|:-----:|:--------:|:----------:|:-------:|
+| Atribuir responsável / prioridade / status operacional | ✅ | ✅ | ❌ | ❌ |
+| Marcar checklists (revisão e GRU) | ✅ | ✅ | ❌ | ❌ |
+| Nota interna | ✅ | ✅ | ✅ (financeira) | ❌ |
+| Mensagem ao usuário | ✅ | ✅ | ✅ | ✅ |
+
+O usuário vê, no próprio processo, um **status amigável** e apenas as
+**mensagens marcadas como visíveis** — nunca notas internas. Não escreva PII nas
+notas (docs/11 §19). Schema mudou: rode `npm run db:push`.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

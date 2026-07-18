@@ -8,10 +8,10 @@ import { requireUser } from "@/server/auth/guards";
 import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
-  INTERNAL_STATUS_LABELS,
+  OPERATIONAL_STATUS_USER_LABELS,
   PAYMENT_STATUS_LABELS,
-  USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
+import { listNotesForProcess } from "@/server/repositories/processNoteRepository";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
@@ -42,12 +42,15 @@ export default async function ProcessoRevisaoPage({
   let process: Awaited<ReturnType<typeof findProcessByIdForUser>> = null;
   let documents: Awaited<ReturnType<typeof listDocumentsForOwner>> = [];
   let payments: Awaited<ReturnType<typeof listPaymentsForProcess>> = [];
+  let messages: Awaited<ReturnType<typeof listNotesForProcess>> = [];
   try {
     process = await findProcessByIdForUser(id, user.id);
     if (process) {
-      [documents, payments] = await Promise.all([
+      [documents, payments, messages] = await Promise.all([
         listDocumentsForOwner(process.id),
         listPaymentsForProcess(process.id),
+        // Need-to-know: o dono le APENAS mensagens marcadas como visiveis.
+        listNotesForProcess(process.id, true),
       ]);
     }
   } catch {
@@ -73,14 +76,35 @@ export default async function ProcessoRevisaoPage({
 
         <Card className="mt-4 space-y-1 text-sm">
           <p className="font-medium">Status</p>
-          <p className="text-neutral-600">
-            {USER_FACING_STATUS_LABELS[process.userFacingStatus]}{" "}
-            <span className="text-neutral-400">
-              (interno: {INTERNAL_STATUS_LABELS[process.internalStatus]})
-            </span>
+          <p className="text-neutral-800">
+            {OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]}
           </p>
           <p className="text-neutral-600">{process.processType.name}</p>
+          <p className="text-xs text-neutral-500">
+            Acompanhe por aqui. Nenhum processo foi protocolado — este e um ambiente de
+            desenvolvimento com dados ficticios.
+          </p>
         </Card>
+
+        {messages.length > 0 ? (
+          <Card className="mt-4 text-sm">
+            <p className="font-medium">Mensagens da equipe</p>
+            <ul className="mt-3 space-y-2">
+              {messages.map((message) => (
+                <li key={message.id} className="rounded-md border border-neutral-200 px-3 py-2">
+                  <p className="text-xs text-neutral-500">
+                    {message.createdAt.toLocaleDateString("pt-BR")}{" "}
+                    {message.createdAt.toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-neutral-700">{message.body}</p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
 
         <Card className="mt-4 space-y-1 text-sm">
           <p className="font-medium">Destino / evento</p>

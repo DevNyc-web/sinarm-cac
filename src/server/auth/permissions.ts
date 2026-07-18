@@ -18,6 +18,10 @@ export const PERMISSIONS = [
   "sinarm.execute", // Executar fluxo no SINARM/CAC
   "review.checklist", // Aplicar/registrar checklist de revisao
   "document.review", // Aprovar/rejeitar documento do processo (docs/11 §14)
+  "process.assign", // Atribuir/trocar responsavel pelo processo (docs/11 §4)
+  "process.priority", // Alterar prioridade operacional (docs/11 §4)
+  "process.operationalStatus", // Mover o status operacional da fila
+  "note.internal", // Escrever nota interna (equipe) no processo
   "gru.generate", // Clicar "Gerar GRU e Salvar" (irreversivel)
   "payment.pix.confirm", // Confirmar Pix do cliente
   "payment.gru.register", // Registrar pagamento da GRU (empresa)
@@ -40,6 +44,10 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "sinarm.execute": "Executar fluxo no SINARM/CAC",
   "review.checklist": "Aplicar checklist de revisao",
   "document.review": "Aprovar/rejeitar documento do processo",
+  "process.assign": "Atribuir responsavel pelo processo",
+  "process.priority": "Alterar prioridade do processo",
+  "process.operationalStatus": "Mover status operacional",
+  "note.internal": "Escrever nota interna",
   "gru.generate": 'Clicar "Gerar GRU e Salvar"',
   "payment.pix.confirm": "Confirmar Pix do cliente",
   "payment.gru.register": "Registrar pagamento da GRU (empresa)",
@@ -71,6 +79,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "sinarm.execute",
     "review.checklist",
     "document.review",
+    "process.assign",
+    "process.priority",
+    "process.operationalStatus",
+    "note.internal",
     "gru.generate",
     "message.send",
     "audit.view.own",
@@ -83,6 +95,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "payment.pix.confirm",
     "payment.gru.register",
     "refund.approve",
+    // Nota financeira: registra conferencia de Pix/GRU sem executar operacao.
+    "note.internal",
     "message.send",
     "audit.view.financial",
   ],

@@ -11,11 +11,26 @@ import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
+  NOTE_VISIBILITY_LABELS,
+  OPERATIONAL_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
+  PRIORITY_LABELS,
   USER_FACING_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
-import { reviewDocumentAction, toggleChecklistAction } from "./actions";
+import { assignableMockUsers } from "@/server/services/updateProcessOperations";
+import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
+import {
+  assignProcessAction,
+  changeOperationalStatusAction,
+  changePriorityAction,
+  createNoteAction,
+  reviewDocumentAction,
+  toggleChecklistAction,
+} from "./actions";
+
+const controlClass =
+  "mt-1 rounded-md border border-neutral-300 px-2 py-1 text-xs focus:border-neutral-500 focus:outline-none";
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
 const DETAIL_PERMISSIONS: readonly Permission[] = [
@@ -65,6 +80,15 @@ export default async function AdminProcessoDetalhePage({
   if (!detail) notFound();
 
   const canReview = hasPermission(admin, "review.checklist");
+  const canOperate =
+    hasPermission(admin, "process.assign") ||
+    hasPermission(admin, "process.priority") ||
+    hasPermission(admin, "process.operationalStatus");
+  const canWriteInternalNote = hasPermission(admin, "note.internal");
+  const canMessageUser = hasPermission(admin, "message.send");
+  const assignees = assignableMockUsers();
+  const revisionChecklist = detail.checklist.filter((item) => item.group === "REVISAO");
+  const gruChecklist = detail.checklist.filter((item) => item.group === "GRU");
 
   return (
     <Container>
@@ -85,14 +109,104 @@ export default async function AdminProcessoDetalhePage({
           <p className="font-medium">Resumo</p>
           <p className="text-neutral-600">{detail.processTypeName}</p>
           <p className="text-neutral-600">
-            Status interno: {INTERNAL_STATUS_LABELS[detail.internalStatus]}
+            Status operacional:{" "}
+            <span className="font-medium text-neutral-900">
+              {OPERATIONAL_STATUS_LABELS[detail.operationalStatus]}
+            </span>
           </p>
+          <p className="text-neutral-600">Prioridade: {PRIORITY_LABELS[detail.priority]}</p>
           <p className="text-neutral-600">
-            Status visivel: {USER_FACING_STATUS_LABELS[detail.userFacingStatus]}
+            Responsavel: {detail.assignedToLabel ?? "sem responsavel"}
           </p>
-          <p className="text-neutral-600">
+          <p className="text-xs text-neutral-500">
+            Status visivel ao usuario: {USER_FACING_STATUS_LABELS[detail.userFacingStatus]} ·
+            interno (docs/12 §6): {INTERNAL_STATUS_LABELS[detail.internalStatus]}
+          </p>
+          <p className="text-xs text-neutral-500">
             Criado em {detail.createdAt.toLocaleDateString("pt-BR")}
           </p>
+        </Card>
+
+        <Card className="space-y-3 text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">Operacao</p>
+            <Badge>dev</Badge>
+          </div>
+          {!canOperate ? (
+            <p className="text-neutral-500">
+              Seu perfil ({ROLE_LABELS[admin.role]}) acompanha a operacao, mas nao altera
+              responsavel, prioridade ou status (docs/11 §3).
+            </p>
+          ) : (
+            <>
+              <form action={assignProcessAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="processId" value={detail.id} />
+                <label className="block text-xs text-neutral-600">
+                  Responsavel
+                  <select
+                    name="assigneeId"
+                    defaultValue={detail.assignedToMockUserId ?? ""}
+                    className={controlClass}
+                  >
+                    <option value="">Sem responsavel</option>
+                    {assignees.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.name} ({ROLE_LABELS[candidate.role]})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                  Atribuir
+                </Button>
+              </form>
+
+              <form action={changePriorityAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="processId" value={detail.id} />
+                <label className="block text-xs text-neutral-600">
+                  Prioridade
+                  <select name="priority" defaultValue={detail.priority} className={controlClass}>
+                    {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                  Salvar
+                </Button>
+              </form>
+
+              <form
+                action={changeOperationalStatusAction}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <input type="hidden" name="processId" value={detail.id} />
+                <label className="block text-xs text-neutral-600">
+                  Status operacional
+                  <select
+                    name="operationalStatus"
+                    defaultValue={detail.operationalStatus}
+                    className={controlClass}
+                  >
+                    {Object.entries(OPERATIONAL_STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                  Mover
+                </Button>
+              </form>
+              <p className="text-xs text-neutral-500">
+                &quot;Pronto para protocolo manual&quot; apenas sinaliza a fila: o protocolo no
+                SINARM e feito por humano, fora do app. Nada aqui protocola.
+              </p>
+            </>
+          )}
         </Card>
 
         <Card className="space-y-1 text-sm">
@@ -258,14 +372,14 @@ export default async function AdminProcessoDetalhePage({
       </div>
 
       <Card className="mt-4 text-sm">
-        <p className="font-medium">Checklist de revisao (docs/11 §6 — versao desta fase)</p>
+        <p className="font-medium">Checklist de revisao (docs/11 §6)</p>
         <p className="mt-1 text-xs text-neutral-500">
           {canReview
             ? "Cada marcacao registra quem marcou, o perfil e a data/hora."
             : `Seu perfil (${ROLE_LABELS[admin.role]}) pode visualizar, mas nao marcar (docs/11 §3).`}
         </p>
         <ul className="mt-3 space-y-2">
-          {detail.checklist.map((item) => (
+          {revisionChecklist.map((item) => (
             <li key={item.key} className="flex items-start gap-2">
               {canReview ? (
                 <form action={toggleChecklistAction}>
@@ -300,6 +414,107 @@ export default async function AdminProcessoDetalhePage({
             </li>
           ))}
         </ul>
+      </Card>
+
+      <Card className="mt-4 text-sm">
+        <div className="flex items-center gap-2">
+          <p className="font-medium">Checkpoint &quot;Dados da GRU&quot; (docs/11 §7)</p>
+          <Badge>ficticio</Badge>
+        </div>
+        <p className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>Conferencia ficticia.</strong> Esta tela nao acessa o SINARM, nao gera GRU e nao
+          protocola nada. No fluxo real, este checkpoint antecede o ato irreversivel &quot;Gerar
+          GRU e Salvar&quot; — que continua sendo feito por humano, fora do app.
+        </p>
+        <ul className="mt-3 space-y-2">
+          {gruChecklist.map((item) => (
+            <li key={item.key} className="flex items-start gap-2">
+              {canReview ? (
+                <form action={toggleChecklistAction}>
+                  <input type="hidden" name="processId" value={detail.id} />
+                  <input type="hidden" name="key" value={item.key} />
+                  <input type="hidden" name="nextChecked" value={item.checked ? "false" : "true"} />
+                  <button
+                    type="submit"
+                    aria-label={item.checked ? `Desmarcar: ${item.label}` : `Marcar: ${item.label}`}
+                    className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded border text-xs ${
+                      item.checked
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-neutral-400 bg-white text-transparent hover:border-neutral-600"
+                    }`}
+                  >
+                    ✓
+                  </button>
+                </form>
+              ) : (
+                <input type="checkbox" checked={item.checked} disabled readOnly className="mt-0.5" />
+              )}
+              <div>
+                <span className={item.checked ? "text-neutral-800" : "text-neutral-600"}>
+                  {item.label}
+                </span>
+                {item.checked && item.checkedAt && item.checkedByLabel ? (
+                  <p className="text-xs text-neutral-500">
+                    Marcado por {item.checkedByLabel} em {formatDateTime(item.checkedAt)}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card className="mt-4 text-sm">
+        <p className="font-medium">Notas e mensagens</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Nota interna: visivel so para a equipe. Mensagem: aparece para o usuario no processo
+          dele. <strong>Nao escreva PII</strong> (CPF, RG, endereco, nº de serie) — docs/11 §19.
+        </p>
+
+        {canWriteInternalNote || canMessageUser ? (
+          <form action={createNoteAction} className="mt-3 space-y-2">
+            <input type="hidden" name="processId" value={detail.id} />
+            <textarea
+              name="body"
+              rows={2}
+              maxLength={MAX_NOTE_LENGTH}
+              placeholder="Escreva aqui (sem dados pessoais)…"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <select name="visibility" defaultValue="INTERNA" className={controlClass}>
+                {canWriteInternalNote ? <option value="INTERNA">Nota interna</option> : null}
+                {canMessageUser ? <option value="VISIVEL_USUARIO">Mensagem ao usuario</option> : null}
+              </select>
+              <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                Registrar
+              </Button>
+              {!canWriteInternalNote ? (
+                <span className="text-xs text-neutral-500">
+                  Seu perfil ({ROLE_LABELS[admin.role]}) envia apenas mensagem ao usuario.
+                </span>
+              ) : null}
+            </div>
+          </form>
+        ) : null}
+
+        {detail.notes.length === 0 ? (
+          <p className="mt-3 text-neutral-500">Nenhuma nota ainda.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {detail.notes.map((note) => (
+              <li key={note.id} className="rounded-md border border-neutral-200 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Badge>{NOTE_VISIBILITY_LABELS[note.visibility]}</Badge>
+                  <span className="text-xs text-neutral-500">
+                    {note.authorLabel} · {formatDateTime(note.createdAt)}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-neutral-700">{note.body}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card className="mt-4 text-sm">

@@ -9,6 +9,7 @@ import {
   findDocumentById,
   updateDocumentReview,
 } from "@/server/repositories/processDocumentRepository";
+import { updateProcessOperations } from "@/server/repositories/processRepository";
 
 export type ReviewDecision = "APROVADO" | "REJEITADO";
 
@@ -38,6 +39,19 @@ export async function reviewProcessDocument(
       reviewedByRole: actor.role,
       rejectionReason: rejectionReason?.trim(),
     });
+
+    // Reflete a decisao na fila, sem regredir quem ja passou do pagamento.
+    if (decision === "APROVADO" && document.process.operationalStatus === "DOCUMENTO_ENVIADO") {
+      await updateProcessOperations(document.processId, {
+        operationalStatus: "DOCUMENTO_APROVADO",
+      });
+    }
+    if (decision === "REJEITADO" && document.process.operationalStatus !== "CANCELADO_DEV") {
+      await updateProcessOperations(document.processId, {
+        operationalStatus: "BLOQUEADO",
+        userFacingStatus: "PRECISAMOS_DE_UM_AJUSTE",
+      });
+    }
 
     return { ok: true };
   } catch {

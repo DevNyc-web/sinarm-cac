@@ -1,19 +1,32 @@
 /**
- * Definicao do checklist de revisao admin — Fase 3.6.
+ * Definicao dos checklists admin — Fases 3.6 / 6.
  *
- * Subconjunto do docs/11 §6 aplicavel as fases atuais (sem Pix/GRU): valida os
- * dados ficticios do rascunho + documento ficticio (F4) e confirma
- * explicitamente o que NAO existe ainda. Itens de pagamento/protocolo entram
- * nas fases proprias.
+ * Dois grupos (docs/11 §6 e §7):
+ * - REVISAO: conferencia geral do rascunho ficticio.
+ * - GRU: checkpoint "Dados da GRU" — FICTICIO nesta fase. Nao acessa SINARM,
+ *   nao gera GRU, nao protocola: apenas registra a conferencia humana que, no
+ *   fluxo real, antecede o ato irreversivel (docs/11 §7, docs/10 §13).
  */
+import { type ChecklistGroup } from "@prisma/client";
 
 export const CHECKLIST_ITEMS = [
-  { key: "destination_validated", label: "Dados do destino validados" },
-  { key: "firearm_validated", label: "Arma/PCE ficticia validada" },
-  { key: "justification_validated", label: "Justificativa validada" },
-  { key: "document_validated", label: "Documento (ficticio) anexado e legivel" },
-  { key: "no_pix_confirmed", label: "Confirmado: sem pagamento Pix nesta fase" },
-  { key: "no_gru_confirmed", label: "Confirmado: sem GRU/protocolo nesta fase" },
+  // --- Grupo REVISAO (docs/11 §6) ---
+  { key: "destination_validated", group: "REVISAO", label: "Dados do destino validados" },
+  { key: "firearm_validated", group: "REVISAO", label: "Arma/PCE ficticia validada" },
+  { key: "justification_validated", group: "REVISAO", label: "Justificativa validada" },
+  { key: "document_validated", group: "REVISAO", label: "Documento (ficticio) anexado e legivel" },
+  { key: "no_pix_confirmed", group: "REVISAO", label: "Confirmado: sem pagamento Pix nesta fase" },
+  { key: "no_gru_confirmed", group: "REVISAO", label: "Confirmado: sem GRU/protocolo nesta fase" },
+
+  // --- Grupo GRU (docs/11 §7) — conferencia ficticia, sem SINARM ---
+  { key: "gru_service_correct", group: "GRU", label: "Servico correto: Emitir Guia de Trafego PF (CAC)" },
+  { key: "gru_amount_expected", group: "GRU", label: "Valor da GRU esperado conferido (R$ 20,00)" },
+  { key: "gru_contributor_checked", group: "GRU", label: "Contribuinte/dados ficticios conferidos" },
+  { key: "gru_destination_checked", group: "GRU", label: "Destino conferido" },
+  { key: "gru_firearm_checked", group: "GRU", label: "Arma/PCE ficticia conferida" },
+  { key: "gru_document_approved", group: "GRU", label: "Documento aprovado" },
+  { key: "gru_payment_confirmed", group: "GRU", label: "Pagamento confirmado (sandbox/dev)" },
+  { key: "gru_internal_review", group: "GRU", label: "Autorizacao/revisao interna registrada" },
 ] as const;
 
 export type ChecklistKey = (typeof CHECKLIST_ITEMS)[number]["key"];
@@ -27,4 +40,13 @@ export function isChecklistKey(key: string): key is ChecklistKey {
 export function checklistLabel(key: ChecklistKey): string {
   const item = CHECKLIST_ITEMS.find((candidate) => candidate.key === key);
   return item ? item.label : key;
+}
+
+export function checklistGroup(key: ChecklistKey): ChecklistGroup {
+  const item = CHECKLIST_ITEMS.find((candidate) => candidate.key === key);
+  return (item?.group ?? "REVISAO") as ChecklistGroup;
+}
+
+export function checklistItemsByGroup(group: ChecklistGroup) {
+  return CHECKLIST_ITEMS.filter((item) => item.group === group);
 }

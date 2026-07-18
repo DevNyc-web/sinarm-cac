@@ -1,3 +1,10 @@
+import {
+  type DocumentStatus,
+  type OperationalStatus,
+  type PaymentStatus,
+  type ProcessPriority,
+  type UserFacingStatus,
+} from "@prisma/client";
 import { getPrisma } from "@/server/db/prisma";
 import { type MockFirearm } from "@/server/processes/mockFirearms";
 
@@ -104,6 +111,59 @@ export function listProcessesForAdmin() {
     include: { destination: true, processType: true },
     orderBy: { createdAt: "desc" },
   });
+}
+
+export type AdminQueueFilters = {
+  operationalStatus?: OperationalStatus;
+  paymentStatus?: PaymentStatus;
+  documentStatus?: DocumentStatus;
+  /** Busca por codigo interno (ex.: GT-DEV-ABC). */
+  code?: string;
+  assignedToMockUserId?: string;
+  sort?: "recent" | "oldest";
+};
+
+/**
+ * Fila admin com filtros (docs/11 §4). `select` explicito: a fila mostra apenas
+ * status/prioridade/responsavel — nenhum metadado de documento ou arma/PCE sai
+ * daqui, para qualquer perfil (need-to-know, docs/11 §3/§19).
+ */
+export function listAdminQueue(filters: AdminQueueFilters) {
+  return getPrisma().process.findMany({
+    where: {
+      operationalStatus: filters.operationalStatus,
+      assignedToMockUserId: filters.assignedToMockUserId,
+      code: filters.code ? { contains: filters.code, mode: "insensitive" } : undefined,
+      payments: filters.paymentStatus ? { some: { status: filters.paymentStatus } } : undefined,
+      documents: filters.documentStatus ? { some: { status: filters.documentStatus } } : undefined,
+    },
+    select: {
+      id: true,
+      code: true,
+      userId: true,
+      createdAt: true,
+      operationalStatus: true,
+      priority: true,
+      assignedToMockUserId: true,
+      processType: { select: { name: true } },
+      destination: { select: { eventName: true, city: true, uf: true } },
+      payments: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      documents: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
+    },
+    orderBy: { createdAt: filters.sort === "oldest" ? "asc" : "desc" },
+  });
+}
+
+export type UpdateProcessOperationsData = {
+  operationalStatus?: OperationalStatus;
+  priority?: ProcessPriority;
+  assignedToMockUserId?: string | null;
+  userFacingStatus?: UserFacingStatus;
+};
+
+/** Atualiza campos operacionais do processo (Fase 6). */
+export function updateProcessOperations(id: string, data: UpdateProcessOperationsData) {
+  return getPrisma().process.update({ where: { id }, data });
 }
 
 /**

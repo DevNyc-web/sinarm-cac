@@ -37,6 +37,15 @@ model Process {
   processType      ProcessType      @relation(fields: [processTypeId], references: [id])
   internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
   userFacingStatus UserFacingStatus @default(RECEBIDO) @map("user_facing_status")
+  /// Trilha OPERACIONAL do modo dev/assistido (Fase 6). Nao substitui
+  /// `internalStatus` (docs/12 §6, canonico, com estados SINARM/GRU): e a visao
+  /// que a fila/operacao usa enquanto nao ha protocolo real. As transicoes
+  /// sincronizam `userFacingStatus` para o usuario nao ver algo divergente.
+  operationalStatus OperationalStatus     @default(RASCUNHO) @map("operational_status")
+  priority          ProcessPriority       @default(NORMAL)
+  /// Responsavel atual (usuario MOCK — docs/11 §4). Vira FK com auth real.
+  assignedToMockUserId String?             @map("assigned_to_mock_user_id")
+  notes             ProcessNote[]
   /// Padrao "Guia para treino", editavel (docs/10 §4).
   justification    String                 @map("justification")
   destination      Destination?
@@ -49,26 +58,98 @@ model Process {
   updatedAt        DateTime               @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@index([operationalStatus])
+  @@index([assignedToMockUserId])
   @@map("processes")
+}
+
+/// Status operacional da fila em modo dev/assistido (Fase 6).
+/// NAO inclui estados de protocolo/GRU real — o MVP e assistido e nada e
+/// protocolado nesta fase (docs/10 §17, docs/11 §20).
+enum OperationalStatus {
+  RASCUNHO
+  DOCUMENTO_ENVIADO
+  DOCUMENTO_APROVADO
+  AGUARDANDO_PAGAMENTO
+  PAGO_EM_FILA
+  EM_REVISAO_OPERACIONAL
+  /// Pronto para o operador protocolar MANUALMENTE no SINARM (fora do app).
+  PRONTO_PARA_PROTOCOLO_MANUAL
+  BLOQUEADO
+  /// Cancelamento em ambiente de desenvolvimento (nao e reembolso real).
+  CANCELADO_DEV
+
+  @@map("operational_status")
+}
+
+/// Prioridade operacional da fila (docs/11 §4).
+enum ProcessPriority {
+  BAIXA
+  NORMAL
+  ALTA
+  URGENTE
+
+  @@map("process_priority")
+}
+
+/// Notas internas e mensagens ao usuario (docs/11 §5.11/§17).
+/// Texto livre — a UI avisa para NAO escrever PII (docs/11 §19).
+model ProcessNote {
+  id               String         @id @default(uuid())
+  processId        String         @map("process_id")
+  process          Process        @relation(fields: [processId], references: [id])
+  visibility       NoteVisibility @default(INTERNA)
+  body             String
+  authorMockUserId String         @map("author_mock_user_id")
+  authorRole       String         @map("author_role")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@index([processId])
+  @@map("process_notes")
+}
+
+/// Visibilidade da nota: interna (equipe) ou mensagem ao usuario (docs/11 §11).
+enum NoteVisibility {
+  INTERNA
+  VISIVEL_USUARIO
+
+  @@map("note_visibility")
 }
 
 /// Historico imutavel de mudancas de status (docs/12 §3.5). APPEND-ONLY:
 /// nunca editar/apagar. `actorMockUserId`/`actorRole` referem-se aos usuarios
 /// MOCK da Fase 2 — viram FK/enum reais quando a auth real entrar.
 model ProcessStatusEvent {
-  id              String          @id @default(uuid())
-  processId       String          @map("process_id")
-  process         Process         @relation(fields: [processId], references: [id])
-  fromStatus      InternalStatus? @map("from_status")
-  toStatus        InternalStatus  @map("to_status")
-  actorMockUserId String          @map("actor_mock_user_id")
-  actorRole       String          @map("actor_role")
+  id              String           @id @default(uuid())
+  processId       String           @map("process_id")
+  process         Process          @relation(fields: [processId], references: [id])
+  /// Tipo do evento — a trilha cobre status, prioridade, responsavel e notas.
+  kind            ProcessEventKind @default(STATUS_INTERNO)
+  fromStatus      InternalStatus?  @map("from_status")
+  /// Nulo em eventos que nao mudam o status interno (prioridade, responsavel…).
+  toStatus        InternalStatus?  @map("to_status")
+  /// Valores genericos dos eventos operacionais (rotulos curtos, SEM PII).
+  fromValue       String?          @map("from_value")
+  toValue         String?          @map("to_value")
+  actorMockUserId String           @map("actor_mock_user_id")
+  actorRole       String           @map("actor_role")
   /// Texto curto, SEM PII (docs/12 §3.5).
   note            String?
-  createdAt       DateTime        @default(now()) @map("created_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
 
   @@index([processId])
   @@map("process_status_events")
+}
+
+/// Tipos de evento da trilha do processo (docs/11 §18).
+enum ProcessEventKind {
+  STATUS_INTERNO
+  STATUS_OPERACIONAL
+  PRIORIDADE
+  RESPONSAVEL
+  NOTA
+
+  @@map("process_event_kind")
 }
 
 /// Itens do checklist de revisao admin (docs/11 §6, versao dev/mock).
@@ -78,6 +159,8 @@ model ProcessChecklistItem {
   id                  String    @id @default(uuid())
   processId           String    @map("process_id")
   process             Process   @relation(fields: [processId], references: [id])
+  /// Grupo do item: revisao geral (docs/11 §6) ou checkpoint GRU (docs/11 §7).
+  group               ChecklistGroup @default(REVISAO)
   key                 String
   label               String
   checked             Boolean   @default(false)
@@ -89,6 +172,16 @@ model ProcessChecklistItem {
 
   @@unique([processId, key])
   @@map("process_checklist_items")
+}
+
+/// Grupos de checklist: revisao geral (docs/11 §6) e checkpoint "Dados da GRU"
+/// (docs/11 §7). O checkpoint GRU aqui e FICTICIO: nao acessa SINARM, nao gera
+/// GRU e nao protocola — so registra a conferencia humana.
+enum ChecklistGroup {
+  REVISAO
+  GRU
+
+  @@map("checklist_group")
 }
 
 /// Destino/clube/evento informado pelo usuario (docs/12 §3.7). Dados de local

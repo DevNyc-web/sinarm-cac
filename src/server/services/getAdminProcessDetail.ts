@@ -14,7 +14,17 @@
  * - `sha256`: o DTO carrega apenas o prefixo curto que a UI exibe; a coluna
  *   completa so e lida para quem ja tem direito aos metadados do documento.
  */
-import { type DocumentStatus, type DocumentType, type InternalStatus, type PaymentStatus, type UserFacingStatus } from "@prisma/client";
+import {
+  type ChecklistGroup,
+  type DocumentStatus,
+  type DocumentType,
+  type InternalStatus,
+  type NoteVisibility,
+  type OperationalStatus,
+  type PaymentStatus,
+  type ProcessPriority,
+  type UserFacingStatus,
+} from "@prisma/client";
 import { hasPermission } from "@/server/auth/guards";
 import { findMockUser, type AuthUser } from "@/server/auth/mockUsers";
 import { ROLE_LABELS, type Role } from "@/server/auth/roles";
@@ -25,6 +35,7 @@ import {
   PAYMENT_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import { listChecklistItems } from "@/server/repositories/checklistRepository";
+import { listNotesForProcess } from "@/server/repositories/processNoteRepository";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
 import { listDocumentsForAdmin } from "@/server/repositories/processDocumentRepository";
 import { listStatusEvents } from "@/server/repositories/processEventRepository";
@@ -68,10 +79,19 @@ export type AdminPaymentView = {
 
 export type AdminChecklistView = {
   key: string;
+  group: ChecklistGroup;
   label: string;
   checked: boolean;
   checkedByLabel?: string;
   checkedAt?: Date;
+};
+
+export type AdminNoteView = {
+  id: string;
+  visibility: NoteVisibility;
+  body: string;
+  authorLabel: string;
+  createdAt: Date;
 };
 
 export type AdminTimelineEntry = {
@@ -87,6 +107,10 @@ export type AdminProcessDetail = {
   processTypeName: string;
   internalStatus: InternalStatus;
   userFacingStatus: UserFacingStatus;
+  operationalStatus: OperationalStatus;
+  priority: ProcessPriority;
+  assignedToMockUserId: string | null;
+  assignedToLabel: string | null;
   createdAt: Date;
   justification: string;
   owner: { name: string; email: string } | null;
@@ -106,6 +130,7 @@ export type AdminProcessDetail = {
   documentsRestricted: boolean;
   payments: AdminPaymentView[];
   checklist: AdminChecklistView[];
+  notes: AdminNoteView[];
   timeline: AdminTimelineEntry[];
 };
 
@@ -132,11 +157,13 @@ export async function getAdminProcessDetail(
   const process = await findProcessByIdForAdmin(processId, canViewFull);
   if (!process) return null;
 
-  const [statusEvents, checklistRows, documentRows, paymentRows] = await Promise.all([
+  const [statusEvents, checklistRows, documentRows, paymentRows, noteRows] = await Promise.all([
     listStatusEvents(process.id),
     listChecklistItems(process.id),
     listDocumentsForAdmin(process.id, canViewFull),
     listPaymentsForProcess(process.id),
+    // Perfis internos leem notas internas e mensagens; o dono le so as visiveis.
+    listNotesForProcess(process.id, false),
   ]);
 
   // Documentos: sem visao completa, so tipo e status saem do servidor.
@@ -177,6 +204,7 @@ export async function getAdminProcessDetail(
     const row = checklistRows.find((candidate) => candidate.key === definition.key);
     return {
       key: definition.key,
+      group: definition.group as ChecklistGroup,
       label: definition.label,
       checked: row?.checked ?? false,
       checkedByLabel:
@@ -188,6 +216,17 @@ export async function getAdminProcessDetail(
   });
 
   const owner = findMockUser(process.userId);
+  const assigned = process.assignedToMockUserId
+    ? findMockUser(process.assignedToMockUserId)
+    : null;
+
+  const notes: AdminNoteView[] = noteRows.map((note) => ({
+    id: note.id,
+    visibility: note.visibility,
+    body: note.body,
+    authorLabel: actorLabel(note.authorMockUserId, note.authorRole),
+    createdAt: note.createdAt,
+  }));
 
   // Linha do tempo — nomes de arquivo tambem respeitam o need-to-know.
   const timeline: AdminTimelineEntry[] = [];
@@ -202,13 +241,29 @@ export async function getAdminProcessDetail(
     });
   }
   for (const event of statusEvents) {
+    let title: string;
+    if (event.kind === "STATUS_INTERNO" && event.toStatus) {
+      title =
+        event.fromStatus === null
+          ? `Rascunho criado — status ${INTERNAL_STATUS_LABELS[event.toStatus]}`
+          : `Status: ${INTERNAL_STATUS_LABELS[event.fromStatus]} → ${INTERNAL_STATUS_LABELS[event.toStatus]}`;
+    } else {
+      const transition =
+        event.fromValue && event.toValue
+          ? `${event.fromValue} → ${event.toValue}`
+          : (event.toValue ?? "-");
+      const prefix: Record<string, string> = {
+        STATUS_OPERACIONAL: "Status operacional",
+        PRIORIDADE: "Prioridade",
+        RESPONSAVEL: "Responsavel",
+        NOTA: "Registro",
+      };
+      title = `${prefix[event.kind] ?? "Evento"}: ${transition}`;
+    }
     timeline.push({
       id: event.id,
       at: event.createdAt,
-      title:
-        event.fromStatus === null
-          ? `Rascunho criado — status ${INTERNAL_STATUS_LABELS[event.toStatus]}`
-          : `Status: ${INTERNAL_STATUS_LABELS[event.fromStatus]} → ${INTERNAL_STATUS_LABELS[event.toStatus]}`,
+      title,
       detail: `por ${actorLabel(event.actorMockUserId, event.actorRole)}${event.note ? ` · ${event.note}` : ""}`,
     });
   }
@@ -257,6 +312,10 @@ export async function getAdminProcessDetail(
     processTypeName: process.processType.name,
     internalStatus: process.internalStatus,
     userFacingStatus: process.userFacingStatus,
+    operationalStatus: process.operationalStatus,
+    priority: process.priority,
+    assignedToMockUserId: process.assignedToMockUserId,
+    assignedToLabel: assigned ? assigned.name : process.assignedToMockUserId,
     createdAt: process.createdAt,
     justification: process.justification,
     owner: owner ? { name: owner.name, email: owner.email } : null,
@@ -285,6 +344,7 @@ export async function getAdminProcessDetail(
     documentsRestricted: !canViewFull,
     payments,
     checklist,
+    notes,
     timeline,
   };
 }

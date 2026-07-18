@@ -1,3 +1,4 @@
+import { type ChecklistGroup } from "@prisma/client";
 import { getPrisma } from "@/server/db/prisma";
 import { type ChecklistKey } from "@/server/processes/checklistDefinition";
 
@@ -16,6 +17,7 @@ export function listChecklistItems(processId: string) {
 export type SetChecklistItemData = {
   processId: string;
   key: ChecklistKey;
+  group: ChecklistGroup;
   label: string;
   checked: boolean;
   /** Quem marcou/desmarcou (usuario mock + perfil) — docs/11 §18. */
@@ -44,6 +46,7 @@ export function setChecklistItem(data: SetChecklistItemData) {
     create: {
       processId: data.processId,
       key: data.key,
+      group: data.group,
       label: data.label,
       ...checkedFields,
     },

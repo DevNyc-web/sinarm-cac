@@ -9,7 +9,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { type AuthUser } from "@/server/auth/mockUsers";
 import { createDocument } from "@/server/repositories/processDocumentRepository";
-import { findProcessByIdForUser } from "@/server/repositories/processRepository";
+import {
+  findProcessByIdForUser,
+  updateProcessOperations,
+} from "@/server/repositories/processRepository";
 import { getStorageAdapter } from "@/server/storage";
 
 export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024; // 2 MB (dev)
@@ -59,6 +62,11 @@ export async function uploadProcessDocument(
       storageKey,
       uploadedByMockUserId: actor.id,
     });
+
+    // Avanca a fila apenas se ainda estava no inicio (nao regride status).
+    if (process.operationalStatus === "RASCUNHO") {
+      await updateProcessOperations(process.id, { operationalStatus: "DOCUMENTO_ENVIADO" });
+    }
 
     return { ok: true };
   } catch {

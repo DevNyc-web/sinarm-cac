@@ -1,4 +1,4 @@
-import { type InternalStatus } from "@prisma/client";
+import { type InternalStatus, type ProcessEventKind } from "@prisma/client";
 import { getPrisma } from "@/server/db/prisma";
 
 /**
@@ -34,5 +34,34 @@ export function listStatusEvents(processId: string) {
   return getPrisma().processStatusEvent.findMany({
     where: { processId },
     orderBy: { createdAt: "asc" },
+  });
+}
+
+export type RecordOperationalEventData = {
+  processId: string;
+  kind: Exclude<ProcessEventKind, "STATUS_INTERNO">;
+  /** Rotulos curtos, SEM PII (ex.: "Normal" -> "Urgente"). */
+  fromValue?: string | null;
+  toValue?: string | null;
+  actorMockUserId: string;
+  actorRole: string;
+  note?: string;
+};
+
+/**
+ * Registra evento operacional (status operacional, prioridade, responsavel,
+ * nota) na mesma trilha append-only dos eventos de status (docs/11 §18).
+ */
+export function recordOperationalEvent(data: RecordOperationalEventData) {
+  return getPrisma().processStatusEvent.create({
+    data: {
+      processId: data.processId,
+      kind: data.kind,
+      fromValue: data.fromValue ?? null,
+      toValue: data.toValue ?? null,
+      actorMockUserId: data.actorMockUserId,
+      actorRole: data.actorRole,
+      note: data.note,
+    },
   });
 }
