@@ -4,9 +4,12 @@
 > tomadas e o próximo passo, para que qualquer pessoa (ou o Claude, numa nova
 > sessão) entenda o contexto só lendo os arquivos.
 >
-> **Última atualização:** 2026-07-17
-> **Estado geral:** Fase 0/1 — planejamento e reconhecimento. **Sem código de
-> aplicação.** Só documentação.
+> **Última atualização:** 2026-07-18
+> **Estado geral:** **Fases 1–5 implementadas e validadas localmente** com
+> **Postgres real** e **dados 100% fictícios** (ver
+> `docs/18-validacao-integrada-fases-1-5.md`). Auth mock/dev, upload fictício e
+> Pix sandbox — **nada real**: sem PII, sem documento real, sem cobrança real,
+> sem Gov.br/SINARM, sem protocolo.
 
 ---
 
@@ -80,9 +83,15 @@ Arquivos existentes:
 - `docs/14-roadmap-implementacao-mvp.md`
 - `docs/15-decisoes-fase-0.md`
 - `docs/16-fase-1-esqueleto-tecnico.md`
+- `docs/17-decisao-pix-mvp.md`
+- `docs/18-validacao-integrada-fases-1-5.md`
 - `docs/legal/analise-termos-de-uso.md`
 
-**Nenhum código de aplicação foi escrito.** Nenhuma dependência instalada.
+**Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
+com as **Fases 1–5** implementadas e **validadas localmente com dados
+fictícios** (`docs/18`). Roda com **Postgres local**, **auth mock/dev**,
+**storage local/dev** e **Pix em modo fake/sandbox** — nenhum provedor de
+produção conectado.
 
 ## 5. O que já foi descoberto sobre o SINARM/CAC
 
@@ -150,6 +159,16 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 
 ## 7. Próximo passo planejado
 
+> **Estado da implementação (2026-07-18):** Fases 1–5 concluídas e validadas
+> localmente — ver `docs/18-validacao-integrada-fases-1-5.md`. Fluxo fictício
+> completo: login mock → rascunho → revisão → documento fictício → fila admin →
+> aprovação/rejeição → checklist → Pix sandbox → processo em fila, com histórico
+> auditável. **Próximo passo recomendado:** **Fase 6** (operação/admin avançada)
+> ou preparação da **execução assistida manual** (docs/18 §10).
+> **Pendências que travam produção** (docs/18 §9): auth real + MFA, storage de
+> produção, KMS/criptografia, retenção final, conta Mercado Pago de produção,
+> webhook externo real, termos/reembolso.
+
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
 `docs/09-reconhecimento-sinarm-cac.md §15`.
@@ -189,7 +208,10 @@ e como identificar compensação/pagamento. **Por enquanto NÃO seguir para auto
 **Sequência de leitura ao abrir o projeto na próxima sessão:**
 
 1. Leia **este arquivo** (`docs/00-contexto-atual.md`) primeiro.
-2. Depois leia `docs/09-reconhecimento-sinarm-cac.md`.
+2. Depois `docs/18-validacao-integrada-fases-1-5.md` (o que já está pronto e
+   validado, e o que trava produção).
+3. Depois `docs/15-decisoes-fase-0.md` (decisões e pendências) e
+   `docs/09-reconhecimento-sinarm-cac.md` (fluxo SINARM).
 
 ### ➡️ PRÓXIMO PASSO (explícito)
 
@@ -216,10 +238,18 @@ e como identificar compensação/pagamento. **Por enquanto NÃO seguir para auto
 **Ao voltar:** preencher §15.14 com os achados; onde não observar, "não
 observado"; onde houver dúvida, "inconclusivo — confirmar".
 
-### Regras de retomada (permanentes nesta etapa)
+### Regras de retomada (permanentes)
 
-- ❌ **Não implementar código ainda.**
-- ❌ **Não instalar dependências.**
-- ❌ **Não automatizar Gov.br/SINARM ainda.**
-- ✅ **Continuar documentando antes de implementar.**
-- ✅ Nada de código/dependências/automação **sem confirmação explícita** do usuário.
+- ❌ **Não automatizar Gov.br/SINARM.** O MVP é **assistido/manual**.
+- ❌ **Não usar dados reais / PII real** (CPF, RG, documento, cliente real).
+- ❌ **Não gerar cobrança Pix real** nem conectar provedor de produção.
+- ❌ **Não protocolar** processo real.
+- ✅ **Documentar a decisão antes de implementar** a fase que depende dela.
+- ✅ Código, dependências, mudança de fase ou provedor **só com confirmação
+  explícita** do usuário.
+- ✅ Ao criar tela nova, aplicar **permissão na query + DTO redigido**
+  (docs/18 §6).
+
+> **Nota:** a regra anterior "não implementar código ainda" valia até a Fase 0.
+> As Fases 1–5 já foram implementadas **com confirmação explícita** e validadas
+> em modo dev/fictício (docs/18).
