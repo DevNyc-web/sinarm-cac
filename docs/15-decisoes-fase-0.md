@@ -112,14 +112,33 @@ decisões improvisadas no meio da implementação.
   banco); login por **e-mail/senha ou magic link/OTP**; sessão em cookie httpOnly.
   **Não** é Gov.br.
 - **Alternativa aceitável:** **Lucia** (mais controle manual).
-- **Decisão escolhida:** `PENDENTE` (segue a escolha de 3.1)
+- **Decisão escolhida (2026-07-17):** 🟡 **PRELIMINAR PARA A FASE 2** —
+  implementar a **estrutura interna preparada para autenticação**, mas **começar
+  com auth de desenvolvimento/mock** (ou sessão local controlada).
+  - **Provedor real de produção:** ainda `PENDENTE`. Candidatos futuros:
+    **Supabase Auth**, **Auth.js/NextAuth** ou provedor dedicado (segue 3.1).
+  - **Restrição:** **não usar dados reais**, **não coletar CPF real**, **não usar
+    PII real**.
+  - **Objetivo:** liberar **guards**, **layout autenticado**, **dashboard** e o
+    **fluxo de processo** com **dados fictícios**.
+  - **Efeito:** libera iniciar a **Fase 2** (auth mock/dev). Provedor real fica
+    para antes de produção.
 
 ### 3.9 Autenticação do admin
 - **Recomendação padrão:** **mesma tecnologia de 3.8**, em **domínio/rotas
   separados**, com **RBAC** (Admin/Operador/Financeiro/Suporte) e **MFA
   obrigatório** para internos; **segregação de funções**.
 - **Alternativa aceitável:** provider dedicado para o painel, se necessário isolar.
-- **Decisão escolhida:** `PENDENTE`
+- **Decisão escolhida (2026-07-17):** 🟡 **PRELIMINAR PARA A FASE 2** —
+  criar a **estrutura de RBAC/admin** no **modelo** e no **app**, **sem**
+  autenticação real de produção ainda.
+  - **Perfis previstos:** **admin · operador · financeiro · suporte**.
+  - **MFA:** **obrigatório antes de produção**.
+  - **Segregação de perfis:** deve seguir `docs/11-painel-admin-operacao.md` (§2/§3).
+  - **Restrição:** o painel admin pode funcionar em **modo dev/mock** apenas para
+    **validar navegação e permissões fictícias** — sem dados reais/PII.
+  - **Efeito:** libera iniciar a **Fase 2** (RBAC estrutural + mock). Auth real e
+    MFA ficam para antes de produção.
 
 ### 3.10 Estratégia de criptografia (PII)
 - **Recomendação padrão:** **cifra em aplicação** dos campos sensíveis (doc 12 §19)
@@ -151,7 +170,7 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
 | 3 | **Múltiplas armas por guia** (1 ou N em `firearms_pce`) | Sim | `PENDENTE` — confirmar no SINARM |
 | 4 | **Prazos de retenção** por tipo | Não (política, não schema) | `PENDENTE` — ver §3.11 |
 | 5 | **Cadastro inicial PF** vira fluxo? (tabela/campos próprios) | Não no MVP (é fallback) | `PENDENTE` — adiar |
-| 6 | **Multi-perfil interno** (role único vs. tabela de papéis) | Pequeno (afeta `admin_users`) | `PENDENTE` — decidir em F2 |
+| 6 | **Multi-perfil interno** (role único vs. tabela de papéis) | Pequeno (afeta `admin_users`) | 🟡 **Em andamento na F2** — perfis definidos (admin/operador/financeiro/suporte, §3.9); modelagem role único vs. tabela ainda a fechar |
 | 7 | **Reembolso parcial** (valor/estágio em `payments`) | Pequeno | `PENDENTE` — decidir com política de reembolso |
 | 8 | Campos do **provedor Pix** (`provider_ref`/webhook) | Sim (afeta `payments`) | `PENDENTE` — depende de 3.4 |
 | 9 | **Chave de cifra / KMS** | Sim (afeta PII) | `PENDENTE` — ver §3.10 |
@@ -166,6 +185,10 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
 0. ✅ **Banco de dados (3.1): RESOLVIDO para a Fase 1** — **Postgres local +
    Prisma**. Deixa de ser bloqueador do **início**. Produção segue `PENDENTE`
    (Supabase/Neon/outro), o que **não** bloqueia F1.
+0b. ✅ **Auth usuário/admin (3.8/3.9): RESOLVIDO para a Fase 2 (preliminar)** —
+   **auth mock/dev + RBAC estrutural**. Deixa de bloquear o **início da F2**.
+   **Provedor real de auth** e **MFA** seguem `PENDENTE` — obrigatórios **antes de
+   produção**.
 1. **Provedor Pix (3.4 / §7 #8):** bloqueia **Fase 5 (Pix)**. Não bloqueia F1–F4.
 2. **Estratégia de criptografia + KMS (3.10 / §7 #9):** bloqueia **persistir PII
    real**. Não bloqueia esqueleto/estrutura, mas **precisa estar pronto antes de
@@ -176,62 +199,77 @@ Status de cada dúvida do modelo de dados que pode afetar o schema:
    não o início.
 5. **Multi-arma (§7 #3)** e **campos Pix (§7 #8):** bloqueiam **congelar o schema**
    dessas tabelas — mas o schema pode ser modelado incrementalmente por fase.
+6. **Provedor real de auth + MFA (3.8/3.9):** bloqueiam **ir a produção** com
+   contas reais. **Não** bloqueiam a **Fase 2** (que roda mock/dev).
 
-> Com **3.1 decidido**, a **Fase 1 (esqueleto)** está **destravada**. Os demais
-> itens impõem **ordem**: **Pix** e **cifra/storage** prontos **antes** das fases
-> que tocam pagamento e **PII real**.
+> Com **3.1 decidido**, a **Fase 1 (esqueleto)** está **destravada**; com
+> **3.8/3.9 preliminares**, a **Fase 2 (auth/perfis)** também. Os demais itens
+> impõem **ordem**: **Pix** e **cifra/storage** prontos **antes** das fases que
+> tocam pagamento e **PII real**; **auth real + MFA** prontos **antes de produção**.
 
 ---
 
 ## 9. O que pode começar mesmo com pendências
 
-Com **3.1 decidido (Postgres local + Prisma)**, é seguro avançar (após confirmação
-para iniciar código):
+Com **3.1 decidido (Postgres local + Prisma)** e **3.8/3.9 preliminares (auth
+mock/dev + RBAC estrutural)**, é seguro avançar (após confirmação para iniciar código):
 
 - **Fase 0 restante:** estrutura de pastas (doc 07), convenções (lint/commits),
   **`.env.example`** (sem segredos), wireframes.
 - **Fase 1 (esqueleto):** Next.js + TS, camadas, healthcheck, **config Zod**,
-  conexão com **Postgres local** via Prisma — sem provedor externo.
+  conexão com **Postgres local** via Prisma — sem provedor externo. **(FEITO)**
+- **Fase 2 (auth/perfis):** **estrutura interna de autenticação** + **guards** +
+  **layout autenticado** + **dashboard** + **fluxo de processo**, com **auth
+  mock/dev** (sessão local controlada). **RBAC estrutural** com perfis
+  **admin/operador/financeiro/suporte** e **segregação** conforme doc 11 — em
+  **modo dev/mock**, validando **navegação e permissões fictícias**.
 - **Modelagem incremental** das tabelas **sem PII/pagamento** (ex.: `process_types`,
-  estados) atrás do Prisma, com repositórios.
+  estados, `admin_users`/papéis) atrás do Prisma, com repositórios.
 - **UI neutra** e formulários do usuário (F3) com validação Zod, usando **DB local**
   e dados **fictícios** até os provedores serem escolhidos.
 - **Design de auditoria/eventos** (doc 12 §12) como contrato, independente do provedor.
 
-> **Regras enquanto storage/criptografia/retenção estiverem `PENDENTE`:**
-> - **Não usar dados reais / PII real.**
+> **Regras enquanto auth real/storage/criptografia/retenção estiverem `PENDENTE`:**
+> - **Não usar dados reais / PII real** (nem CPF real).
+> - **Não** usar **provedor de auth real** nem contas reais (só mock/dev).
 > - **Não implementar pagamento** (Pix).
 > - **Não implementar upload real de documentos sensíveis** (F4).
 > - **Não implementar automação SINARM/CAC.**
 > - **Não** conectar provedores de **produção**.
-> Ou seja: Fase 1 roda **100% com Postgres local e dados fictícios**.
+> Ou seja: Fases 1–2 rodam **100% com Postgres local, auth mock/dev e dados fictícios**.
 
 ---
 
 ## 10. Critério para liberar início da implementação
 
-**Liberar a Fase 1 (código do esqueleto):**
+**Liberar a Fase 1 (código do esqueleto):** ✅ **CONCLUÍDA**
 - [x] **Banco (3.1)** escolhido → ✅ **Postgres local + Prisma** (2026-07-17).
-- [ ] **Ambiente de deploy (3.7)** ao menos direcionado (pode ser confirmado até F1 fechar).
-- [ ] **Estrutura de pastas** e convenções definidas.
-- [ ] **`.env.example`** rascunhado (chaves do doc 13 §16, sem valores).
-- [ ] Confirmação **explícita** do usuário para começar a codar.
+- [x] **Estrutura de pastas** e convenções definidas (doc 16 / esqueleto criado).
+- [x] **`.env.example`** rascunhado (sem valores).
+- [x] Confirmação **explícita** do usuário → esqueleto Next.js implementado e versionado.
+- [ ] **Ambiente de deploy (3.7)** ao menos direcionado (segue `PENDENTE`, não bloqueia).
 
-> **Situação:** o único bloqueador técnico do início (banco) está **resolvido para
-> a Fase 1**. Falta apenas preparar estrutura/convenções e a **confirmação
-> explícita** para começar a codar — sempre com **Postgres local e dados
-> fictícios**.
+**Liberar a Fase 2 (auth e perfis):**
+- [x] **Auth usuário (3.8)** definida (preliminar) → **mock/dev + estrutura interna**.
+- [x] **Auth admin (3.9)** definida (preliminar) → **RBAC estrutural + perfis**
+      admin/operador/financeiro/suporte, **modo dev/mock**.
+- [ ] Confirmação **explícita** do usuário para iniciar a Fase 2.
+
+> **Situação:** **Fase 1 concluída**; **Fase 2 liberada** para começar com **auth
+> mock/dev + RBAC estrutural** — sem provedor de auth real, **sem PII/CPF real**.
+> **Provedor de auth real** e **MFA** ficam **obrigatórios antes de produção**.
 
 **Liberar fases sensíveis:**
+- [ ] **Produção com contas reais:** **provedor de auth real (3.8/3.9)** + **MFA** ativos.
 - [ ] **Fase 4/PII real:** **storage (3.2)** + **criptografia + KMS (3.10)** definidos.
 - [ ] **Fase 5/Pix:** **provedor Pix (3.4)** e **campos/idempotência (§7 #8/#10)** definidos.
 - [ ] **Fase 10/LGPD:** **retenção (3.11)** definida.
 - [ ] **Fase 12/piloto:** **hardening (F11)** aprovado; provedores de produção ativos.
 
-> **Resumo:** a **Fase 1 está liberada** (banco decidido) — falta só estrutura +
-> confirmação. **Pix, storage, criptografia e retenção** continuam `PENDENTE` e
-> **travam** as fases de pagamento, upload real e PII real — devem estar prontos
-> **antes** delas.
+> **Resumo:** **Fases 1 e 2 liberadas** (banco + auth preliminar). **Auth real +
+> MFA** antes de **produção**; **Pix, storage, criptografia e retenção** continuam
+> `PENDENTE` e **travam** as fases de pagamento, upload real e PII real — devem
+> estar prontos **antes** delas.
 
 ---
 
@@ -246,8 +284,8 @@ para iniciar código):
 | 3.5 | E-mail | Resend | `PENDENTE` |
 | 3.6 | Domínio | Domínio neutro (app./admin.) | `PENDENTE` |
 | 3.7 | Deploy | Vercel (web) + gerenciados / Railway | `PENDENTE` |
-| 3.8 | Auth usuário | Auth.js ou Supabase Auth | `PENDENTE` |
-| 3.9 | Auth admin | Mesma + RBAC + MFA, domínio separado | `PENDENTE` |
+| 3.8 | Auth usuário | Auth.js ou Supabase Auth | 🟡 **Fase 2: mock/dev + estrutura**; provedor real `PENDENTE` |
+| 3.9 | Auth admin | Mesma + RBAC + MFA, domínio separado | 🟡 **Fase 2: RBAC estrutural + mock**; auth real + MFA `PENDENTE` (antes de produção) |
 | 3.10 | Criptografia | Cifra em app + KMS + `cpf_hash` | `PENDENTE` |
 | 3.11 | Retenção docs | Apagar doc 30–90d após conclusão | `PENDENTE` |
 
