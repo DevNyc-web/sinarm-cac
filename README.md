@@ -131,7 +131,14 @@ Páginas nunca comparam `role` diretamente — sempre via guard/permissão.
 > `GT-DEV-xxxx` é só um identificador de desenvolvimento.
 
 Fluxo: entrar como **Usuario Exemplo** → `/processos/novo` → preencher →
-**Salvar rascunho** → tela de sucesso → rascunhos listados em `/dashboard`.
+**Salvar rascunho** → tela de sucesso → **Revisar processo** (`/processos/[id]`)
+→ rascunhos listados em `/dashboard`.
+
+**Fila admin (Fase 3.5):** perfis internos veem a fila em `/admin/processos` e
+o detalhe em `/admin/processos/[id]` (dados, destino, arma fictícia,
+justificativa, permissões do perfil e checklist visual não interativo).
+Need-to-know: SUPORTE não vê o bloco de arma/PCE (mínimo necessário,
+docs/11 §3). Nenhuma ação de protocolo/pagamento existe nesta fase.
 Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 

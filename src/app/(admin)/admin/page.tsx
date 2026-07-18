@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { hasPermission, permissionsOf, requireAdminRole } from "@/server/auth/guards";
 import { PERMISSIONS, PERMISSION_LABELS } from "@/server/auth/permissions";
 import { ROLE_LABELS } from "@/server/auth/roles";
@@ -50,7 +51,9 @@ export default async function AdminPage() {
       </Card>
 
       <div className="mt-6">
-        <EmptyState title="Fila vazia" description="Sem processos (esqueleto). Nenhum dado real." />
+        <Link href="/admin/processos">
+          <Button>Abrir fila de processos</Button>
+        </Link>
       </div>
     </Container>
   );

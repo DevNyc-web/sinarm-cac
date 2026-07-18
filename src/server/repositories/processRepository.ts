@@ -75,3 +75,27 @@ export function findProcessByCodeForUser(code: string, userId: string) {
     include: { destination: true, firearm: true, processType: true },
   });
 }
+
+/** Busca um processo pelo id, restrito ao dono (tela de revisao do usuario). */
+export function findProcessByIdForUser(id: string, userId: string) {
+  return getPrisma().process.findFirst({
+    where: { id, userId },
+    include: { destination: true, firearm: true, processType: true },
+  });
+}
+
+/** Fila admin: todos os processos, mais recentes primeiro (docs/11 §4). */
+export function listProcessesForAdmin() {
+  return getPrisma().process.findMany({
+    include: { destination: true, processType: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/** Detalhe admin: processo por id, sem restricao de dono (docs/11 §5). */
+export function findProcessByIdForAdmin(id: string) {
+  return getPrisma().process.findUnique({
+    where: { id },
+    include: { destination: true, firearm: true, processType: true },
+  });
+}

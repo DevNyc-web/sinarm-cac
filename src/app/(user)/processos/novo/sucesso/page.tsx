@@ -57,8 +57,13 @@ export default async function SucessoPage({
         )}
 
         <div className="mt-6 flex gap-3">
+          {process ? (
+            <Link href={`/processos/${process.id}`}>
+              <Button>Revisar processo</Button>
+            </Link>
+          ) : null}
           <Link href="/dashboard">
-            <Button>Ir para meus processos</Button>
+            <Button variant="secondary">Meus processos</Button>
           </Link>
           <Link href="/processos/novo">
             <Button variant="secondary">Criar outro rascunho</Button>

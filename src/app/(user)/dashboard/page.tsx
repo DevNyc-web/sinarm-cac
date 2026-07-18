@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
+import { INTERNAL_STATUS_LABELS } from "@/server/processes/statusLabels";
 import { listProcessesByUser } from "@/server/repositories/processRepository";
 
 type ProcessRow = Awaited<ReturnType<typeof listProcessesByUser>>[number];
@@ -59,21 +60,23 @@ export default async function DashboardPage() {
           <ul className="space-y-3">
             {processes.map((process) => (
               <li key={process.id}>
-                <Card className="flex items-center justify-between">
-                  <div>
-                    <p className="font-mono text-sm font-medium">{process.code}</p>
-                    <p className="mt-1 text-sm text-neutral-600">
-                      {process.processType.name}
-                      {process.destination
-                        ? ` · ${process.destination.eventName} — ${process.destination.city}/${process.destination.uf}`
-                        : ""}
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      Criado em {process.createdAt.toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  <Badge>{process.internalStatus}</Badge>
-                </Card>
+                <Link href={`/processos/${process.id}`} className="block">
+                  <Card className="flex items-center justify-between transition-colors hover:bg-neutral-50">
+                    <div>
+                      <p className="font-mono text-sm font-medium">{process.code}</p>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        {process.processType.name}
+                        {process.destination
+                          ? ` · ${process.destination.eventName} — ${process.destination.city}/${process.destination.uf}`
+                          : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Criado em {process.createdAt.toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <Badge>{INTERNAL_STATUS_LABELS[process.internalStatus]}</Badge>
+                  </Card>
+                </Link>
               </li>
             ))}
           </ul>
