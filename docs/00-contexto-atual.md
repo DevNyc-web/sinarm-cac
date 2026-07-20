@@ -4,7 +4,7 @@
 > tomadas e o próximo passo, para que qualquer pessoa (ou o Claude, numa nova
 > sessão) entenda o contexto só lendo os arquivos.
 >
-> **Última atualização:** 2026-07-18
+> **Última atualização:** 2026-07-20
 > **Estado geral:** **Fases 1–7 implementadas e validadas localmente** com
 > **Postgres real** e **dados 100% fictícios** (ver `docs/18`, `docs/19`,
 > `docs/20` e `docs/22`). O **ciclo dev/fictício está completo de ponta a
@@ -98,6 +98,8 @@ Arquivos existentes:
 - `docs/22-validacao-fase-7-execucao-manual.md`
 - `docs/23-checklist-piloto-real.md`
 - `docs/24-revisao-ux-textos-conformidade.md`
+- `docs/25-visao-automacao-e-decisoes-negocio.md`
+- `docs/26-arquitetura-automacao-hibrida.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -218,6 +220,27 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > **Pendências que travam produção** (docs/20 §11): auth real + MFA, storage de
 > produção + KMS + retenção, conta Mercado Pago de produção + webhook público
 > real, termos/reembolso, revisão jurídica.
+>
+> **➡️ Próximo bloco planejado: ARQUITETURA / LABORATÓRIO DE AUTOMAÇÃO HÍBRIDA
+> (planejamento, não implementação).**
+> - `docs/25-visao-automacao-e-decisoes-negocio.md` — **visão futura**: automação
+>   **server-side autorizada**, com consentimento e presença do usuário, atrás de
+>   **gates** jurídico/segurança/produção/validação. Registra decisões do dono e
+>   go-to-market (clube).
+> - `docs/26-arquitetura-automacao-hibrida.md` — **arquitetura híbrida (Caminho
+>   3)**: **Playwright/Puppeteer** como motor determinístico previsível, **backend
+>   orquestrando**, **IA só em exceção/validação/diagnóstico** (fora do caminho
+>   crítico), **humano** confirmando atos sensíveis. Propõe **Fase 8 — Laboratório
+>   de Automação Sintética** (página **fake/sintética**, dados fictícios) e
+>   **Fase 9 — Prova técnica controlada** (só após os gates).
+>
+> **Automação real NÃO está liberada.** O laboratório **começa em página
+> fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
+> site público real, sem dados reais, sem instalar Playwright ainda**. Qualquer
+> automação contra o sistema real depende dos **gates do `docs/26 §19`** (escopo
+> jurídico por escrito + 12 pendências do `docs/23 §5` + segurança de sessão +
+> Fase 8 concluída + confirmação explícita). As **regras permanentes** (§8) e os
+> **bloqueios de fase** (docs/15) seguem valendo integralmente.
 
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
