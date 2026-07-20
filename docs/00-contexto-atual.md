@@ -102,6 +102,7 @@ Arquivos existentes:
 - `docs/26-arquitetura-automacao-hibrida.md`
 - `docs/27-fase-8a-laboratorio-sintetico.md`
 - `docs/28-fase-8b-playwright-laboratorio-sintetico.md`
+- `docs/29-validacao-fase-8-laboratorio-automacao.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -250,12 +251,21 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 >   **prova negativa de rede** (o teste falha se houver requisição externa/Gov).
 >   Evidências (screenshot/vídeo/trace) **não versionadas**. **Sem Gov.br/SINARM,
 >   sem site público, sem dados reais, sem Puppeteer.**
+> - `docs/29-validacao-fase-8-laboratorio-automacao.md` — **Fase 8 VALIDADA** como
+>   prova técnica segura: consolida 8A (página fake) + 8B (automação). Caminho feliz
+>   ponta a ponta verde (`typecheck`/`lint`/`build`/`test:e2e`), gates provados
+>   (arma/checkbox), **guard de rede com lista de externas VAZIA**. Registra as
+>   **limitações** (só caminho feliz — sem exceções/sessão expirada/arma
+>   ambígua/erro de GRU/instabilidade/retry) e aponta a **Fase 8C**.
 >
 > **Automação real NÃO está liberada.** O laboratório roda em **página
 > fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
 > site público real, sem dados reais**. O **Playwright** já existe, mas **só** mira
-> o laboratório local (`docs/28`). Qualquer automação contra o sistema real depende
-> dos **gates do `docs/26 §19`** (escopo jurídico por escrito + 12 pendências do
+> o laboratório local (`docs/28`/`docs/29`). **Próximo passo: Fase 8C — caminhos de
+> exceção sintéticos** (sessão expirada, campo inválido, arma ambígua, falha de
+> GRU, instabilidade fake, pausa para humano, retry) — **ainda 100% em página fake,
+> sem Gov/SINARM real**. Qualquer automação contra o sistema real depende dos
+> **gates do `docs/26 §19`** (escopo jurídico por escrito + 12 pendências do
 > `docs/23 §5` + segurança de sessão + confirmação explícita). As **regras
 > permanentes** (§8) e os **bloqueios de fase** (docs/15) seguem valendo
 > integralmente.
