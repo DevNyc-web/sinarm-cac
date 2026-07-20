@@ -106,6 +106,7 @@ Arquivos existentes:
 - `docs/30-fase-8c-excecoes-sinteticas.md`
 - `docs/31-material-gate-juridico-automacao.md`
 - `docs/32-decisao-gate-juridico-automacao.md`
+- `docs/33-plano-fase-9-prova-tecnica-controlada.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -285,12 +286,16 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > (termos/privacidade/consentimento/responsabilidade) ainda será assinada pelo
 > advogado antes de cliente real.
 >
-> **➡️ Próxima etapa possível: PLANEJAR a Fase 9 (prova técnica controlada).** O
-> gate jurídico destrava **apenas o planejamento** — não a execução. A Fase 9, quando
-> planejada e aprovada, roda **preferencialmente em conta própria/autorizada**, um
-> processo por vez, com health check, sessão efêmera, logs, screenshots mascaradas,
-> **pausa antes do ato irreversível** e rollback — **sem cliente real** inicialmente
-> (docs/32 §5/§8).
+> **➡️ Plano da Fase 9: ESCRITO (aguardando aprovação de execução).** O plano da
+> **prova técnica controlada** está em `docs/33-plano-fase-9-prova-tecnica-controlada.md`
+> — escopo mínimo (um processo, conta própria/autorizada, sem cliente real), fluxo
+> passo a passo, **ponto de parada obrigatório** (sugestão: parar na tela "Dados da
+> GRU", sem protocolar), health check, sessão efêmera + descarte verificável, logs/
+> evidências mascaradas, critérios de sucesso/parada, rollback e o que precisa ser
+> aprovado antes de codar (§19). **A execução da Fase 9 ainda NÃO está autorizada:**
+> depende de **aprovação explícita do plano** + um **checklist de execução**
+> (`docs/34`, futuro) — só então a menor automação possível é implementada, primeiro
+> em conta própria, **sem clientes reais**.
 >
 > **Produção e piloto amplo continuam BLOQUEADOS** pelas pendências técnicas/
 > operacionais (docs/32 §7, docs/23 §5): auth real + MFA, storage + KMS + retenção,
