@@ -108,6 +108,7 @@ Arquivos existentes:
 - `docs/32-decisao-gate-juridico-automacao.md`
 - `docs/33-plano-fase-9-prova-tecnica-controlada.md`
 - `docs/34-checklist-execucao-fase-9.md`
+- `docs/35-configuracao-segura-fase-9.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -297,8 +298,21 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > "Dados da GRU" — SEM clicar "Gerar GRU e Salvar", sem gerar protocolo, sem pagar
 > taxa.** **A execução da Fase 9 continua NÃO autorizada:** só começa com o bloco
 > §16 do `docs/34` assinado — então a menor automação possível é implementada,
-> primeiro em conta própria, **sem clientes reais**. Validação posterior irá para
-> `docs/35` (futuro).
+> primeiro em conta própria, **sem clientes reais**.
+>
+> **➡️ Revisão dos pré-checks (`docs/34 §5/§6`) encontrou BLOQUEIOS técnicos.** A
+> infra está boa (Playwright instalado, Chromium, env controlado, artifacts
+> gitignored, schema sem persistência de sessão), **mas** a config atual do
+> Playwright grava **screenshot/video/trace** — ok para o sintético, **inseguro para
+> tela real com PII** — e faltam **ambiente isolado** e **branch dedicada**. A
+> decisão técnica está em `docs/35-configuracao-segura-fase-9.md`: **config separada
+> `playwright.phase9.config.ts`** (trace/vídeo off, screenshot mascarado/desativado,
+> contexto efêmero, allowlist de rede), evidências sem PII, sessão efêmera, logs
+> mascarados, ambiente isolado e branch `feat/phase-9-controlled-proof`. **O
+> `docs/34 §16` NÃO deve ser assinado** até esses itens fecharem (docs/35 §11).
+> **Próximo passo:** criar a branch e implementar **só a config segura** (sem
+> automação real), rodar os testes do sintético para garantir que não quebrou, e só
+> então revisar o §16. A **validação** da Fase 9 irá para `docs/36` (futuro).
 >
 > **Produção e piloto amplo continuam BLOQUEADOS** pelas pendências técnicas/
 > operacionais (docs/32 §7, docs/23 §5): auth real + MFA, storage + KMS + retenção,
