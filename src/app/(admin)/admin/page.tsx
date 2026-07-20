@@ -50,10 +50,15 @@ export default async function AdminPage() {
         </ul>
       </Card>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-wrap gap-3">
         <Link href="/admin/processos">
           <Button>Abrir fila de processos</Button>
         </Link>
+        {user.role === "ADMIN" || user.role === "OPERADOR" ? (
+          <Link href="/admin/lab/guia-trafego">
+            <Button variant="secondary">Laboratório sintético (Fase 8A)</Button>
+          </Link>
+        ) : null}
       </div>
     </Container>
   );

@@ -100,6 +100,7 @@ Arquivos existentes:
 - `docs/24-revisao-ux-textos-conformidade.md`
 - `docs/25-visao-automacao-e-decisoes-negocio.md`
 - `docs/26-arquitetura-automacao-hibrida.md`
+- `docs/27-fase-8a-laboratorio-sintetico.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -233,6 +234,13 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 >   crítico), **humano** confirmando atos sensíveis. Propõe **Fase 8 — Laboratório
 >   de Automação Sintética** (página **fake/sintética**, dados fictícios) e
 >   **Fase 9 — Prova técnica controlada** (só após os gates).
+> - `docs/27-fase-8a-laboratorio-sintetico.md` — **Fase 8A IMPLEMENTADA e validada
+>   (dev)**: rota interna `/admin/lab/guia-trafego` (ADMIN/OPERADOR) — uma **página
+>   fake/sintética** que imita o fluxo da Guia de Tráfego, com dados **100%
+>   fictícios** e `data-testid` estáveis, para servir de **alvo** à automação
+>   futura. **Sem Playwright, sem Gov.br/SINARM, sem rede, sem upload/pagamento/
+>   protocolo real.** Próximo: **Fase 8B** (automação Playwright **só** contra essa
+>   página fake), mediante confirmação.
 >
 > **Automação real NÃO está liberada.** O laboratório **começa em página
 > fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
