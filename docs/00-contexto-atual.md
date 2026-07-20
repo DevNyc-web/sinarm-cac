@@ -107,6 +107,7 @@ Arquivos existentes:
 - `docs/31-material-gate-juridico-automacao.md`
 - `docs/32-decisao-gate-juridico-automacao.md`
 - `docs/33-plano-fase-9-prova-tecnica-controlada.md`
+- `docs/34-checklist-execucao-fase-9.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -286,16 +287,18 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > (termos/privacidade/consentimento/responsabilidade) ainda será assinada pelo
 > advogado antes de cliente real.
 >
-> **➡️ Plano da Fase 9: ESCRITO (aguardando aprovação de execução).** O plano da
-> **prova técnica controlada** está em `docs/33-plano-fase-9-prova-tecnica-controlada.md`
-> — escopo mínimo (um processo, conta própria/autorizada, sem cliente real), fluxo
-> passo a passo, **ponto de parada obrigatório** (sugestão: parar na tela "Dados da
-> GRU", sem protocolar), health check, sessão efêmera + descarte verificável, logs/
-> evidências mascaradas, critérios de sucesso/parada, rollback e o que precisa ser
-> aprovado antes de codar (§19). **A execução da Fase 9 ainda NÃO está autorizada:**
-> depende de **aprovação explícita do plano** + um **checklist de execução**
-> (`docs/34`, futuro) — só então a menor automação possível é implementada, primeiro
-> em conta própria, **sem clientes reais**.
+> **➡️ Plano da Fase 9 (`docs/33`) + Checklist de execução (`docs/34`): ESCRITOS
+> (aguardando aprovação).** O plano descreve a **prova técnica controlada** (um
+> processo, conta própria/autorizada, sem cliente real) e o checklist (`docs/34`) é
+> o **portão final** item a item — pré-checks jurídico/técnico/segurança/dados,
+> health check, execução passo a passo, evidências permitidas/proibidas, rollback,
+> critérios de sucesso/falha e um **bloco de aprovação explícita** que precisa ser
+> assinado antes de qualquer código. **Ponto de parada obrigatório da Fase 9: a tela
+> "Dados da GRU" — SEM clicar "Gerar GRU e Salvar", sem gerar protocolo, sem pagar
+> taxa.** **A execução da Fase 9 continua NÃO autorizada:** só começa com o bloco
+> §16 do `docs/34` assinado — então a menor automação possível é implementada,
+> primeiro em conta própria, **sem clientes reais**. Validação posterior irá para
+> `docs/35` (futuro).
 >
 > **Produção e piloto amplo continuam BLOQUEADOS** pelas pendências técnicas/
 > operacionais (docs/32 §7, docs/23 §5): auth real + MFA, storage + KMS + retenção,
