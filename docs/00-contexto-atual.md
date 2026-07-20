@@ -104,6 +104,7 @@ Arquivos existentes:
 - `docs/28-fase-8b-playwright-laboratorio-sintetico.md`
 - `docs/29-validacao-fase-8-laboratorio-automacao.md`
 - `docs/30-fase-8c-excecoes-sinteticas.md`
+- `docs/31-material-gate-juridico-automacao.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -271,13 +272,20 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
 > site público real, sem dados reais**. O **Playwright** já existe, mas **só** mira
 > o laboratório local (`docs/28`–`docs/30`). O laboratório agora cobre **caminho
-> feliz + exceções sintéticas** (docs/30). **Próximo passo: fechar os gates do
-> `docs/26 §19`** — fora do código, sobretudo o **escopo jurídico por escrito** —
-> que é o que (no futuro) destrava a **Fase 9** (prova técnica controlada). Qualquer
-> automação contra o sistema real depende desses **gates** (escopo jurídico por
-> escrito + 12 pendências do `docs/23 §5` + segurança de sessão + confirmação
-> explícita). As **regras permanentes** (§8) e os **bloqueios de fase** (docs/15)
-> seguem valendo integralmente.
+> feliz + exceções sintéticas** (docs/30).
+>
+> **➡️ Próximo bloco: GATE JURÍDICO POR ESCRITO (fora do código).** O material de
+> pedido de análise está pronto em `docs/31-material-gate-juridico-automacao.md` —
+> resumo do projeto, arquitetura pretendida (server-side, sessão efêmera),
+> consentimento, responsabilidade por erro, representação, Gov.br/sessão
+> autenticada, captcha/anti-bot, LGPD, segurança e **10 perguntas objetivas** para
+> resposta formal. **Nada de Fase 9** (teste em conta própria, cliente real,
+> automação contra Gov/SINARM, PII real, pagamento real, piloto) **antes das
+> respostas jurídicas por escrito** (docs/31 §18). Qualquer automação contra o
+> sistema real depende dos **gates do `docs/26 §19`** (escopo jurídico por escrito +
+> 12 pendências do `docs/23 §5` + segurança de sessão + confirmação explícita). As
+> **regras permanentes** (§8) e os **bloqueios de fase** (docs/15) seguem valendo
+> integralmente.
 
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
