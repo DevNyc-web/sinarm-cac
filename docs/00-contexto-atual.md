@@ -101,6 +101,7 @@ Arquivos existentes:
 - `docs/25-visao-automacao-e-decisoes-negocio.md`
 - `docs/26-arquitetura-automacao-hibrida.md`
 - `docs/27-fase-8a-laboratorio-sintetico.md`
+- `docs/28-fase-8b-playwright-laboratorio-sintetico.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -241,14 +242,23 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 >   futura. **Sem Playwright, sem Gov.br/SINARM, sem rede, sem upload/pagamento/
 >   protocolo real.** Próximo: **Fase 8B** (automação Playwright **só** contra essa
 >   página fake), mediante confirmação.
+> - `docs/28-fase-8b-playwright-laboratorio-sintetico.md` — **Fase 8B IMPLEMENTADA
+>   e validada (dev)**: primeira automação **Playwright** do projeto (Chromium),
+>   rodando **exclusivamente** contra a página fake `/admin/lab/guia-trafego` em
+>   `localhost`. Prova o fluxo ponta a ponta (login mock → destino → arma → revisão
+>   → GRU fake → protocolo fake), inclusive os **gates** (arma/checkbox) e uma
+>   **prova negativa de rede** (o teste falha se houver requisição externa/Gov).
+>   Evidências (screenshot/vídeo/trace) **não versionadas**. **Sem Gov.br/SINARM,
+>   sem site público, sem dados reais, sem Puppeteer.**
 >
-> **Automação real NÃO está liberada.** O laboratório **começa em página
+> **Automação real NÃO está liberada.** O laboratório roda em **página
 > fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
-> site público real, sem dados reais, sem instalar Playwright ainda**. Qualquer
-> automação contra o sistema real depende dos **gates do `docs/26 §19`** (escopo
-> jurídico por escrito + 12 pendências do `docs/23 §5` + segurança de sessão +
-> Fase 8 concluída + confirmação explícita). As **regras permanentes** (§8) e os
-> **bloqueios de fase** (docs/15) seguem valendo integralmente.
+> site público real, sem dados reais**. O **Playwright** já existe, mas **só** mira
+> o laboratório local (`docs/28`). Qualquer automação contra o sistema real depende
+> dos **gates do `docs/26 §19`** (escopo jurídico por escrito + 12 pendências do
+> `docs/23 §5` + segurança de sessão + confirmação explícita). As **regras
+> permanentes** (§8) e os **bloqueios de fase** (docs/15) seguem valendo
+> integralmente.
 
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em

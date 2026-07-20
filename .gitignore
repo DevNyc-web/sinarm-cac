@@ -36,11 +36,15 @@ labs/certidoes/storage/
 docs/**/prints/
 docs/legal/screenshots/
 
-# === Playwright / automação (futuro) ===
+# === Playwright / automação (Fase 8B — docs/28) ===
 playwright-report/
 test-results/
 .playwright/
 traces/
+# evidências geradas do laboratório sintético (screenshots/PNG) — não versionar;
+# a pasta é mantida por tests/e2e/artifacts/.gitkeep
+tests/e2e/artifacts/*
+!tests/e2e/artifacts/.gitkeep
 
 # === Banco local (laboratório) ===
 *.sqlite
