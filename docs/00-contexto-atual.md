@@ -103,6 +103,7 @@ Arquivos existentes:
 - `docs/27-fase-8a-laboratorio-sintetico.md`
 - `docs/28-fase-8b-playwright-laboratorio-sintetico.md`
 - `docs/29-validacao-fase-8-laboratorio-automacao.md`
+- `docs/30-fase-8c-excecoes-sinteticas.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -257,18 +258,26 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 >   (arma/checkbox), **guard de rede com lista de externas VAZIA**. Registra as
 >   **limitações** (só caminho feliz — sem exceções/sessão expirada/arma
 >   ambígua/erro de GRU/instabilidade/retry) e aponta a **Fase 8C**.
+> - `docs/30-fase-8c-excecoes-sinteticas.md` — **Fase 8C IMPLEMENTADA e validada
+>   (dev)**: o laboratório fake ganhou **modos de simulação de exceção** (sessão
+>   expirada, campo inválido, arma ambígua, documento ausente, falha de GRU,
+>   instabilidade fake, pausa para humano, retry, bloqueio operacional), via
+>   `?scenario=` + seletor. **10 testes Playwright** (caminho feliz + 9 exceções)
+>   provam que cada falha **para com segurança**, não gera sucesso/protocolo fake, e
+>   que **retry só conclui quando explícito**. Guard de rede **vazio** nos 10.
+>   **Sem Gov.br/SINARM, sem rede externa, sem dados reais.**
 >
 > **Automação real NÃO está liberada.** O laboratório roda em **página
 > fake/sintética** com **dados fictícios** — **sem tocar Gov.br/SINARM real, sem
 > site público real, sem dados reais**. O **Playwright** já existe, mas **só** mira
-> o laboratório local (`docs/28`/`docs/29`). **Próximo passo: Fase 8C — caminhos de
-> exceção sintéticos** (sessão expirada, campo inválido, arma ambígua, falha de
-> GRU, instabilidade fake, pausa para humano, retry) — **ainda 100% em página fake,
-> sem Gov/SINARM real**. Qualquer automação contra o sistema real depende dos
-> **gates do `docs/26 §19`** (escopo jurídico por escrito + 12 pendências do
-> `docs/23 §5` + segurança de sessão + confirmação explícita). As **regras
-> permanentes** (§8) e os **bloqueios de fase** (docs/15) seguem valendo
-> integralmente.
+> o laboratório local (`docs/28`–`docs/30`). O laboratório agora cobre **caminho
+> feliz + exceções sintéticas** (docs/30). **Próximo passo: fechar os gates do
+> `docs/26 §19`** — fora do código, sobretudo o **escopo jurídico por escrito** —
+> que é o que (no futuro) destrava a **Fase 9** (prova técnica controlada). Qualquer
+> automação contra o sistema real depende desses **gates** (escopo jurídico por
+> escrito + 12 pendências do `docs/23 §5` + segurança de sessão + confirmação
+> explícita). As **regras permanentes** (§8) e os **bloqueios de fase** (docs/15)
+> seguem valendo integralmente.
 
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
