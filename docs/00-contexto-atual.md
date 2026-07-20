@@ -105,6 +105,7 @@ Arquivos existentes:
 - `docs/29-validacao-fase-8-laboratorio-automacao.md`
 - `docs/30-fase-8c-excecoes-sinteticas.md`
 - `docs/31-material-gate-juridico-automacao.md`
+- `docs/32-decisao-gate-juridico-automacao.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -274,18 +275,29 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > o laboratório local (`docs/28`–`docs/30`). O laboratório agora cobre **caminho
 > feliz + exceções sintéticas** (docs/30).
 >
-> **➡️ Próximo bloco: GATE JURÍDICO POR ESCRITO (fora do código).** O material de
-> pedido de análise está pronto em `docs/31-material-gate-juridico-automacao.md` —
-> resumo do projeto, arquitetura pretendida (server-side, sessão efêmera),
-> consentimento, responsabilidade por erro, representação, Gov.br/sessão
-> autenticada, captcha/anti-bot, LGPD, segurança e **10 perguntas objetivas** para
-> resposta formal. **Nada de Fase 9** (teste em conta própria, cliente real,
-> automação contra Gov/SINARM, PII real, pagamento real, piloto) **antes das
-> respostas jurídicas por escrito** (docs/31 §18). Qualquer automação contra o
-> sistema real depende dos **gates do `docs/26 §19`** (escopo jurídico por escrito +
-> 12 pendências do `docs/23 §5` + segurança de sessão + confirmação explícita). As
-> **regras permanentes** (§8) e os **bloqueios de fase** (docs/15) seguem valendo
-> integralmente.
+> **Gate jurídico: VALIDADO (retorno positivo).** O material de pedido de análise
+> (`docs/31`) foi levado ao jurídico e o **modelo pretendido foi aprovado**,
+> conforme retorno reportado pelo dono — decisão registrada em
+> `docs/32-decisao-gate-juridico-automacao.md`: **execução server-side**, **sessão
+> efêmera**, **login/autorização pelo usuário**, **sem armazenar senha/OTP/token/
+> cookie**, **consentimento**, **confirmação antes do irreversível**, **sem
+> procuração**, **serviço privado sem promessa de aprovação**. A **redação final**
+> (termos/privacidade/consentimento/responsabilidade) ainda será assinada pelo
+> advogado antes de cliente real.
+>
+> **➡️ Próxima etapa possível: PLANEJAR a Fase 9 (prova técnica controlada).** O
+> gate jurídico destrava **apenas o planejamento** — não a execução. A Fase 9, quando
+> planejada e aprovada, roda **preferencialmente em conta própria/autorizada**, um
+> processo por vez, com health check, sessão efêmera, logs, screenshots mascaradas,
+> **pausa antes do ato irreversível** e rollback — **sem cliente real** inicialmente
+> (docs/32 §5/§8).
+>
+> **Produção e piloto amplo continuam BLOQUEADOS** pelas pendências técnicas/
+> operacionais (docs/32 §7, docs/23 §5): auth real + MFA, storage + KMS + retenção,
+> Mercado Pago produção + webhook público, termos/privacidade/reembolso finais,
+> política operacional, treinamento, monitoramento, suporte. **Regra mantida:** não
+> há "resolve durante". As **regras permanentes** (§8) e os **bloqueios de fase**
+> (docs/15) seguem valendo integralmente.
 
 **Reconhecimento da Guia de Tráfego MAPEADO até o checkpoint final** — inclui a
 tela **"Dados da GRU"** e o botão **"Gerar GRU e Salvar"**. Detalhes em
