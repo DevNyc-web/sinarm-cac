@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { DocumentIntakePanel } from "@/components/documents/DocumentIntakePanel";
 import { requireUser } from "@/server/auth/guards";
 import {
   DOCUMENT_STATUS_LABELS,
@@ -153,6 +154,8 @@ export default async function ProcessoRevisaoPage({
           <p className="font-medium">Justificativa</p>
           <p className="text-neutral-600">{process.justification}</p>
         </Card>
+
+        <DocumentIntakePanel documents={documents} />
 
         <Card className="mt-4 text-sm">
           <p className="font-medium">Documento de identificação</p>
