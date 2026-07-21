@@ -5,11 +5,11 @@
 > sessão) entenda o contexto só lendo os arquivos.
 >
 > **Última atualização:** 2026-07-21
-> **Em andamento (branch `feat/document-intake-foundation`):** fundação do módulo
-> de documentos — camada de domínio `src/server/documents/` (tipos, status
-> amigáveis, requisitos por processo, contrato de extração futura) + painel de
-> intake no detalhe do processo. **Sem OCR/IA/schema novo**; reaproveita o upload
-> dev/fake e o enum Prisma existentes. Fase 9 (PR #1) segue aberta e intocada.
+> **Em andamento (branch `feat/phase-9-controlled-proof-rebased`):** infraestrutura
+> segura da Fase 9, rebaseada sobre a `main` atual (até PR #29, com a Fase 8D já
+> mergeada). **Não libera execução real:** `PHASE9_REAL_EXECUTION_ENABLED`
+> continua `false` hard-coded e os gates 1, 2, 3 e 5 do `docs/26 §19` seguem
+> abertos.
 > **Estado geral:** **Fases 1–7 implementadas e validadas localmente** com
 > **Postgres real** e **dados 100% fictícios** (ver `docs/18`, `docs/19`,
 > `docs/20` e `docs/22`). O **ciclo dev/fictício está completo de ponta a
@@ -114,6 +114,8 @@ Arquivos existentes:
 - `docs/33-plano-fase-9-prova-tecnica-controlada.md`
 - `docs/34-checklist-execucao-fase-9.md`
 - `docs/35-configuracao-segura-fase-9.md`
+- `docs/36-preparacao-infra-fase-9.md`
+- `docs/37-fase-8d-log-seguro-e-relatorio.md`
 - `docs/legal/analise-termos-de-uso.md`
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
@@ -317,7 +319,35 @@ Fluxo mapeado até o **checkpoint final** (detalhes em `docs/09-reconhecimento-s
 > `docs/34 §16` NÃO deve ser assinado** até esses itens fecharem (docs/35 §11).
 > **Próximo passo:** criar a branch e implementar **só a config segura** (sem
 > automação real), rodar os testes do sintético para garantir que não quebrou, e só
-> então revisar o §16. A **validação** da Fase 9 irá para `docs/36` (futuro).
+> então revisar o §16. O `docs/36` ficou com a **preparação/infra segura** da Fase 9;
+> a **validação** da execução real irá para `docs/38` (futuro) — o `docs/37` **já
+> existe** e é a **Fase 8D** (log seguro e relatório do laboratório).
+>
+> **➡️ INFRA SEGURA DA FASE 9 INICIADA (2026-07-21) — `docs/36`, branch
+> `feat/phase-9-controlled-proof`.** Criada a **primeira infraestrutura real da Fase
+> 9**, **sem tocar Gov.br/SINARM e sem dados reais**: config Playwright segura
+> (`playwright.phase9.config.ts` — trace/vídeo/screenshot **off**, contexto efêmero,
+> `outputDir` gitignored), módulo `src/server/automation/phase9/` (types, safety,
+> networkGuard, auditLogger, runner, index), **guard de rede só localhost** (Gov/SINARM
+> em trava dura, **fora** da allowlist), **logs de auditoria em memória** com máscara,
+> **feature flag `PHASE9_REAL_EXECUTION_ENABLED = false`** e **28 testes** (25
+> unitários + 3 smoke). O **runner real está BLOQUEADO por padrão**: retorna resultado
+> seguro com `sessionDiscarded: true` e a mensagem *“Execução real da Fase 9 ainda não
+> autorizada. docs/34 §16 pendente.”* — **não abre navegador real, não faz rede
+> externa, não gera GRU/protocolo**. Verde em `typecheck`/`lint`/`build`, laboratório
+> sintético intacto. **A execução real da Fase 9 ainda NÃO começou** — segue
+> dependendo do `docs/34 §16` assinado (pendências em `docs/36 §12`). A validação da
+> execução real irá para `docs/38` (futuro).
+>
+> **➡️ REBASE SOBRE A FASE 8D (2026-07-25) — branch
+> `feat/phase-9-controlled-proof-rebased`.** A infra da Fase 9 foi rebaseada sobre a
+> `main` (até PR #29). A sanitização própria da Fase 9 (`sanitizeMeta`/`maskValue`)
+> foi **removida** e substituída pelo `labRedaction` da Fase 8D (`docs/37`), que é
+> mais forte: cobre e-mail, telefone e RG formatado, percorre objetos aninhados e
+> arrays, trata ciclo/profundidade e não confunde `passo`/`author` com segredo.
+> Conforme a decisão da Fase 8D, a **chave** sensível permanece com valor
+> `[REDACTED]` (evidência de auditoria) — o **valor original nunca aparece**.
+> **Nada disso libera execução:** a flag continua `false` e os gates seguem abertos.
 >
 > **Produção e piloto amplo continuam BLOQUEADOS** pelas pendências técnicas/
 > operacionais (docs/32 §7, docs/23 §5): auth real + MFA, storage + KMS + retenção,
