@@ -4,7 +4,12 @@
 > tomadas e o próximo passo, para que qualquer pessoa (ou o Claude, numa nova
 > sessão) entenda o contexto só lendo os arquivos.
 >
-> **Última atualização:** 2026-07-20
+> **Última atualização:** 2026-07-21
+> **Em andamento (branch `feat/document-intake-foundation`):** fundação do módulo
+> de documentos — camada de domínio `src/server/documents/` (tipos, status
+> amigáveis, requisitos por processo, contrato de extração futura) + painel de
+> intake no detalhe do processo. **Sem OCR/IA/schema novo**; reaproveita o upload
+> dev/fake e o enum Prisma existentes. Fase 9 (PR #1) segue aberta e intocada.
 > **Estado geral:** **Fases 1–7 implementadas e validadas localmente** com
 > **Postgres real** e **dados 100% fictícios** (ver `docs/18`, `docs/19`,
 > `docs/20` e `docs/22`). O **ciclo dev/fictício está completo de ponta a
