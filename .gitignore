@@ -46,6 +46,11 @@ traces/
 tests/e2e/artifacts/*
 !tests/e2e/artifacts/.gitkeep
 
+# === Fase 9 — artifacts da config segura (docs/35) — NUNCA versionar ===
+# podem conter PII/evidências de tela real; a pasta é mantida pelo .gitkeep
+tests/e2e/phase9-artifacts/*
+!tests/e2e/phase9-artifacts/.gitkeep
+
 # === Banco local (laboratório) ===
 *.sqlite
 *.sqlite3

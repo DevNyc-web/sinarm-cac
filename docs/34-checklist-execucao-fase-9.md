@@ -258,7 +258,7 @@ Assinatura/registro interno: ________________
 - [ ] **Verificar artifacts.**
 - [ ] **Remover artifacts sensíveis.**
 - [ ] **Registrar o resultado.**
-- [ ] **Atualizar docs de validação** (`docs/36`, §19).
+- [ ] **Atualizar docs de validação** (`docs/37`, §19).
 - [ ] **Decidir** se repete, ajusta ou cancela.
 - [ ] **Não** avançar para cliente real automaticamente.
 
@@ -279,9 +279,13 @@ Mesmo se der certo:
 
 ## 19. Próximo documento após execução
 
-- `docs/36-validacao-fase-9-prova-controlada.md` — **somente depois** da execução
+- `docs/37-validacao-fase-9-prova-controlada.md` — **somente depois** da execução
   autorizada, para registrar o que aconteceu, evidências e decisão de continuar/
   ajustar/parar.
+
+> **Nota de numeração:** o `docs/36` passou a registrar a **preparação/infra segura**
+> da Fase 9 (config, módulo, runner bloqueado — 2026-07-21); por isso a **validação da
+> execução real** foi remanejada para o **`docs/37`**.
 
 ---
 

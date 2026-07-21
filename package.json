@@ -18,6 +18,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
+    "test:e2e:phase9": "playwright test -c playwright.phase9.config.ts",
+    "test:e2e:phase9:headed": "playwright test -c playwright.phase9.config.ts --headed",
+    "test:phase9:unit": "tsx --test tests/unit/phase9/safety.test.ts tests/unit/phase9/networkGuard.test.ts tests/unit/phase9/auditLogger.test.ts tests/unit/phase9/phase9Runner.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
