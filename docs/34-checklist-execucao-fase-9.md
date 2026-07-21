@@ -258,7 +258,7 @@ Assinatura/registro interno: ________________
 - [ ] **Verificar artifacts.**
 - [ ] **Remover artifacts sensíveis.**
 - [ ] **Registrar o resultado.**
-- [ ] **Atualizar docs de validação** (`docs/35`, §19).
+- [ ] **Atualizar docs de validação** (`docs/36`, §19).
 - [ ] **Decidir** se repete, ajusta ou cancela.
 - [ ] **Não** avançar para cliente real automaticamente.
 
@@ -279,7 +279,7 @@ Mesmo se der certo:
 
 ## 19. Próximo documento após execução
 
-- `docs/35-validacao-fase-9-prova-controlada.md` — **somente depois** da execução
+- `docs/36-validacao-fase-9-prova-controlada.md` — **somente depois** da execução
   autorizada, para registrar o que aconteceu, evidências e decisão de continuar/
   ajustar/parar.
 
