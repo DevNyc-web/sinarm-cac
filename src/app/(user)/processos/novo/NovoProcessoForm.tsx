@@ -44,95 +44,107 @@ export function NovoProcessoForm({
           </p>
         ) : null}
 
-        <label className="block text-sm">
-          Nome do evento / clube
-          <input
-            name="eventName"
-            defaultValue={values.eventName ?? ""}
-            placeholder="Ex.: Clube de Tiro Exemplo"
-            className={inputClass}
-          />
-          <FieldError message={errors.eventName} />
-        </label>
+        <fieldset className="space-y-4">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Destino / evento
+          </legend>
 
-        <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm">
-            UF
-            <select name="uf" defaultValue={values.uf ?? ""} className={inputClass}>
+            Nome do evento / clube
+            <input
+              name="eventName"
+              defaultValue={values.eventName ?? ""}
+              placeholder="Ex.: Clube de Tiro Exemplo"
+              className={inputClass}
+            />
+            <FieldError message={errors.eventName} />
+          </label>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              UF
+              <select name="uf" defaultValue={values.uf ?? ""} className={inputClass}>
+                <option value="">Selecione…</option>
+                {ufs.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={errors.uf} />
+            </label>
+            <label className="block text-sm">
+              Cidade
+              <input
+                name="city"
+                defaultValue={values.city ?? ""}
+                placeholder="Cidade Exemplo"
+                className={inputClass}
+              />
+              <FieldError message={errors.city} />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
+            <label className="block text-sm">
+              Logradouro
+              <input
+                name="street"
+                defaultValue={values.street ?? ""}
+                placeholder="Rua Exemplo"
+                className={inputClass}
+              />
+              <FieldError message={errors.street} />
+            </label>
+            <label className="block text-sm">
+              Número
+              <input
+                name="number"
+                defaultValue={values.number ?? ""}
+                placeholder="100"
+                className={inputClass}
+              />
+              <FieldError message={errors.number} />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-4 border-t border-neutral-200 pt-4">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Armamento
+          </legend>
+
+          <label className="block text-sm">
+            Arma/PCE
+            <select name="firearmId" defaultValue={values.firearmId ?? ""} className={inputClass}>
               <option value="">Selecione…</option>
-              {ufs.map((uf) => (
-                <option key={uf} value={uf}>
-                  {uf}
+              {firearms.map((firearm) => (
+                <option key={firearm.id} value={firearm.id}>
+                  {firearm.label}
                 </option>
               ))}
             </select>
-            <FieldError message={errors.uf} />
+            <FieldError message={errors.firearmId} />
+            <p className="mt-1 text-xs text-neutral-500">
+              Opções de demonstração. <strong>O acervo do SINARM não é acessado por este
+              aplicativo</strong> — a conferência do armamento é feita por uma pessoa da equipe.
+            </p>
           </label>
+
           <label className="block text-sm">
-            Cidade
-            <input
-              name="city"
-              defaultValue={values.city ?? ""}
-              placeholder="Cidade Exemplo"
+            Justificativa
+            <textarea
+              name="justification"
+              rows={3}
+              defaultValue={values.justification ?? defaultJustification}
               className={inputClass}
             />
-            <FieldError message={errors.city} />
+            <FieldError message={errors.justification} />
           </label>
-        </div>
+        </fieldset>
 
-        <div className="grid grid-cols-[1fr_8rem] gap-3">
-          <label className="block text-sm">
-            Logradouro
-            <input
-              name="street"
-              defaultValue={values.street ?? ""}
-              placeholder="Rua Exemplo"
-              className={inputClass}
-            />
-            <FieldError message={errors.street} />
-          </label>
-          <label className="block text-sm">
-            Numero
-            <input
-              name="number"
-              defaultValue={values.number ?? ""}
-              placeholder="100"
-              className={inputClass}
-            />
-            <FieldError message={errors.number} />
-          </label>
-        </div>
-
-        <label className="block text-sm">
-          Arma/PCE
-          <select name="firearmId" defaultValue={values.firearmId ?? ""} className={inputClass}>
-            <option value="">Selecione…</option>
-            {firearms.map((firearm) => (
-              <option key={firearm.id} value={firearm.id}>
-                {firearm.label}
-              </option>
-            ))}
-          </select>
-          <FieldError message={errors.firearmId} />
-          <p className="mt-1 text-xs text-neutral-500">
-            Opções de demonstração. <strong>O acervo do SINARM não é acessado por este
-            aplicativo</strong> — a conferência do armamento é feita por uma pessoa da equipe.
-          </p>
-        </label>
-
-        <label className="block text-sm">
-          Justificativa
-          <textarea
-            name="justification"
-            rows={3}
-            defaultValue={values.justification ?? defaultJustification}
-            className={inputClass}
-          />
-          <FieldError message={errors.justification} />
-        </label>
-
-        <Button type="submit" disabled={pending}>
-          {pending ? "Salvando…" : "Salvar rascunho"}
+        <Button type="submit" disabled={pending} className="w-full px-5 py-3 text-base sm:w-auto">
+          {pending ? "Salvando…" : "Salvar rascunho e continuar"}
         </Button>
       </Card>
     </form>
