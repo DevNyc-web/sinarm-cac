@@ -39,6 +39,8 @@ export function DocumentIntakePanel({
   sentKind,
   error,
   currentValues,
+  applyAction,
+  appliedTarget,
 }: {
   processId: string;
   documents: readonly ReviewDocument[];
@@ -48,6 +50,10 @@ export function DocumentIntakePanel({
   error?: string;
   /** Valores ja preenchidos no processo, para comparar com o sugerido. */
   currentValues?: ProcessCurrentValues;
+  /** Aplicacao manual de sugestao; ausente => painel apenas exibe. */
+  applyAction?: (formData: FormData) => void | Promise<void>;
+  /** Campo aplicado no ultimo POST (querystring `?aplicado=`). */
+  appliedTarget?: string;
 }) {
   const requirements = guiaTrafegoRequirements();
   // Calculada uma vez e compartilhada: conferencia e sugestoes veem o mesmo estado.
@@ -134,7 +140,13 @@ export function DocumentIntakePanel({
       </Card>
 
       <DocumentExtractionReviewPanel reviews={reviews} />
-      <DocumentFieldSuggestionsPanel reviews={reviews} current={currentValues} />
+      <DocumentFieldSuggestionsPanel
+        processId={processId}
+        reviews={reviews}
+        current={currentValues}
+        applyAction={applyAction}
+        appliedTarget={appliedTarget}
+      />
     </>
   );
 }

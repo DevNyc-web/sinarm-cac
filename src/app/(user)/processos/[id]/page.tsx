@@ -25,6 +25,7 @@ import { listPaymentsForProcess } from "@/server/repositories/paymentRepository"
 import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
 import {
+  applyDocumentFieldSuggestionAction,
   createPixPaymentAction,
   simulatePaymentApprovedAction,
   uploadDocumentAction,
@@ -42,11 +43,11 @@ export default async function ProcessoRevisaoPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ erro?: string; ok?: string; pago?: string }>;
+  searchParams: Promise<{ erro?: string; ok?: string; pago?: string; aplicado?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { erro, ok, pago } = await searchParams;
+  const { erro, ok, pago, aplicado } = await searchParams;
   // `?ok=` carrega o tipo enviado, para o feedback aparecer no card certo.
   const sentKind = isDocumentKind(ok) ? ok : undefined;
 
@@ -167,6 +168,8 @@ export default async function ProcessoRevisaoPage({
           // Destino e o unico grupo com campo no modelo atual — o resto das
           // sugestoes aparece como "campo futuro", sem valor atual para comparar.
           currentValues={{ destination: process.destination }}
+          applyAction={applyDocumentFieldSuggestionAction}
+          appliedTarget={aplicado}
         />
 
         <Card className="mt-4 text-sm">
