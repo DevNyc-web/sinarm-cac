@@ -42,7 +42,10 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   IDENTIFICACAO_PESSOAL: "Documento de Identificacao Pessoal",
-  OUTRO: "Outro",
+  CR_REGISTRO_CAC: "CR / registro / autorizacao (CAC)",
+  COMPROVANTE_ORIGEM_ENDERECO: "Comprovante de origem / endereco",
+  DECLARACAO_DESTINO_EVENTO: "Declaracao do destino / evento",
+  OUTRO: "Complementar / outro",
 };
 
 /** Status operacional da fila (Fase 6) — rotulo para a equipe interna. */

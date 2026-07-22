@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DocumentIntakePanel } from "@/components/documents/DocumentIntakePanel";
 import { requireUser } from "@/server/auth/guards";
+import { isDocumentKind } from "@/server/documents";
 import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
@@ -46,6 +47,8 @@ export default async function ProcessoRevisaoPage({
   const user = await requireUser();
   const { id } = await params;
   const { erro, ok, pago } = await searchParams;
+  // `?ok=` carrega o tipo enviado, para o feedback aparecer no card certo.
+  const sentKind = isDocumentKind(ok) ? ok : undefined;
 
   let process: Awaited<ReturnType<typeof findProcessByIdForUser>> = null;
   let documents: Awaited<ReturnType<typeof listDocumentsForOwner>> = [];
@@ -155,26 +158,21 @@ export default async function ProcessoRevisaoPage({
           <p className="text-neutral-600">{process.justification}</p>
         </Card>
 
-        <DocumentIntakePanel documents={documents} />
+        <DocumentIntakePanel
+          processId={process.id}
+          documents={documents}
+          uploadAction={uploadDocumentAction}
+          sentKind={sentKind}
+          error={erro}
+        />
 
         <Card className="mt-4 text-sm">
-          <p className="font-medium">Documento de identificação</p>
+          <p className="font-medium">Arquivos enviados</p>
           <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             <strong>Ambiente de demonstração: não envie documento real</strong> — nada de RG, CPF,
             CNH ou foto de documento verdadeiro. Envie um PDF/JPG/PNG de teste (até 2 MB). O envio
             definitivo só será aberto em ambiente de produção seguro.
           </p>
-
-          {erro ? (
-            <p className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
-              {erro}
-            </p>
-          ) : null}
-          {ok ? (
-            <p className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              Arquivo enviado. Status: Enviado — aguardando conferência da nossa equipe.
-            </p>
-          ) : null}
 
           {documents.length > 0 ? (
             <ul className="mt-3 space-y-2">
@@ -195,21 +193,10 @@ export default async function ProcessoRevisaoPage({
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-neutral-500">Nenhum arquivo enviado ainda.</p>
+            <p className="mt-3 text-neutral-500">
+              Nenhum arquivo enviado ainda. Use o botão de cada documento esperado acima.
+            </p>
           )}
-
-          <form action={uploadDocumentAction} className="mt-3 flex flex-wrap items-center gap-3">
-            <input type="hidden" name="processId" value={process.id} />
-            <input
-              type="file"
-              name="file"
-              accept="application/pdf,image/jpeg,image/png"
-              className="text-xs text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-neutral-50"
-            />
-            <Button type="submit" variant="secondary">
-              Enviar arquivo
-            </Button>
-          </form>
         </Card>
 
         <Card className="mt-4 text-sm">

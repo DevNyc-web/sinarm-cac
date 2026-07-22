@@ -8,4 +8,5 @@
 export * from "./documentTypes";
 export * from "./documentStatus";
 export * from "./documentRequirements";
+export * from "./documentIntake";
 export * from "./documentExtractionTypes";
