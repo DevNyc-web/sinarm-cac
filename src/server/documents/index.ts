@@ -10,3 +10,6 @@ export * from "./documentStatus";
 export * from "./documentRequirements";
 export * from "./documentIntake";
 export * from "./documentExtractionTypes";
+export * from "./documentExtractionStatus";
+export * from "./documentExtractionMock";
+export * from "./documentExtractionReview";
