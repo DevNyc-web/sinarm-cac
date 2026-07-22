@@ -1,10 +1,10 @@
 /**
- * Fundacao do modulo de documentos — TIPOS de documento (dominio).
+ * Modulo de documentos — TIPOS de documento (dominio).
  *
- * Esta e uma camada de DOMINIO em TypeScript, um superset conceitual do enum
- * Prisma `DocumentType` (que hoje so tem IDENTIFICACAO_PESSOAL e OUTRO). Nao
- * altera o schema: para persistir, `toPrismaDocumentType` mapeia o tipo de
- * dominio para o valor persistivel mais proximo (docs/12 §3.6).
+ * Camada de DOMINIO em TypeScript espelhada no enum Prisma `DocumentType`.
+ * Desde a Fase de upload por tipo, o enum persiste IDENTIFICACAO_PESSOAL,
+ * CR_REGISTRO_CAC, COMPROVANTE_ORIGEM_ENDERECO e DECLARACAO_DESTINO_EVENTO com
+ * o proprio valor; apenas COMPLEMENTAR persiste como OUTRO (docs/12 §3.6).
  *
  * Sem OCR, sem IA, sem rede. So contrato/rotulo.
  */
@@ -34,11 +34,25 @@ export function documentKindLabel(kind: DocumentKind): string {
   return DOCUMENT_KIND_LABELS[kind];
 }
 
+/** `true` se o valor recebido (ex.: de um formulario) e um tipo de dominio valido. */
+export function isDocumentKind(value: unknown): value is DocumentKind {
+  return typeof value === "string" && (DOCUMENT_KINDS as readonly string[]).includes(value);
+}
+
 /**
- * Ponte de persistencia (SEM alterar o schema): o enum Prisma so tem
- * IDENTIFICACAO_PESSOAL e OUTRO. Qualquer tipo de dominio que nao seja
- * identificacao persiste como OUTRO ate uma decisao de schema.
+ * Ponte de persistencia dominio -> Prisma.
+ * Todos os tipos tem valor proprio no enum, exceto COMPLEMENTAR, que persiste
+ * como OUTRO (valor generico ja existente — evita dois valores com o mesmo
+ * significado no enum).
  */
 export function toPrismaDocumentType(kind: DocumentKind): PrismaDocumentType {
-  return kind === "IDENTIFICACAO_PESSOAL" ? "IDENTIFICACAO_PESSOAL" : "OUTRO";
+  return kind === "COMPLEMENTAR" ? "OUTRO" : kind;
+}
+
+/**
+ * Volta de Prisma -> dominio. OUTRO vira COMPLEMENTAR: e o unico tipo de
+ * dominio que persiste como OUTRO, entao a ida e a volta sao consistentes.
+ */
+export function fromPrismaDocumentType(type: PrismaDocumentType): DocumentKind {
+  return type === "OUTRO" ? "COMPLEMENTAR" : type;
 }

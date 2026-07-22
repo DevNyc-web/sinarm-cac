@@ -355,9 +355,16 @@ enum PaymentStatus {
   @@map("payment_status")
 }
 
-/// Tipos de documento (docs/12 §3.6). MVP: so Documento de Identificacao.
+/// Tipos de documento (docs/12 §3.6).
+/// Espelha os tipos de DOMINIO (src/server/documents/documentTypes.ts) para que
+/// cada documento esperado da Guia de Trafego persista com o proprio tipo.
+/// Adicao PURAMENTE ADITIVA: nenhum documento existente muda de valor.
+/// `COMPLEMENTAR` (dominio) persiste como OUTRO — nao ha valor duplicado aqui.
 enum DocumentType {
   IDENTIFICACAO_PESSOAL
+  CR_REGISTRO_CAC
+  COMPROVANTE_ORIGEM_ENDERECO
+  DECLARACAO_DESTINO_EVENTO
   OUTRO
 
   @@map("document_type")

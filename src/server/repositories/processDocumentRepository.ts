@@ -13,6 +13,8 @@ import { getPrisma } from "@/server/db/prisma";
 
 export type CreateDocumentData = {
   processId: string;
+  /** Tipo persistido. Omitido => default IDENTIFICACAO_PESSOAL do schema. */
+  type?: DocumentType;
   originalFileName: string;
   mimeType: string;
   sizeBytes: number;
@@ -25,7 +27,7 @@ export function createDocument(data: CreateDocumentData) {
   return getPrisma().processDocument.create({
     data: {
       ...data,
-      // type usa o default IDENTIFICACAO_PESSOAL; status o default ENVIADO.
+      // status usa o default ENVIADO — a conferencia continua sendo humana.
     },
   });
 }

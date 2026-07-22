@@ -9,6 +9,10 @@ import {
   documentRequirementsFor,
   guiaTrafegoRequirements,
 } from "../../../src/server/documents/documentRequirements";
+import {
+  isDocumentKind,
+  toPrismaDocumentType,
+} from "../../../src/server/documents/documentTypes";
 
 test("requisitos de Guia de Tráfego retornam pelo código do processo", () => {
   const byCode = documentRequirementsFor(GUIA_TRAFEGO_PROCESS_CODE);
@@ -34,6 +38,19 @@ test("todo requisito tem título, ajuda e tier com rótulo", () => {
     assert.ok(req.help.length > 0);
     assert.equal(typeof REQUIREMENT_TIER_LABELS[req.tier], "string");
   }
+});
+
+test("todo requisito é anexável: tipo válido e persistível", () => {
+  for (const req of guiaTrafegoRequirements()) {
+    assert.ok(isDocumentKind(req.kind), `${req.kind} deve ser um tipo de domínio válido`);
+    // Nao basta ser valido: precisa ter destino no enum Prisma para o upload gravar.
+    assert.ok(toPrismaDocumentType(req.kind).length > 0);
+  }
+});
+
+test("cada requisito ocupa um tipo persistido distinto", () => {
+  const types = guiaTrafegoRequirements().map((req) => toPrismaDocumentType(req.kind));
+  assert.equal(new Set(types).size, types.length, "dois cards não podem gravar o mesmo tipo");
 });
 
 test("código de processo desconhecido retorna lista vazia", () => {

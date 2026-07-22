@@ -1,13 +1,16 @@
 /**
- * Caso de uso: upload FICTICIO/DEV do Documento de Identificacao — Fase 4.
+ * Caso de uso: upload FICTICIO/DEV de documento do processo — Fase 4,
+ * estendido para aceitar o TIPO do documento (um anexo por documento esperado).
  *
  * Regras (docs/15 §3.2/§3.10, preliminares):
  * - APENAS arquivos ficticios — a UI avisa "Nao envie documento real".
  * - Bytes vao para o storage adapter (local/dev); banco guarda metadados + sha256.
  * - Sem OCR, sem leitura de conteudo, sem URL publica/assinada.
+ * - Sem envio automatico a qualquer orgao ou servico externo.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { type AuthUser } from "@/server/auth/mockUsers";
+import { type DocumentKind, toPrismaDocumentType } from "@/server/documents";
 import { createDocument } from "@/server/repositories/processDocumentRepository";
 import {
   findProcessByIdForUser,
@@ -31,6 +34,8 @@ export async function uploadProcessDocument(
   actor: AuthUser,
   processId: string,
   file: File,
+  /** Tipo do documento esperado. Default mantem o comportamento anterior. */
+  kind: DocumentKind = "IDENTIFICACAO_PESSOAL",
 ): Promise<UploadDocumentResult> {
   if (!file || file.size === 0) {
     return { ok: false, error: "Selecione um arquivo ficticio (PDF, JPG ou PNG)." };
@@ -55,6 +60,7 @@ export async function uploadProcessDocument(
 
     await createDocument({
       processId: process.id,
+      type: toPrismaDocumentType(kind),
       originalFileName: file.name,
       mimeType: file.type,
       sizeBytes: data.byteLength,
