@@ -18,7 +18,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "test:documents:unit": "tsx --test tests/unit/documents/documentTypes.test.ts tests/unit/documents/documentStatus.test.ts tests/unit/documents/documentRequirements.test.ts tests/unit/documents/documentExtraction.test.ts tests/unit/documents/documentIntake.test.ts tests/unit/documents/documentUploadContract.test.ts",
+    "test:documents:unit": "tsx --test tests/unit/documents/documentTypes.test.ts tests/unit/documents/documentStatus.test.ts tests/unit/documents/documentRequirements.test.ts tests/unit/documents/documentExtraction.test.ts tests/unit/documents/documentIntake.test.ts tests/unit/documents/documentUploadContract.test.ts tests/unit/documents/documentExtractionReview.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

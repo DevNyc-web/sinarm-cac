@@ -2,15 +2,15 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
+import { DocumentExtractionReviewPanel } from "./DocumentExtractionReviewPanel";
 import {
   DOCUMENT_STATE_LABELS,
   REQUIREMENT_TIER_LABELS,
-  demoExtractionExample,
   guiaTrafegoRequirements,
   resolveRequirementState,
   type DocumentKind,
   type DocumentState,
-  type IntakeDocument,
+  type ReviewDocument,
 } from "@/server/documents";
 
 /** Cores por estado — pendente/aprovado/rejeitado precisam ser distinguiveis. */
@@ -37,14 +37,13 @@ export function DocumentIntakePanel({
   error,
 }: {
   processId: string;
-  documents: readonly IntakeDocument[];
+  documents: readonly ReviewDocument[];
   uploadAction: (formData: FormData) => void | Promise<void>;
   /** Tipo confirmado no ultimo envio (querystring `?ok=`), para feedback no card. */
   sentKind?: DocumentKind;
   error?: string;
 }) {
   const requirements = guiaTrafegoRequirements();
-  const extraction = demoExtractionExample();
 
   return (
     <>
@@ -126,44 +125,7 @@ export function DocumentIntakePanel({
         </Notice>
       </Card>
 
-      <Card className="mt-4 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium">Dados identificados automaticamente</p>
-          <Badge>demonstração</Badge>
-        </div>
-
-        <ul className="mt-3 space-y-2">
-          {extraction.fields.map((field) => (
-            <li
-              key={field.key}
-              className="flex flex-col gap-1 rounded-md border border-neutral-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="text-xs text-neutral-500">{field.label}</p>
-                <p className="truncate text-neutral-800">{field.value ?? "—"}</p>
-              </div>
-              <div className="flex flex-none items-center gap-2">
-                <span className="text-xs text-neutral-500">
-                  {field.confidence !== null ? `${Math.round(field.confidence * 100)}% ` : ""}
-                  confiança
-                </span>
-                <Badge>Pendente de conferência</Badge>
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="inline-flex cursor-not-allowed items-center rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-400">
-            Confirmar dados (indisponível na demonstração)
-          </span>
-        </div>
-
-        <Notice tone="info" className="mt-3">
-          <strong>Extração automática ainda não habilitada.</strong> Os dados devem ser conferidos
-          antes de qualquer uso, e <strong>nada é enviado automaticamente</strong>.
-        </Notice>
-      </Card>
+      <DocumentExtractionReviewPanel documents={documents} />
     </>
   );
 }
