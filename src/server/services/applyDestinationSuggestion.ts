@@ -57,12 +57,24 @@ export async function applyDestinationSuggestion(
     const check = checkSuggestionApplication(suggestion);
     if (!check.ok) return { ok: false, error: check.message };
 
-    await updateProcessDestination(process.id, check.patch);
+    const updated = await updateProcessDestination(process.id, check.patch);
 
-    // Trilha append-only (docs/11 §18). Nao ha kind proprio para "sugestao
-    // aplicada" no enum; usamos NOTA, o mais proximo, para nao exigir migration.
-    // Valores de DESTINO (evento/cidade/UF) nao sao PII de pessoa e ja constam
-    // no proprio processo — a trilha nao amplia o alcance do dado.
+    // `Destination` e opcional no schema: sem destino, o update afeta 0 linhas.
+    // Parar AQUI e essencial — a trilha e append-only, entao registrar uma
+    // aplicacao que nao aconteceu criaria auditoria falsa e permanente.
+    if (updated.count === 0) {
+      return {
+        ok: false,
+        error:
+          "Nao foi possivel aplicar a sugestao porque os dados de destino ainda nao existem neste processo.",
+      };
+    }
+
+    // Trilha append-only (docs/11 §18), so DEPOIS de confirmar a alteracao real.
+    // Nao ha kind proprio para "sugestao aplicada" no enum; usamos NOTA, o mais
+    // proximo, para nao exigir migration. Valores de DESTINO (evento/cidade/UF)
+    // nao sao PII de pessoa e ja constam no proprio processo — a trilha nao
+    // amplia o alcance do dado.
     await recordOperationalEvent({
       processId: process.id,
       kind: "NOTA",

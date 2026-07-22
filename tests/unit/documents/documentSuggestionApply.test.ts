@@ -227,6 +227,40 @@ test("aplicação exige confirmação humana explícita", () => {
   assert.match(service, /if \(!confirmed\)/, "sem confirmacao, recusa antes de tudo");
 });
 
+test("update que não afeta nenhuma linha não vira sucesso nem histórico", () => {
+  const service = readFileSync("src/server/services/applyDestinationSuggestion.ts", "utf8");
+  const code = codeOnly(service);
+
+  // O resultado do update precisa ser capturado e checado.
+  assert.match(code, /const updated = await updateProcessDestination/);
+  assert.match(code, /updated\.count === 0/, "count zero precisa ser tratado");
+
+  // A checagem tem de vir ANTES de gravar a trilha: registrar uma aplicacao que
+  // nao aconteceu poluiria a auditoria append-only para sempre.
+  const guardIndex = code.indexOf("updated.count === 0");
+  const eventIndex = code.indexOf("recordOperationalEvent({");
+  assert.ok(guardIndex > 0 && eventIndex > 0, "guarda e evento devem existir");
+  assert.ok(guardIndex < eventIndex, "a guarda de count precisa vir antes do evento");
+
+  // E o retorno da guarda e erro, nao sucesso.
+  const guardBlock = code.slice(guardIndex, eventIndex);
+  assert.match(guardBlock, /ok: false/, "count zero retorna erro");
+  assert.match(guardBlock, /destino ainda nao existem/i, "mensagem amigavel ao usuario");
+  assert.doesNotMatch(guardBlock, /ok: true/, "count zero nunca retorna sucesso");
+});
+
+test("só existe um ponto de sucesso, depois da guarda", () => {
+  const code = codeOnly(readFileSync("src/server/services/applyDestinationSuggestion.ts", "utf8"));
+  // `return { ok: true` — a declaracao do tipo tambem contem "ok: true", por
+  // isso contamos apenas os RETORNOS.
+  const successes = code.match(/return \{ ok: true/g) ?? [];
+  assert.equal(successes.length, 1, "um unico retorno de sucesso");
+  assert.ok(
+    code.indexOf("return { ok: true") > code.indexOf("updated.count === 0"),
+    "o sucesso vem depois da guarda de count",
+  );
+});
+
 test("caminho de aplicação não tem rede, OCR nem IA", () => {
   const files = [
     "src/server/documents/documentSuggestionApply.ts",
