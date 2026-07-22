@@ -164,6 +164,9 @@ export default async function ProcessoRevisaoPage({
           uploadAction={uploadDocumentAction}
           sentKind={sentKind}
           error={erro}
+          // Destino e o unico grupo com campo no modelo atual — o resto das
+          // sugestoes aparece como "campo futuro", sem valor atual para comparar.
+          currentValues={{ destination: process.destination }}
         />
 
         <Card className="mt-4 text-sm">
