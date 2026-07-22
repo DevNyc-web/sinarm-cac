@@ -179,7 +179,11 @@ export type UpdateDestinationData = Partial<
 /**
  * Atualiza campos do destino do processo. Recebe um patch JA VALIDADO pelo
  * dominio (`checkSuggestionApplication`) — o repositorio nao decide o que pode
- * ser aplicado, so grava. Nunca cria destino: se nao existir, nada acontece.
+ * ser aplicado, so grava. Nunca cria destino.
+ *
+ * Retorna `{ count }`: 0 significa que o processo NAO tem destino e nada foi
+ * gravado. Quem chama DEVE checar antes de registrar historico ou dizer que
+ * aplicou (`Destination` e opcional no schema).
  */
 export function updateProcessDestination(processId: string, data: UpdateDestinationData) {
   return getPrisma().destination.updateMany({ where: { processId }, data });
