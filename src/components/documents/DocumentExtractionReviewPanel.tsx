@@ -6,8 +6,7 @@ import {
   DOCUMENT_KIND_LABELS,
   REVIEW_STATUS_HELP,
   REVIEW_STATUS_LABELS,
-  buildExtractionReview,
-  type ReviewDocument,
+  type DocumentReview,
 } from "@/server/documents";
 
 /**
@@ -19,12 +18,10 @@ import {
  * existe (seria mentira oferece-lo funcionando).
  */
 export function DocumentExtractionReviewPanel({
-  documents,
+  reviews,
 }: {
-  documents: readonly ReviewDocument[];
+  reviews: readonly DocumentReview[];
 }) {
-  const reviews = buildExtractionReview(documents);
-
   return (
     <Card className="mt-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">

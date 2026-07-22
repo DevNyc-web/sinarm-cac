@@ -3,13 +3,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { DocumentExtractionReviewPanel } from "./DocumentExtractionReviewPanel";
+import { DocumentFieldSuggestionsPanel } from "./DocumentFieldSuggestionsPanel";
 import {
   DOCUMENT_STATE_LABELS,
   REQUIREMENT_TIER_LABELS,
+  buildExtractionReview,
   guiaTrafegoRequirements,
   resolveRequirementState,
   type DocumentKind,
   type DocumentState,
+  type ProcessCurrentValues,
   type ReviewDocument,
 } from "@/server/documents";
 
@@ -35,6 +38,7 @@ export function DocumentIntakePanel({
   uploadAction,
   sentKind,
   error,
+  currentValues,
 }: {
   processId: string;
   documents: readonly ReviewDocument[];
@@ -42,8 +46,12 @@ export function DocumentIntakePanel({
   /** Tipo confirmado no ultimo envio (querystring `?ok=`), para feedback no card. */
   sentKind?: DocumentKind;
   error?: string;
+  /** Valores ja preenchidos no processo, para comparar com o sugerido. */
+  currentValues?: ProcessCurrentValues;
 }) {
   const requirements = guiaTrafegoRequirements();
+  // Calculada uma vez e compartilhada: conferencia e sugestoes veem o mesmo estado.
+  const reviews = buildExtractionReview(documents);
 
   return (
     <>
@@ -125,7 +133,8 @@ export function DocumentIntakePanel({
         </Notice>
       </Card>
 
-      <DocumentExtractionReviewPanel documents={documents} />
+      <DocumentExtractionReviewPanel reviews={reviews} />
+      <DocumentFieldSuggestionsPanel reviews={reviews} current={currentValues} />
     </>
   );
 }
