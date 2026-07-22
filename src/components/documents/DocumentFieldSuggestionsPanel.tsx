@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import {
   CONFIDENCE_LABELS,
@@ -8,6 +9,8 @@ import {
   SUGGESTION_STATUS_LABELS,
   buildFieldSuggestions,
   groupSuggestionsByArea,
+  isNoOpSuggestion,
+  isSuggestionApplicable,
   type DocumentReview,
   type ProcessCurrentValues,
 } from "@/server/documents";
@@ -20,11 +23,19 @@ import {
  * rede — os valores vem da conferencia de demonstracao.
  */
 export function DocumentFieldSuggestionsPanel({
+  processId,
   reviews,
   current = {},
+  applyAction,
+  appliedTarget,
 }: {
+  processId: string;
   reviews: readonly DocumentReview[];
   current?: ProcessCurrentValues;
+  /** Ausente => painel so exibe; nenhuma aplicacao e oferecida. */
+  applyAction?: (formData: FormData) => void | Promise<void>;
+  /** Campo aplicado no ultimo POST (querystring `?aplicado=`). */
+  appliedTarget?: string;
 }) {
   const suggestions = buildFieldSuggestions(reviews, current);
   const groups = groupSuggestionsByArea(suggestions);
@@ -36,9 +47,17 @@ export function DocumentFieldSuggestionsPanel({
         <Badge>demonstração</Badge>
       </div>
       <p className="mt-1 text-xs text-neutral-500">
-        <strong>Nada é aplicado automaticamente.</strong> São propostas a partir da conferência —
-        uma pessoa decide o que usar.
+        <strong>Nada é aplicado automaticamente.</strong> São propostas a partir da conferência —{" "}
+        <strong>você precisa conferir antes de aplicar</strong>. A aplicação altera apenas os dados
+        deste processo.
       </p>
+
+      {appliedTarget ? (
+        <p className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          Sugestão aplicada em <span className="font-mono">{appliedTarget}</span>. O valor anterior
+          ficou registrado no histórico do processo.
+        </p>
+      ) : null}
 
       {groups.length === 0 ? (
         <p className="mt-3 rounded-md border border-neutral-200 px-3 py-2 text-neutral-500">
@@ -92,15 +111,44 @@ export function DocumentFieldSuggestionsPanel({
                       {DOCUMENT_KIND_LABELS[suggestion.sourceDocumentType]}
                     </p>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span
-                        aria-disabled="true"
-                        className="inline-flex cursor-not-allowed items-center rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-400"
+                    {isNoOpSuggestion(suggestion) ? (
+                      <p className="mt-2 text-xs text-neutral-500">
+                        <strong>Sem alteração necessária</strong> — o valor sugerido é igual ao
+                        atual.
+                      </p>
+                    ) : applyAction && isSuggestionApplicable(suggestion) ? (
+                      <form
+                        action={applyAction}
+                        className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-2"
                       >
-                        Aplicar sugestão (em breve)
-                      </span>
-                      <span className="text-xs text-neutral-500">{suggestion.reason}</span>
-                    </div>
+                        <input type="hidden" name="processId" value={processId} />
+                        {/* Só o ID da sugestão trafega: o valor é regerado no servidor. */}
+                        <input type="hidden" name="suggestionId" value={suggestion.id} />
+                        <label className="flex items-center gap-2 text-xs text-neutral-700">
+                          <input
+                            type="checkbox"
+                            name="confirmacao"
+                            className="h-3.5 w-3.5 rounded border-neutral-300"
+                          />
+                          Conferi esta informação e quero aplicar no processo
+                        </label>
+                        <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                          Aplicar sugestão
+                        </Button>
+                      </form>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          aria-disabled="true"
+                          className="inline-flex cursor-not-allowed items-center rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-400"
+                        >
+                          {suggestion.status === "CAMPO_FUTURO"
+                            ? "Campo ainda não existe nesta etapa"
+                            : "Aplicar sugestão (indisponível)"}
+                        </span>
+                        <span className="text-xs text-neutral-500">{suggestion.reason}</span>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -171,6 +171,20 @@ export function updateProcessOperations(id: string, data: UpdateProcessOperation
   return getPrisma().process.update({ where: { id }, data });
 }
 
+/** Colunas do destino que a aplicacao manual de sugestao pode tocar. */
+export type UpdateDestinationData = Partial<
+  Record<"eventName" | "uf" | "city" | "street" | "number", string>
+>;
+
+/**
+ * Atualiza campos do destino do processo. Recebe um patch JA VALIDADO pelo
+ * dominio (`checkSuggestionApplication`) — o repositorio nao decide o que pode
+ * ser aplicado, so grava. Nunca cria destino: se nao existir, nada acontece.
+ */
+export function updateProcessDestination(processId: string, data: UpdateDestinationData) {
+  return getPrisma().destination.updateMany({ where: { processId }, data });
+}
+
 /** Atualiza a etapa da execucao assistida MANUAL (Fase 7, docs/21 §8). */
 export function updateManualExecutionStatus(id: string, status: ManualExecutionStatus) {
   return getPrisma().process.update({ where: { id }, data: { manualExecutionStatus: status } });

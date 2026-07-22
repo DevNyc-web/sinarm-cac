@@ -12,6 +12,7 @@ import { requireUser } from "@/server/auth/guards";
 import { isDocumentKind } from "@/server/documents";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
 import { listPaymentsForProcess } from "@/server/repositories/paymentRepository";
+import { applyDestinationSuggestion } from "@/server/services/applyDestinationSuggestion";
 import { confirmPixPayment } from "@/server/services/confirmPixPayment";
 import { createPixPayment } from "@/server/services/createPixPayment";
 import { uploadProcessDocument } from "@/server/services/uploadProcessDocument";
@@ -38,6 +39,31 @@ export async function uploadDocumentAction(formData: FormData) {
   }
   revalidatePath(base);
   redirect(`${base}?ok=${encodeURIComponent(rawKind)}`);
+}
+
+/**
+ * Aplica MANUALMENTE uma sugestao de preenchimento no destino do processo.
+ *
+ * O formulario envia apenas QUAL sugestao e a confirmacao do usuario. O VALOR
+ * nunca vem do cliente: o service regenera as sugestoes no servidor a partir dos
+ * documentos conferidos. Campos fora do destino sao recusados pelo dominio.
+ */
+export async function applyDocumentFieldSuggestionAction(formData: FormData) {
+  const user = await requireUser();
+
+  const processId = String(formData.get("processId") ?? "");
+  const suggestionId = String(formData.get("suggestionId") ?? "");
+  // Checkbox nao marcada nem aparece no FormData — ausencia significa "nao".
+  const confirmed = formData.get("confirmacao") === "on";
+
+  const base = `/processos/${encodeURIComponent(processId)}`;
+
+  const result = await applyDestinationSuggestion(user, processId, suggestionId, confirmed);
+  if (!result.ok) {
+    redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath(base);
+  redirect(`${base}?aplicado=${encodeURIComponent(result.target)}`);
 }
 
 /** Gera a cobranca Pix SANDBOX/DEV do proprio processo (valor ficticio R$ 100). */

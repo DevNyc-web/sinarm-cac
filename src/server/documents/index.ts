@@ -14,3 +14,4 @@ export * from "./documentExtractionStatus";
 export * from "./documentExtractionMock";
 export * from "./documentExtractionReview";
 export * from "./documentFieldSuggestions";
+export * from "./documentSuggestionApply";
