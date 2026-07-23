@@ -20,6 +20,7 @@
  */
 import { type ReadinessItem } from "./automationReadiness";
 import { isLaunchProcessCode, type LaunchProcessCode } from "@/server/processes/processCatalog";
+import { catalogCodeFromPersistedProcessTypeCode } from "@/server/processes/processTypeMapping";
 import {
   documentRequirementsForProcess,
   type ProcessDocumentRequirement,
@@ -27,11 +28,22 @@ import {
 } from "@/server/processes/processDocumentRequirements";
 
 /**
- * Tipo de processo que o fluxo REAL persiste hoje. So existe a Guia de Trafego —
- * o banco nao guarda o tipo. Trocar isto por leitura real do processo e ETAPA
- * FUTURA (depende de schema/reconciliacao, fora deste escopo).
+ * Codigo de CATALOGO do processo, a partir do `process_types.code` persistido.
+ *
+ * Recebe o `code` gravado no banco e reconcilia via `processTypeMapping`. Quando
+ * o code vem vazio/nulo/desconhecido, cai num FALLBACK TEMPORARIO para a Guia de
+ * Trafego — valido APENAS enquanto ela e o unico fluxo real persistido. Assim
+ * que os demais tipos existirem no banco (e forem reconciliados no seed), este
+ * fallback deve ser removido para nao mascarar um tipo desconhecido.
  */
-export function getCurrentPersistedProcessCatalogCode(): LaunchProcessCode {
+export function getCurrentPersistedProcessCatalogCode(
+  persistedProcessTypeCode?: string | null,
+): LaunchProcessCode {
+  if (persistedProcessTypeCode) {
+    const catalogCode = catalogCodeFromPersistedProcessTypeCode(persistedProcessTypeCode);
+    if (catalogCode) return catalogCode;
+  }
+  // Fallback temporario: so a Guia e fluxo real hoje (ver comentario acima).
   return "GUIA_TRAFEGO";
 }
 
