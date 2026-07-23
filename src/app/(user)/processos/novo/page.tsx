@@ -5,6 +5,7 @@ import { Notice } from "@/components/ui/Notice";
 import { requireUser } from "@/server/auth/guards";
 import { DEFAULT_JUSTIFICATION, UFS } from "@/server/processes/guiaTrafegoSchema";
 import { MOCK_FIREARMS, mockFirearmLabel } from "@/server/processes/mockFirearms";
+import { ProcessTypeSelection } from "@/components/processes/ProcessTypeSelection";
 import { NovoProcessoForm } from "./NovoProcessoForm";
 
 export default async function NovoProcessoPage() {
@@ -24,8 +25,13 @@ export default async function NovoProcessoPage() {
           feita depois, por uma pessoa da nossa equipe.
         </p>
 
-        {/* Serviço escolhido + finalidade (contexto, leitura) */}
-        <Card className="mt-4">
+        {/* Processos do lançamento (catálogo) — só a Guia está disponível */}
+        <div className="mt-4">
+          <ProcessTypeSelection />
+        </div>
+
+        {/* Serviço escolhido + finalidade (contexto, leitura) — Guia de Tráfego */}
+        <Card className="mt-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>Serviço</Badge>
             <p className="font-medium text-neutral-900">Guia de Tráfego (CAC)</p>
@@ -42,7 +48,7 @@ export default async function NovoProcessoPage() {
           </dl>
         </Card>
 
-        {/* Passo 1 — dados do pedido */}
+        {/* Passo 1 — dados do pedido (Guia de Tráfego) */}
         <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-neutral-500">
           1. Dados do pedido
         </h2>
