@@ -2,6 +2,7 @@
 // Requer um Postgres local acessivel via DATABASE_URL. Rodar com: npm run seed
 
 import { PrismaClient } from "@prisma/client";
+import { FUTURE_PROCESS_TYPE_SEED } from "../src/server/processes/processTypeSeed";
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,24 @@ async function main() {
       active: true,
     },
   });
+
+  // Tipos FUTUROS do catalogo (CR, Autorizacao de Compra, CRAF) — registrados
+  // como dados com `active: false`: aparecem em process_types SEM liberar
+  // criacao real (a selecao continua so-Guia). Upsert por `code` unico =
+  // idempotente: rodar o seed varias vezes nao duplica registros. Nao altera a
+  // Guia acima. Valores derivam do catalogo/mapeamento (ver processTypeSeed).
+  for (const type of FUTURE_PROCESS_TYPE_SEED) {
+    await prisma.processType.upsert({
+      where: { code: type.code },
+      update: { name: type.name, baseFeeCents: type.baseFeeCents, active: type.active },
+      create: {
+        code: type.code,
+        name: type.name,
+        baseFeeCents: type.baseFeeCents,
+        active: type.active,
+      },
+    });
+  }
 
   // Processo de demonstracao — dados 100% ficticios, sem PII.
   // userId = id do usuario MOCK da Fase 2 (src/server/auth/mockUsers.ts).
