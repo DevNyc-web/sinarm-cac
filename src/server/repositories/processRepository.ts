@@ -159,6 +159,34 @@ export function listAdminQueue(filters: AdminQueueFilters) {
   });
 }
 
+/**
+ * Fila de AUTOMACAO (checklist pre-execucao): so o necessario para derivar a
+ * prontidao. `select` restrito por need-to-know (docs/11 §3/§19):
+ *  - destino: os 5 campos que o checklist avalia (sem ids/timestamps);
+ *  - arma/PCE: apenas a EXISTENCIA (id), nunca especie/marca/serial;
+ *  - documentos: tipo + status + data (sem nome de arquivo, sha256, storageKey);
+ *  - pagamentos: apenas o status.
+ * Nada sensivel sai daqui — o service ainda reduz para um DTO de exibicao.
+ */
+export function listAutomationQueue() {
+  return getPrisma().process.findMany({
+    select: {
+      id: true,
+      code: true,
+      userId: true,
+      createdAt: true,
+      processType: { select: { code: true } },
+      destination: {
+        select: { eventName: true, uf: true, city: true, street: true, number: true },
+      },
+      firearm: { select: { id: true } },
+      documents: { select: { type: true, status: true, createdAt: true } },
+      payments: { select: { status: true }, orderBy: { createdAt: "desc" } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export type UpdateProcessOperationsData = {
   operationalStatus?: OperationalStatus;
   priority?: ProcessPriority;
