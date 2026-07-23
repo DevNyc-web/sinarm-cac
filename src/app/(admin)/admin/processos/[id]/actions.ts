@@ -16,6 +16,7 @@ import {
   registerManualProtocol,
 } from "@/server/services/manualExecution";
 import { reviewProcessDocument, type ReviewDecision } from "@/server/services/reviewProcessDocument";
+import { submitToAutomationQueue } from "@/server/services/submitToAutomationQueue";
 import { toggleChecklistItem } from "@/server/services/toggleChecklistItem";
 import {
   assignProcess,
@@ -104,6 +105,21 @@ export async function changeOperationalStatusAction(formData: FormData) {
     processId,
     String(formData.get("operationalStatus") ?? ""),
   );
+  backTo(processId, result.ok ? undefined : result.error);
+}
+
+/**
+ * Enviar processo pronto para a FILA DE AUTOMACAO futura (docs/25).
+ * Exige "automation.queue.submit" (ADMIN/OPERADOR). O gate NAO executa
+ * automacao, NAO acessa Gov.br/SINARM: apenas marca o processo na trilha.
+ * A prontidao e regenerada no servico — o formulario so informa a confirmacao.
+ */
+export async function submitToAutomationQueueAction(formData: FormData) {
+  const actor = await requirePermission("automation.queue.submit");
+  const processId = String(formData.get("processId") ?? "");
+  const confirmed = formData.get("confirmacao") === "on";
+
+  const result = await submitToAutomationQueue(actor, processId, confirmed);
   backTo(processId, result.ok ? undefined : result.error);
 }
 

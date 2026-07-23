@@ -26,6 +26,11 @@ import {
   type SlaStatus,
 } from "@/server/processes/operationalSignals";
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
+import {
+  getProcessReadinessState,
+  type ProcessReadinessState,
+} from "@/server/services/submitToAutomationQueue";
+import { AutomationSubmitPanel } from "@/components/automation/AutomationSubmitPanel";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
@@ -39,6 +44,7 @@ import {
   registerManualGruPaymentAction,
   registerManualProtocolAction,
   reviewDocumentAction,
+  submitToAutomationQueueAction,
   toggleChecklistAction,
 } from "./actions";
 
@@ -91,14 +97,18 @@ export default async function AdminProcessoDetalhePage({
   const { erro } = await searchParams;
 
   let detail: AdminProcessDetail | null = null;
+  let readinessState: ProcessReadinessState = { found: false };
   try {
     detail = await getAdminProcessDetail(admin, id);
+    // Prontidao regenerada no servidor (nunca do cliente) — gate de automacao.
+    readinessState = await getProcessReadinessState(id);
   } catch {
     // Banco local fora do ar: tratar como nao encontrado.
   }
   if (!detail) notFound();
 
   const canReview = hasPermission(admin, "review.checklist");
+  const canSubmitAutomation = hasPermission(admin, "automation.queue.submit");
   const canOperate =
     hasPermission(admin, "process.assign") ||
     hasPermission(admin, "process.priority") ||
@@ -521,6 +531,17 @@ export default async function AdminProcessoDetalhePage({
           </div>
         </Card>
       </div>
+
+      {readinessState.found ? (
+        <AutomationSubmitPanel
+          processId={detail.id}
+          status={readinessState.readiness.status}
+          alreadySubmitted={readinessState.alreadySubmitted}
+          canSubmit={canSubmitAutomation}
+          roleLabel={ROLE_LABELS[admin.role]}
+          submitAction={submitToAutomationQueueAction}
+        />
+      ) : null}
 
       <Card className="mt-4 text-sm">
         <div className="flex items-center gap-2">
