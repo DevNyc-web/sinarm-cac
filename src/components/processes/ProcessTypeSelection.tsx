@@ -8,6 +8,11 @@ import {
   PROCESS_AVAILABILITY_LABELS,
   launchProcessEntries,
 } from "@/server/processes/processAvailability";
+import {
+  REQUIREMENT_TYPES,
+  REQUIREMENT_TYPE_LABELS,
+  requirementSummaryForProcess,
+} from "@/server/processes/processDocumentRequirements";
 
 /**
  * Selecao dos PROCESSOS DE LANCAMENTO na entrada de novo processo.
@@ -29,6 +34,10 @@ export function ProcessTypeSelection() {
       <p className="mt-1 text-xs text-neutral-500">
         Os processos seguem a ordem lógica: CR → Autorização de Compra → CRAF → Guia de Tráfego.
       </p>
+      <p className="mt-1 text-xs text-neutral-500">
+        Os requisitos exibidos são um resumo operacional. Apenas a Guia de Tráfego está disponível
+        para criação neste momento. Os demais processos seguem em preparação para o lançamento.
+      </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {entries.map((entry) => {
@@ -36,6 +45,9 @@ export function ProcessTypeSelection() {
           const deps = definition.dependsOn.map(
             (code) => getProcessDefinition(code)?.name ?? code,
           );
+          const summary = requirementSummaryForProcess(definition.code);
+          // So os tipos presentes (contagem > 0), para nao poluir o card.
+          const summaryTypes = REQUIREMENT_TYPES.filter((type) => summary.byType[type] > 0);
           return (
             <Card
               key={definition.code}
@@ -66,6 +78,23 @@ export function ProcessTypeSelection() {
                   <dd>{definition.requiresInitialRegistration ? "exigido" : "não exigido"}</dd>
                 </div>
               </dl>
+
+              <div className="border-t border-neutral-200/70 pt-2 text-xs text-neutral-600">
+                <p className="text-neutral-500">
+                  Requisitos documentais ({summary.total} · {summary.requiredCount} obrigatórios)
+                </p>
+                <dl className="mt-1 grid gap-1">
+                  {summaryTypes.map((type) => (
+                    <div key={type} className="flex justify-between gap-2">
+                      <dt className="text-neutral-500">{REQUIREMENT_TYPE_LABELS[type]}</dt>
+                      <dd>{summary.byType[type]}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {!available ? (
+                  <p className="mt-1 text-neutral-500">Requisitos preparados para etapa futura.</p>
+                ) : null}
+              </div>
 
               {available ? (
                 <p className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs text-emerald-900">

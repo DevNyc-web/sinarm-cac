@@ -252,3 +252,32 @@ export function systemGeneratedRequirementsForProcess(
 export function countRequirementsForProcess(code: string): number {
   return documentRequirementsForProcess(code).length;
 }
+
+/** Resumo de contagens por tipo — para exibir na selecao sem listar documentos. */
+export interface RequirementSummary {
+  total: number;
+  /** Contagem por tipo (todas as chaves presentes, mesmo que zero). */
+  byType: Record<RequirementType, number>;
+  /** Quantos sao obrigatorios. */
+  requiredCount: number;
+}
+
+/**
+ * Resumo DERIVADO das contagens de requisitos do processo. Mantem a contagem no
+ * dominio (puro/testavel) para a UI so apresentar. Processo desconhecido -> tudo
+ * zerado, sem quebrar.
+ */
+export function requirementSummaryForProcess(code: string): RequirementSummary {
+  const requirements = documentRequirementsForProcess(code);
+  const byType = Object.fromEntries(REQUIREMENT_TYPES.map((type) => [type, 0])) as Record<
+    RequirementType,
+    number
+  >;
+  for (const requirement of requirements) byType[requirement.type] += 1;
+
+  return {
+    total: requirements.length,
+    byType,
+    requiredCount: requirements.filter((requirement) => requirement.required).length,
+  };
+}
