@@ -107,3 +107,26 @@ test("o fluxo de criacao real da Guia continua na tela de novo processo", () => 
   assert.match(page, /<NovoProcessoForm/, "mantem o formulario da Guia");
   assert.match(page, /createDraftAction|NovoProcessoForm/, "criacao da Guia preservada");
 });
+
+test("a selecao mostra o resumo de requisitos derivado do dominio", () => {
+  const panel = readFileSync("src/components/processes/ProcessTypeSelection.tsx", "utf8");
+  assert.match(panel, /requirementSummaryForProcess/, "usa o helper de resumo do dominio");
+  assert.match(panel, /REQUIREMENT_TYPE_LABELS/, "usa os rotulos de tipo do dominio");
+  // Nao lista documentos hardcoded no card (resumo por contagem).
+  assert.doesNotMatch(
+    panel,
+    /Laudo psicológico|Nota fiscal|Antecedente eleitoral|Declaração de Segurança/,
+    "nao duplica nomes de documentos na UI",
+  );
+});
+
+test("os textos obrigatorios do resumo estao na selecao", () => {
+  const flat = readFileSync("src/components/processes/ProcessTypeSelection.tsx", "utf8").replace(
+    /\s+/g,
+    " ",
+  );
+  assert.match(flat, /Os requisitos exibidos são um resumo operacional\./);
+  assert.match(flat, /Apenas a Guia de Tráfego está disponível para criação neste momento\./);
+  assert.match(flat, /Os demais processos seguem em preparação para o lançamento\./);
+  assert.match(flat, /Requisitos preparados para etapa futura\./);
+});
