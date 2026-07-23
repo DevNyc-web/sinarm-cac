@@ -9,7 +9,7 @@
  * endereco de origem e registro CAC continuam bloqueados — nao ha coluna e nao
  * inventamos uma.
  */
-import type { DocumentFieldSuggestion, ProcessFieldTarget } from "./documentFieldSuggestions";
+import type { DocumentFieldSuggestion } from "./documentFieldSuggestions";
 
 /** Campos que a aplicacao manual aceita. Allowlist — nunca derivar do cliente. */
 export const APPLICABLE_TARGETS = [
@@ -114,9 +114,4 @@ export function checkSuggestionApplication(
     patch: { [COLUMN_BY_TARGET[suggestion.targetField]]: value },
     previousValue: suggestion.currentValue,
   };
-}
-
-/** Rotulo curto do campo para a trilha do processo (sem PII de pessoa). */
-export function targetLabelForHistory(target: ProcessFieldTarget): string {
-  return target;
 }
