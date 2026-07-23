@@ -5,8 +5,14 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DocumentIntakePanel } from "@/components/documents/DocumentIntakePanel";
+import { AutomationReadinessPanel } from "@/components/automation/AutomationReadinessPanel";
 import { requireUser } from "@/server/auth/guards";
-import { isDocumentKind } from "@/server/documents";
+import {
+  buildExtractionReview,
+  buildFieldSuggestions,
+  isDocumentKind,
+} from "@/server/documents";
+import { deriveAutomationReadiness } from "@/server/automation/automationReadiness";
 import {
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
@@ -77,6 +83,20 @@ export default async function ProcessoRevisaoPage({
     !paidPayment &&
     (process.internalStatus === "RASCUNHO" || process.internalStatus === "AGUARDANDO_PAGAMENTO");
 
+  // Checklist pre-execucao (prontidao para automacao) — avaliacao DERIVADA e
+  // pura: nao executa acao, nao muda status, nao acessa Gov.br/SINARM. As
+  // sugestoes sao regeradas no servidor a partir das conferencias (destino.*).
+  const reviews = buildExtractionReview(documents);
+  const suggestions = buildFieldSuggestions(reviews, { destination: process.destination });
+  const readiness = deriveAutomationReadiness({
+    processTypeCode: process.processType.code,
+    destination: process.destination,
+    hasFirearmPce: process.firearm != null,
+    documents,
+    suggestions,
+    paymentStatus: paidPayment ? "PAGO" : (payments[0]?.status ?? null),
+  });
+
   return (
     <Container>
       <div className="mx-auto max-w-2xl">
@@ -106,6 +126,8 @@ export default async function ProcessoRevisaoPage({
             </p>
           ) : null}
         </Card>
+
+        <AutomationReadinessPanel readiness={readiness} />
 
         {messages.length > 0 ? (
           <Card className="mt-4 text-sm">
