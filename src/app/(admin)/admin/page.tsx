@@ -54,6 +54,9 @@ export default async function AdminPage() {
         <Link href="/admin/processos">
           <Button>Abrir fila de processos</Button>
         </Link>
+        <Link href="/admin/automacao">
+          <Button variant="secondary">Fila de automação</Button>
+        </Link>
         {user.role === "ADMIN" || user.role === "OPERADOR" ? (
           <Link href="/admin/lab/guia-trafego">
             <Button variant="secondary">Laboratório sintético (Fase 8A)</Button>
