@@ -182,8 +182,34 @@ export function listAutomationQueue() {
       firearm: { select: { id: true } },
       documents: { select: { type: true, status: true, createdAt: true } },
       payments: { select: { status: true }, orderBy: { createdAt: "desc" } },
+      // Marcador de "enviado para a fila de automacao" (docs/25) — so `toValue`,
+      // rotulo curto sem PII, para derivar se o processo ja foi liberado.
+      statusEvents: { select: { toValue: true } },
     },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+/**
+ * Retrato de UM processo para o checklist/gate de automacao — mesmo `select`
+ * restrito da fila. `findUnique` por id (sem restricao de dono: uso admin, o
+ * guard de permissao decide quem chama). Read-only.
+ */
+export function findProcessForAutomationReadiness(processId: string) {
+  return getPrisma().process.findUnique({
+    where: { id: processId },
+    select: {
+      id: true,
+      code: true,
+      processType: { select: { code: true } },
+      destination: {
+        select: { eventName: true, uf: true, city: true, street: true, number: true },
+      },
+      firearm: { select: { id: true } },
+      documents: { select: { type: true, status: true, createdAt: true } },
+      payments: { select: { status: true }, orderBy: { createdAt: "desc" } },
+      statusEvents: { select: { toValue: true } },
+    },
   });
 }
 

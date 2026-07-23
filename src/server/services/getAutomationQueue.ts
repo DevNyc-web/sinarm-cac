@@ -19,12 +19,8 @@ import {
   classifyReadiness,
   type AutomationQueueCategory,
 } from "@/server/automation/automationQueue";
-import {
-  buildExtractionReview,
-  buildFieldSuggestions,
-  type IntakeDocument,
-  type ReviewDocument,
-} from "@/server/documents";
+import { snapshotFromRow } from "@/server/automation/automationReadinessInput";
+import { wasSubmittedToAutomationQueue } from "@/server/automation/automationQueueSubmission";
 import { listAutomationQueue } from "@/server/repositories/processRepository";
 
 export type AutomationQueueRow = {
@@ -37,48 +33,17 @@ export type AutomationQueueRow = {
   /** Rotulo do bloqueio principal; `null` quando pronto. */
   mainBlockerLabel: string | null;
   blockerCount: number;
+  /** Ja liberado para a fila de automacao futura (marcador na trilha). */
+  submitted: boolean;
 };
 
 export async function getAutomationQueue(): Promise<AutomationQueueRow[]> {
   const rows = await listAutomationQueue();
 
   return rows.map((row) => {
-    // Documentos para derivar estado por requisito. `rejectionReason` nao e
-    // buscado (need-to-know) e nao afeta a prontidao — so o status importa.
-    const documents: IntakeDocument[] = row.documents.map((doc) => ({
-      type: doc.type,
-      status: doc.status,
-      createdAt: doc.createdAt,
-      rejectionReason: null,
-    }));
-
-    // Sugestoes regeradas no servidor, como na tela do usuario. Os campos
-    // id/originalFileName nao influenciam a aplicabilidade — placeholders.
-    const reviewDocuments: ReviewDocument[] = row.documents.map((doc, index) => ({
-      id: `doc-${index}`,
-      originalFileName: "",
-      type: doc.type,
-      status: doc.status,
-      createdAt: doc.createdAt,
-      rejectionReason: null,
-    }));
-    const suggestions = buildFieldSuggestions(buildExtractionReview(reviewDocuments), {
-      destination: row.destination,
-    });
-
-    // Pagamento: PAGO se houver qualquer pagamento pago; senao o mais recente.
-    const paymentStatus = row.payments.some((payment) => payment.status === "PAGO")
-      ? "PAGO"
-      : (row.payments[0]?.status ?? null);
-
-    const readiness = deriveAutomationReadiness({
-      processTypeCode: row.processType.code,
-      destination: row.destination,
-      hasFirearmPce: row.firearm !== null,
-      documents,
-      suggestions,
-      paymentStatus,
-    });
+    // Snapshot montado pelo mesmo adaptador do gate — regras so em
+    // deriveAutomationReadiness (nada de checklist reimplementado aqui).
+    const readiness = deriveAutomationReadiness(snapshotFromRow(row));
 
     const classification = classifyReadiness(readiness);
     const owner = findMockUser(row.userId);
@@ -92,6 +57,7 @@ export async function getAutomationQueue(): Promise<AutomationQueueRow[]> {
       ready: classification.ready,
       mainBlockerLabel: classification.mainBlocker?.label ?? null,
       blockerCount: classification.blockerCount,
+      submitted: wasSubmittedToAutomationQueue(row.statusEvents),
     };
   });
 }

@@ -75,6 +75,9 @@ export function AutomationQueuePanel({ rows }: { rows: readonly AutomationQueueR
                             {row.blockerCount > 1 ? ` (+${row.blockerCount - 1})` : ""}
                           </span>
                         )}
+                        {row.submitted ? (
+                          <span className="text-sky-700"> · enviado para a fila</span>
+                        ) : null}
                       </p>
                     </div>
                     <Link
