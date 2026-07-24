@@ -544,7 +544,7 @@ export default async function AdminProcessoDetalhePage({
         />
       ) : null}
 
-      {/* Resumo auxiliar/read-only; nao substitui AutomationReadinessPanel nem o gate de envio. */}
+      {/* Resumo auxiliar/read-only; nao substitui o gate Fila de automacao. */}
       <ProcessRequirementsSummary processTypeCode={detail.processTypeCode} />
 
       <Card className="mt-4 text-sm">

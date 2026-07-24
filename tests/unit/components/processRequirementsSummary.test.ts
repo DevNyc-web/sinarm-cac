@@ -20,8 +20,9 @@ import { ProcessRequirementsSummary } from "../../../src/components/processes/Pr
 const FUTURE_PERSISTED = ["CONCESSAO_CR", "AUTORIZACAO_COMPRA", "EMISSAO_CRAF"] as const;
 
 const SECURITY_TEXT =
-  "Este resumo não altera o checklist de automação e não executa nenhuma ação.";
-const EMPTY_TEXT = "Nenhum requisito ativo para este processo nesta etapa.";
+  "Não altera o status do processo, não substitui a avaliação de prontidão e não executa nenhuma ação.";
+const HEADER_BADGE = "Resumo informativo";
+const EMPTY_TEXT = "Nenhum requisito ativo para este tipo de processo nesta etapa.";
 
 const GUIA_LABELS = [
   "Documento de identificação pessoal",
@@ -71,6 +72,17 @@ test("codigo desconhecido cai no fallback temporario e mostra requisitos da Guia
 test("mostra sempre o texto de seguranca", () => {
   assert.ok(render("GUIA_TRAFEGO_PF_CAC").includes(SECURITY_TEXT));
   assert.ok(render("CONCESSAO_CR").includes(SECURITY_TEXT));
+});
+
+test("mostra o badge de cabecalho 'Resumo informativo'", () => {
+  assert.ok(render("GUIA_TRAFEGO_PF_CAC").includes(HEADER_BADGE));
+  assert.ok(render("CONCESSAO_CR").includes(HEADER_BADGE));
+});
+
+test("o aviso referencia o gate 'Fila de automação' (nao um painel ausente no admin)", () => {
+  const html = render("GUIA_TRAFEGO_PF_CAC");
+  assert.ok(html.includes("Fila de automação"));
+  assert.ok(html.includes("Nenhum acesso ao Gov.br/SINARM é feito."));
 });
 
 test("marca Obrigatório para o requisito exigido e Opcional para os demais", () => {
