@@ -12,6 +12,7 @@ import {
 } from "@/server/processes/processCatalog";
 import { ConcessaoCrPreparationPreview } from "@/components/processes/ConcessaoCrPreparationPreview";
 import { CadastroInicialPreparationPreview } from "@/components/processes/CadastroInicialPreparationPreview";
+import { AutorizacaoCompraPreparationPreview } from "@/components/processes/AutorizacaoCompraPreparationPreview";
 
 /**
  * "Processos do lancamento" — visao informativa (read-only) do catalogo de
@@ -96,9 +97,11 @@ export default async function ProcessosLancamentoPage() {
         {UF_VARIATION_NOTE}
       </p>
 
-      {/* Previews admin/read-only da preparacao da cadeia — informativos, NAO liberam criacao. */}
-      <ConcessaoCrPreparationPreview />
+      {/* Previews admin/read-only da preparacao da cadeia (ordem logica) — informativos,
+          NAO liberam criacao: Cadastro Inicial -> Concessao de CR -> Autorizacao de Compra. */}
       <CadastroInicialPreparationPreview />
+      <ConcessaoCrPreparationPreview />
+      <AutorizacaoCompraPreparationPreview />
 
       <div className="mt-6">
         <Link href="/admin">
