@@ -10,6 +10,7 @@ import {
   getProcessDefinition,
   listProcessesInLogicalOrder,
 } from "@/server/processes/processCatalog";
+import { ConcessaoCrPreparationPreview } from "@/components/processes/ConcessaoCrPreparationPreview";
 
 /**
  * "Processos do lancamento" — visao informativa (read-only) do catalogo de
@@ -93,6 +94,9 @@ export default async function ProcessosLancamentoPage() {
       <p className="mt-4 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
         {UF_VARIATION_NOTE}
       </p>
+
+      {/* Preview admin/read-only da preparacao de CR — informativo, NAO libera criacao. */}
+      <ConcessaoCrPreparationPreview />
 
       <div className="mt-6">
         <Link href="/admin">
