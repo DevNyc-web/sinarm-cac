@@ -111,6 +111,12 @@ export type AdminProcessDetail = {
   id: string;
   code: string;
   processTypeName: string;
+  /**
+   * `process_types.code` persistido (namespace do banco, ex.: GUIA_TRAFEGO_PF_CAC).
+   * Exposto para o resumo auxiliar de requisitos (read-only); a reconciliacao
+   * catalogo <-> persistido acontece no consumidor (`processTypeMapping`).
+   */
+  processTypeCode: string;
   internalStatus: InternalStatus;
   userFacingStatus: UserFacingStatus;
   operationalStatus: OperationalStatus;
@@ -429,6 +435,8 @@ export async function getAdminProcessDetail(
     id: process.id,
     code: process.code,
     processTypeName: process.processType.name,
+    // `include: { processType: true }` ja traz o code — sem alterar a query.
+    processTypeCode: process.processType.code,
     internalStatus: process.internalStatus,
     userFacingStatus: process.userFacingStatus,
     operationalStatus: process.operationalStatus,
