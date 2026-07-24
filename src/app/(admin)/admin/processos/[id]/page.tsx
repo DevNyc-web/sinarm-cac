@@ -31,6 +31,7 @@ import {
   type ProcessReadinessState,
 } from "@/server/services/submitToAutomationQueue";
 import { AutomationSubmitPanel } from "@/components/automation/AutomationSubmitPanel";
+import { ProcessRequirementsSummary } from "@/components/processes/ProcessRequirementsSummary";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
@@ -542,6 +543,9 @@ export default async function AdminProcessoDetalhePage({
           submitAction={submitToAutomationQueueAction}
         />
       ) : null}
+
+      {/* Resumo auxiliar/read-only; nao substitui AutomationReadinessPanel nem o gate de envio. */}
+      <ProcessRequirementsSummary processTypeCode={detail.processTypeCode} />
 
       <Card className="mt-4 text-sm">
         <div className="flex items-center gap-2">
