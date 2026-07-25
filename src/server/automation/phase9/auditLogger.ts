@@ -15,7 +15,13 @@
  * com valor `[REDACTED]` — isso e evidencia de auditoria. O VALOR original nunca
  * aparece. `_redactedKeys` continua informando quantas foram redigidas.
  */
-import { redactLabMeta, redactLabText, type LabSafeValue } from "../lab/labRedaction";
+import {
+  LAB_REDACTED,
+  isSecretKey,
+  redactLabText,
+  redactLabValue,
+  type LabSafeValue,
+} from "../lab/labRedaction";
 import type {
   Phase9AuditEvent,
   Phase9AuditEventType,
@@ -34,15 +40,53 @@ function toAuditValue(value: LabSafeValue): string | number | boolean {
   return value;
 }
 
-/** Redige chaves de segredo e mascara valores sensiveis (via `labRedaction`). */
+/**
+ * Redige o `meta` de um evento de auditoria reusando o `labRedaction`.
+ *
+ * A POLITICA por tipo e desta camada, nao do `labRedaction`:
+ * - **chave de segredo** -> `[REDACTED]`; o valor nunca e visitado;
+ * - **numero/boolean** -> preservados COMO SAO. Sao METRICA de auditoria
+ *   (`durationMs`, `bytes`, `attempt`, `tentativas`) e mascara-los destruiria a
+ *   evidencia. A heuristica de "sequencia longa de digitos" do `labRedaction`
+ *   existe para TEXTO LIVRE, onde um numero comprido costuma ser RG/serie —
+ *   aqui, nao. Numero tambem nao vira string: o tipo e preservado;
+ * - **string** -> sempre passa pela mascara (CPF, RG, e-mail, telefone, digitos
+ *   longos). Um segredo escrito em texto livre continua com o backstop proprio;
+ * - **objeto/array** (chamador sem tipos) -> redigidos por inteiro e serializados.
+ */
 export function sanitizeMeta(meta: Phase9AuditMeta): Phase9AuditMeta {
-  const { value, summary } = redactLabMeta(meta);
-
   const clean: Phase9AuditMeta = {};
-  for (const [key, item] of Object.entries(value)) {
-    clean[key] = toAuditValue(item);
+  let redactedKeys = 0;
+
+  for (const [key, value] of Object.entries(meta)) {
+    // A chave tambem passa pela mascara: chave tecnica sai intacta, chave que
+    // por acidente carregue PII e mascarada.
+    const safeKey = redactLabText(key).text;
+
+    if (isSecretKey(key)) {
+      clean[safeKey] = LAB_REDACTED;
+      redactedKeys += 1;
+      continue;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      clean[safeKey] = value;
+      continue;
+    }
+
+    if (typeof value === "string") {
+      clean[safeKey] = redactLabText(value).text;
+      continue;
+    }
+
+    // A contagem tambem soma o que foi redigido DENTRO da estrutura — um
+    // `_redactedKeys` zerado com segredo aninhado seria subdeclaracao.
+    const { value: safeValue, summary } = redactLabValue(value);
+    redactedKeys += summary.redactedKeys;
+    clean[safeKey] = toAuditValue(safeValue);
   }
-  if (summary.redactedKeys > 0) clean._redactedKeys = summary.redactedKeys;
+
+  if (redactedKeys > 0) clean._redactedKeys = redactedKeys;
   return clean;
 }
 

@@ -7,6 +7,7 @@ import {
   createPhase9AuditLogger,
   sanitizeMeta,
 } from "../../../src/server/automation/phase9/auditLogger";
+import { LAB_REDACTED } from "../../../src/server/automation/lab/labRedaction";
 
 test("nao registra o VALOR de campos proibidos (senha/otp/cookie/token)", () => {
   const clean = sanitizeMeta({
@@ -51,6 +52,70 @@ test("herda do labRedaction o que a mascara propria da Fase 9 nao cobria", () =>
   for (const pii of ["fulano.teste@example.com", "(11) 98765-4321", "12.345.678-9"]) {
     assert.equal(serialized.includes(pii), false, `"${pii}" nao foi mascarado`);
   }
+});
+
+test("metrica numerica de auditoria e preservada; segredo e PII nao", () => {
+  // Numero em audit meta e EVIDENCIA legitima (duracao, bytes, tentativa) — nao
+  // pode ser mascarado so por ter muitos digitos, nem virar string. Strings
+  // continuam sendo redigidas normalmente.
+  const clean = sanitizeMeta({
+    durationMs: 123456,
+    bytes: 987654,
+    attempt: 123456,
+    tentativas: 3,
+    senha: "hunter2",
+    cpf: "123.456.789-09",
+    email: "teste@example.com",
+  });
+
+  // numeros: mesmo valor E mesmo tipo
+  assert.equal(clean.durationMs, 123456);
+  assert.equal(typeof clean.durationMs, "number");
+  assert.equal(clean.bytes, 987654);
+  assert.equal(typeof clean.bytes, "number");
+  assert.equal(clean.attempt, 123456);
+  assert.equal(typeof clean.attempt, "number");
+  assert.equal(clean.tentativas, 3);
+  assert.equal(typeof clean.tentativas, "number");
+
+  // segredo e PII continuam tratados
+  assert.equal(clean.senha, LAB_REDACTED);
+  assert.equal(String(clean.cpf).includes("123.456.789-09"), false);
+  assert.equal(String(clean.email).includes("teste@example.com"), false);
+
+  const serialized = JSON.stringify(clean);
+  for (const secret of ["hunter2", "123.456.789-09", "teste@example.com"]) {
+    assert.equal(serialized.includes(secret), false, `"${secret}" vazou no evento`);
+  }
+});
+
+test("boolean tambem e preservado como boolean", () => {
+  const clean = sanitizeMeta({ dryRun: true, blocked: false });
+  assert.equal(clean.dryRun, true);
+  assert.equal(typeof clean.dryRun, "boolean");
+  assert.equal(clean.blocked, false);
+  assert.equal(typeof clean.blocked, "boolean");
+});
+
+test("digitos longos EM STRING continuam mascarados", () => {
+  // A preservacao vale para o TIPO number, nao para numero escrito em texto.
+  const clean = sanitizeMeta({ serie: "987654321" });
+  assert.equal(String(clean.serie).includes("987654321"), false);
+});
+
+test("estrutura aninhada e array continuam sanitizados (chamador sem tipos)", () => {
+  const clean = sanitizeMeta({
+    dados: { senha: "hunter2", ok: 1 },
+    lista: ["123.456.789-09", "teste@example.com"],
+  } as unknown as Parameters<typeof sanitizeMeta>[0]);
+
+  const serialized = JSON.stringify(clean);
+  for (const secret of ["hunter2", "123.456.789-09", "teste@example.com"]) {
+    assert.equal(serialized.includes(secret), false, `"${secret}" vazou no aninhado`);
+  }
+  assert.equal(serialized.includes(LAB_REDACTED), true, "segredo aninhado foi redigido");
+  // o contador nao pode ignorar o que foi redigido dentro da estrutura
+  assert.equal(clean._redactedKeys, 1);
 });
 
 test("chave inocente em portugues nao e confundida com segredo", () => {
