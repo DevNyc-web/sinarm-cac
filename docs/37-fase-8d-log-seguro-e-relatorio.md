@@ -55,7 +55,7 @@ OTP"* era verdade **por ausência** (o lab não coleta credencial), e ausência 
 | `src/server/automation/lab/labRedaction.ts` | Redação/sanitização pura |
 | `src/server/automation/lab/labRunReport.ts` | Montagem do relatório estruturado |
 | `tests/unit/automation/labRedaction.test.ts` | 17 testes |
-| `tests/unit/automation/labRunReport.test.ts` | 12 testes |
+| `tests/unit/automation/labRunReport.test.ts` | 14 testes |
 | `docs/37-fase-8d-log-seguro-e-relatorio.md` | Este documento |
 
 Modificados, com diff mínimo:
@@ -102,7 +102,9 @@ arquivo a contenção estrutural (§5) já limita o risco, então mascara-se só
 é inequivocamente PII.
 
 A função também devolve **contagem** (`redactedKeys`, `maskedValues`, `total`),
-para que o relatório declare quanto foi redigido.
+para que o relatório declare quanto foi redigido. A contagem cobre `scenario`,
+nomes de passo, `meta`, `warnings` e `errors` — um relatório que redigiu algo
+não pode exibir resumo zerado.
 
 ---
 
@@ -119,8 +121,11 @@ O relatório contém `scenario`, `status`, `startedAt`, `finishedAt`, `durationM
 - **Auto-declaração.** Todo relatório carrega `kind: "LAB_SINTETICO"`,
   `synthetic: true` e um `disclaimer` explícito. Nenhum consumidor pode confundir
   com execução real.
-- **Falha nunca produz protocolo.** `FALHA`, `BLOQUEADO` e `PAUSA_HUMANA`
-  descartam qualquer protocolo recebido e registram o descarte em `warnings`.
+- **Falha nunca produz protocolo.** A porta é **allow-list**: só `SUCESSO`
+  admite protocolo. Qualquer outro valor — inclusive um status novo que venha a
+  ser adicionado, ou um chamador JavaScript sem tipos — cai em `null` e registra
+  o descarte em `warnings`. Listar os status de falha deixaria a porta aberta por
+  omissão.
 - **Só protocolo sintético.** Mesmo no sucesso, só o prefixo `PROT-FICT-` é
   aceito. Um número fora do padrão é recusado — o relatório **não inventa** e não
   aceita número real.
@@ -196,7 +201,33 @@ Isso é deliberado, e não formalidade:
 
 ---
 
-## 9. O que continua NÃO liberado
+## 9. Limites conhecidos da Fase 8D
+
+Encontrados em revisão, por sondagem adversarial. Nenhum é vazamento de segredo;
+todos falham na direção segura (perda de dado, não exposição). Ficam registrados
+como limite consciente desta fase — **não** são resolvidos aqui.
+
+1. **Texto livre sob chave inocente.** A redação é por **chave**; um segredo
+   escrito em linguagem natural dentro de um valor comum (por exemplo, uma nota
+   livre que mencione a senha no meio da frase) pode não ser capturado. O e2e tem
+   um *backstop*: verifica marcadores sensíveis no relatório final e falha se
+   algum aparecer fora de um par já redigido. Para fase real/produção isso não
+   basta — exigirá política mais forte na origem do dado.
+
+2. **CPF com espaços.** Os formatos usuais (com pontuação e sem pontuação) são
+   mascarados; separadores incomuns como `123 456 789 09` não. O escopo atual
+   cobre os formatos usuais e os hostis usados nos testes.
+
+3. **Colisão de chave após máscara.** Se duas chaves diferentes forem mascaradas
+   para a mesma forma, a última sobrescreve a primeira. É **perda segura**, não
+   vazamento.
+
+4. **`Map`/`Set`.** Não são percorridos: viram objeto vazio. É **perda segura** —
+   o laboratório não persiste dado real, então nada de valor se perde aqui.
+
+---
+
+## 10. O que continua NÃO liberado
 
 A Fase 8D **não move nenhum gate** do `docs/26 §19`. Continuam bloqueados:
 
@@ -213,11 +244,11 @@ O laboratório continua sendo **página fake em `localhost`, com dados fictício
 
 ---
 
-## 10. Verificações executadas
+## 11. Verificações executadas
 
 | Comando | Resultado |
 |---------|-----------|
-| `npm run test:documents:unit` | **295 testes, 0 falhas** |
+| `npm run test:documents:unit` | **297 testes, 0 falhas** |
 | `npm run typecheck` | limpo |
 | `npm run lint` | sem warnings/erros |
 | `npm run build` | build de produção concluído |
@@ -227,7 +258,7 @@ Não foram executados `db:push` nem `seed`.
 
 ---
 
-## 11. Conclusão
+## 12. Conclusão
 
 O laboratório sintético agora **prova**, e não apenas promete, que registra sem
 vazar: segredo não sobrevive, PII é mascarada, falha não gera protocolo e todo

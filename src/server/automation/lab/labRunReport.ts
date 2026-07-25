@@ -17,7 +17,7 @@
  */
 import {
   mergeRedactionSummary,
-  redactLabError,
+  redactLabErrorWithSummary,
   redactLabMeta,
   redactLabText,
   type LabRedactedError,
@@ -46,8 +46,14 @@ export type LabRunStatus = (typeof LAB_RUN_STATUSES)[number];
 export const LAB_STEP_STATUSES = ["OK", "FALHOU", "BLOQUEADO", "PULADO"] as const;
 export type LabStepStatus = (typeof LAB_STEP_STATUSES)[number];
 
-/** Status que NAO admitem protocolo, nem sintetico. */
-const NON_SUCCESS_STATUSES: readonly LabRunStatus[] = ["FALHA", "BLOQUEADO", "PAUSA_HUMANA"];
+/**
+ * UNICO status que admite protocolo, e ainda assim so o sintetico.
+ *
+ * A porta e ALLOW-LIST de proposito: qualquer outro valor — status novo que
+ * venha a ser adicionado, ou chamador JavaScript sem tipos — cai no `null`. O
+ * contrario (listar os status de falha) deixaria a porta aberta por omissao.
+ */
+const PROTOCOL_ALLOWED_STATUS = "SUCESSO" as const satisfies LabRunStatus;
 
 // -------------------------------------------------------------------- input
 
@@ -234,14 +240,18 @@ export function buildLabRunReport(input: LabRunInput): LabRunReport {
     offenders,
   };
 
-  // ---- erros
-  const errors = (input.errors ?? []).map((error) => redactLabError(error));
+  // ---- erros (a redacao deles TAMBEM conta para o resumo)
+  const errors = (input.errors ?? []).map((error) => {
+    const { value, summary } = redactLabErrorWithSummary(error);
+    summaries.push(summary);
+    return value;
+  });
 
   // ---- protocolo: so no sucesso, so o sintetico
   let syntheticProtocol: string | null = null;
   const requestedProtocol = input.syntheticProtocol ?? null;
   if (requestedProtocol !== null && requestedProtocol !== "") {
-    if (NON_SUCCESS_STATUSES.includes(input.status)) {
+    if (input.status !== PROTOCOL_ALLOWED_STATUS) {
       warnings.push("Protocolo descartado: execução sem sucesso não gera protocolo.");
     } else if (!requestedProtocol.startsWith(LAB_SYNTHETIC_PROTOCOL_PREFIX)) {
       warnings.push(

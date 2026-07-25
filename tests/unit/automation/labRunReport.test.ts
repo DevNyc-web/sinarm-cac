@@ -122,6 +122,28 @@ test("o relatorio usa a redacao do lab em meta, erros e avisos", () => {
   );
 });
 
+test("errors redigidos entram na contagem — o resumo nao pode ficar zerado", () => {
+  // Sem steps/warnings: tudo que o resumo contar vem SO dos errors.
+  const report = buildLabRunReport(
+    baseInput({
+      status: "FALHA",
+      steps: [],
+      warnings: [],
+      errors: [new Error(`falha ao enviar ${CPF} para ${EMAIL}`)],
+    }),
+  );
+
+  const output = serialize(report);
+  assert.equal(output.includes(CPF), false);
+  assert.equal(output.includes(EMAIL), false);
+  assert.match(report.errors[0].message, /\*\*\*\.\*\*\*\.\*\*\*-\*\*/);
+  assert.equal(report.errors[0].message.includes("[EMAIL]"), true);
+
+  // CPF + e-mail = 2 redacoes; um resumo zerado seria subdeclaracao.
+  assert.equal(report.redactionSummary.maskedValues, 2);
+  assert.equal(report.redactionSummary.total, 2);
+});
+
 test("nenhum segredo nem PII em claro sobrevive ao relatorio serializado", () => {
   const report = buildLabRunReport(
     baseInput({
@@ -174,6 +196,21 @@ test("execucao sem sucesso NUNCA produz protocolo", () => {
     assert.equal(report.syntheticProtocol, null, `${status} nao pode ter protocolo`);
     assert.ok(report.warnings.some((w) => w.includes("Protocolo descartado")));
   }
+});
+
+test("status desconhecido (chamador sem tipos) nao gera protocolo", () => {
+  // A porta e allow-list: so "SUCESSO" passa. Um status novo, ou um chamador
+  // JavaScript sem tipos, tem de cair no `null` — nao no caminho permissivo.
+  const report = buildLabRunReport(
+    baseInput({
+      status: "ERRO_DESCONHECIDO" as never,
+      syntheticProtocol: `${LAB_SYNTHETIC_PROTOCOL_PREFIX}0001`,
+    }),
+  );
+
+  assert.equal(report.syntheticProtocol, null);
+  assert.equal(serialize(report).includes("PROT-FICT-0001"), false);
+  assert.ok(report.warnings.some((w) => w.includes("Protocolo descartado")));
 });
 
 test("so o protocolo sintetico e aceito; numero fora do padrao e descartado", () => {

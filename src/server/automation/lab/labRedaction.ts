@@ -292,16 +292,29 @@ export function redactLabMeta(
 }
 
 /**
- * Sanitiza um erro para o relatorio: mantem `name`/`message` mascarados e
- * DESCARTA o stack (caminhos, argv e query strings podem carregar segredo).
+ * Sanitiza um erro para o relatorio e informa QUANTO foi redigido.
+ *
+ * Mantem `name`/`message` mascarados e DESCARTA o stack (caminhos, argv e query
+ * strings podem carregar segredo). A contagem existe para que quem monta o
+ * relatorio nao subdeclare a redacao: erro redigido tem de aparecer no total.
  */
+export function redactLabErrorWithSummary(error: unknown): LabRedactionResult<LabRedactedError> {
+  const fromText = (name: string, text: string): LabRedactionResult<LabRedactedError> => {
+    const { text: message, masked } = redactLabText(text);
+    return {
+      value: { name, message },
+      summary: { redactedKeys: 0, maskedValues: masked, total: masked },
+    };
+  };
+
+  if (error instanceof Error) return fromText(error.name, error.message);
+  if (typeof error === "string") return fromText("Error", error);
+
+  const { value, summary } = redactLabValue(error);
+  return { value: { name: "Error", message: JSON.stringify(value) ?? "" }, summary };
+}
+
+/** Atalho para quem so precisa do erro sanitizado (ver variante com contagem). */
 export function redactLabError(error: unknown): LabRedactedError {
-  if (error instanceof Error) {
-    return { name: error.name, message: redactLabText(error.message).text };
-  }
-  if (typeof error === "string") {
-    return { name: "Error", message: redactLabText(error).text };
-  }
-  const { value } = redactLabValue(error);
-  return { name: "Error", message: JSON.stringify(value) ?? "" };
+  return redactLabErrorWithSummary(error).value;
 }
