@@ -13,6 +13,12 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/e2e",
+  // ISOLAMENTO: os testes da Fase 9 tem config PROPRIA e SEGURA
+  // (`playwright.phase9.config.ts`, com screenshot/video/trace OFF). Esta config do
+  // laboratorio sintetico grava evidencias — nunca deve capturar um teste da Fase 9
+  // (docs/35 §3). Por isso ignoramos a pasta phase9 aqui. NAO altera o comportamento
+  // do laboratorio sintetico; apenas impede vazamento de escopo entre as configs.
+  testIgnore: "**/phase9/**",
   // Um unico fluxo, deterministico: sem paralelismo, sem retries.
   fullyParallel: false,
   workers: 1,

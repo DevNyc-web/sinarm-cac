@@ -17,7 +17,8 @@
 >
 > **Nota de numeração:** o `docs/34 §19` reservava `docs/35` para a *validação* da
 > Fase 9; com este documento ocupando o `docs/35`, a validação passa a ser
-> `docs/36-validacao-fase-9-prova-controlada.md` (futuro).
+> `docs/37-validacao-fase-9-prova-controlada.md` (futuro) — o `docs/36` ficou com a
+> **preparação/infra segura** da Fase 9 (2026-07-21).
 
 ---
 
