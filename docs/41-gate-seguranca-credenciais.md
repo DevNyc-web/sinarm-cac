@@ -39,7 +39,7 @@
 `gov.br`, `acesso.gov`, `SINARM`, `servicos.pf`,
 `PHASE9_REAL_EXECUTION_ENABLED`, `process.env`.
 
-**Resultado bruto:** 194 ocorrências em 65 arquivos sob `src/`.
+**Resultado bruto:** 194 linhas com correspondência em 65 arquivos sob `src/`.
 
 **Nota sobre `docs/39` e `docs/40`:** existem em **branches irmãs**, ainda não na
 `main`. Foram considerados como contexto; não são pré-requisito desta auditoria.
@@ -55,16 +55,25 @@ strings de texto livre). Os resultados de §5 são medidos, não inferidos.
 Agrupadas por natureza, não por arquivo — o volume bruto (194) é enganoso: a
 maioria é **texto declarando que o sistema não faz aquilo**.
 
+Volume = **linhas com correspondência** nos arquivos listados, medido com a mesma
+expressão dos termos de §0.
+
 | Grupo | Onde | Volume |
 |-------|------|--------|
-| **Declarações de não-acesso** ("não acessa Gov.br/SINARM") | ~40 arquivos de `src/components/`, `src/app/`, `src/server/processes/`, `src/server/automation/` | Maioria absoluta |
+| **Declarações de não-acesso** ("não acessa Gov.br/SINARM") | ~40 arquivos de `src/components/`, `src/app/`, `src/server/processes/`, `src/server/automation/` | 108 — o restante de `src/` |
 | **Guard / bloqueio ativo** | `phase9/networkGuard.ts` (allowlist + `FORBIDDEN_HOST_PATTERN`), `phase9/safety.ts` (`FORBIDDEN_REAL_MARKERS`) | 7 |
 | **Redação / sanitização** | `automation/redaction.ts` (`SECRET_KEY_SUBSTRINGS`, `SECRET_KEY_EXACT_TOKENS`, padrões de valor) | 20 |
-| **Sessão mock** | `server/auth/session.ts` (`cac_mock_session`), `mockUsers.ts`, `guards.ts`, `permissions.ts` | 13 |
+| **Sessão mock** | `server/auth/session.ts` (`cac_mock_session`), `mockUsers.ts`, `guards.ts`, `permissions.ts` | 16 |
 | **Credencial de pagamento** | `payments/mercadoPagoProvider.ts` (`Authorization: Bearer`), `api/payments/webhook/route.ts` (`x-dev-webhook-secret`), `config/env.ts` | 18 |
-| **Rótulos de domínio** | `processes/statusLabels.ts` (`AGUARDANDO_LOGIN_GOVBR`, `SESSAO_GOVBR_EXPIRADA`), `prisma/schema.prisma` (enums `SINARM_*`) | 13 |
-| **Texto legal público** | `/consentimento`, `/termos`, `/privacidade`, `Footer`, `LegalPage`, `login` | 17 |
-| **Fixtures de teste** | `tests/unit/phase9/*`, `tests/unit/automation/labRedaction.test.ts`, `tests/e2e/**` | ~20 |
+| **Rótulos de domínio** | `processes/statusLabels.ts` (`AGUARDANDO_LOGIN_GOVBR`, `SESSAO_GOVBR_EXPIRADA`) — 7; `prisma/schema.prisma` (enums `SINARM_*`) — 6 | 13 \* |
+| **Texto legal público** | `/consentimento`, `/termos`, `/privacidade`, `Footer`, `LegalPage`, `login` | 18 |
+| **Fixtures de teste** | `tests/unit/phase9/` — 26; `tests/unit/automation/labRedaction.test.ts` — 27; `tests/e2e/` — 58 | 111 \* |
+
+> **\* Escopo.** O total de 194 (§0) cobre **apenas `src/`**. Duas linhas da
+> tabela extrapolam esse escopo de propósito, porque a menção sensível está fora
+> de `src/`: `prisma/schema.prisma` (6, em *Rótulos*) e `tests/**` (111, em
+> *Fixtures*). Somando só as parcelas dentro de `src/` —
+> 108 + 7 + 20 + 16 + 18 + 7 + 18 — fecha-se exatamente **194**.
 
 ---
 
@@ -119,8 +128,26 @@ presumido:
 
 **Artifacts não são versionados — verificado.** `git ls-files` sobre
 `tests/e2e/artifacts/`, `tests/e2e/phase9-artifacts/` e `storage-local/` retorna
-**somente os dois `.gitkeep`**. Existem 16 relatórios de laboratório locais,
-todos cobertos por `.gitignore:46`.
+**somente os dois `.gitkeep`**.
+
+O conteúdo local de `tests/e2e/artifacts/` é:
+
+| Item | Quantidade | Versionado? |
+|------|-----------|-------------|
+| Relatórios de run (`lab-run-report-*.json`) | 12 | ❌ não |
+| Screenshots do laboratório (`lab-final-*.png`) | 4 | ❌ não |
+| `.gitkeep` (mantém a pasta no git) | 1 | ✅ sim |
+
+Os 16 arquivos de evidência — relatórios **e** screenshots — são **locais, do
+laboratório sintético**, e estão cobertos por `.gitignore:46`
+(`tests/e2e/artifacts/*`, com exceção apenas do `.gitkeep`). Verificado item a
+item com `git check-ignore -v`, inclusive nos `.png`.
+
+**Isto não é um vazamento:** os screenshots são de páginas **fake locais**
+(`docs/27`/`docs/28`), com dados fictícios, e nenhum deles entra no
+repositório. A conclusão de §3 permanece: **nenhum artifact sensível está
+versionado.** O registro dos 4 `.png` existe porque a política de screenshot
+para **ensaio real** segue indefinida — ver §4, R5.
 
 ---
 
@@ -194,7 +221,7 @@ para segredo em texto livre** — os padrões de valor cobrem identificadores
 pessoais, não credenciais.
 
 ⚠️ **Discrepância de comentário a corrigir (não corrigida aqui).**
-`auditLogger.ts:53-55` afirma: *"Um segredo escrito em texto livre continua com o
+`auditLogger.ts:53-54` afirma: *"Um segredo escrito em texto livre continua com o
 backstop proprio"*. **Não existe tal backstop** em `redactLabText` — os padrões
 são e-mail, CPF, RG, telefone e sequência de ≥6 dígitos. O comentário deve ser
 lido como *proteção por chave apenas*, e vale ajustá-lo para não induzir
@@ -265,7 +292,7 @@ Achados desta auditoria, **para sua aprovação** — nenhum foi corrigido:
 |---|-----------|--------|
 | **A1** | Decidir se a redação ganha padrão para **segredo em texto livre** (JWT, `chave=valor`, `Bearer ...`) | §5, R1 |
 | **A2** | Ampliar `SECRET_KEY_*` para `pwd`, `codigo*`, `pin`, `assinatura`/`signature`/`hmac`, `mfa`/`totp`/`twoFactor`, `recoveryCode`, `chave*`, `certificado` | §5, R2 |
-| **A3** | Corrigir o comentário de `auditLogger.ts:53-55` (afirma backstop de texto livre que não existe) | §5 |
+| **A3** | Corrigir o comentário de `auditLogger.ts:53-54` (afirma backstop de texto livre que não existe) | §5 |
 | **A4** | Configurar **`redact`/serializer no `logger` pino** de aplicação, ou proibir por convenção que ele receba objeto não sanitizado | §4, R3 |
 | **A5** | Definir **persistência append-only** da trilha de auditoria + retenção | §4, R4; `docs/40 §3` (G-LOG) |
 | **A6** | Provar **descarte de sessão observado**, não declarado | §6; `docs/40 §3` (G-ROLLBACK) |
