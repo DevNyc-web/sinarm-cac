@@ -21,7 +21,7 @@ import {
   redactLabText,
   redactLabValue,
   type LabSafeValue,
-} from "../lab/labRedaction";
+} from "../redaction";
 import type {
   Phase9AuditEvent,
   Phase9AuditEventType,

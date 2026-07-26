@@ -23,7 +23,7 @@ import {
   type LabRedactedError,
   type LabRedactionSummary,
   type LabSafeValue,
-} from "./labRedaction";
+} from "../redaction";
 
 /** Marcacao obrigatoria: nenhum consumidor pode confundir com execucao real. */
 export const LAB_REPORT_KIND = "LAB_SINTETICO" as const;

@@ -17,7 +17,7 @@ import {
   buildLabRunReport,
   type LabRunInput,
 } from "../../../src/server/automation/lab/labRunReport";
-import { LAB_REDACTED } from "../../../src/server/automation/lab/labRedaction";
+import { LAB_REDACTED } from "../../../src/server/automation/redaction";
 
 const CPF = "123.456.789-09";
 const RG = "12.345.678-9";

@@ -15,7 +15,7 @@ import {
   redactLabMeta,
   redactLabText,
   redactLabValue,
-} from "../../../src/server/automation/lab/labRedaction";
+} from "../../../src/server/automation/redaction";
 
 /** Valores FICTICIOS usados como "vazamento" a ser barrado. */
 const CPF = "123.456.789-09";
@@ -210,7 +210,7 @@ function codeOnly(source: string): string {
 }
 
 test("a redacao do lab e pura: sem banco, rede, arquivo ou navegador", () => {
-  const code = codeOnly(readFileSync("src/server/automation/lab/labRedaction.ts", "utf8"));
+  const code = codeOnly(readFileSync("src/server/automation/redaction.ts", "utf8"));
   assert.doesNotMatch(code, /getPrisma|@prisma\/client/, "e puro, sem Prisma");
   assert.doesNotMatch(code, /\bfetch\(|XMLHttpRequest|WebSocket/, "nao faz requisicao");
   assert.doesNotMatch(code, /\b(?:https?|wss?):\/\//, "nao tem URL externa");

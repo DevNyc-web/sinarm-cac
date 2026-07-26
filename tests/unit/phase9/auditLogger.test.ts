@@ -7,7 +7,7 @@ import {
   createPhase9AuditLogger,
   sanitizeMeta,
 } from "../../../src/server/automation/phase9/auditLogger";
-import { LAB_REDACTED } from "../../../src/server/automation/lab/labRedaction";
+import { LAB_REDACTED } from "../../../src/server/automation/redaction";
 
 test("nao registra o VALOR de campos proibidos (senha/otp/cookie/token)", () => {
   const clean = sanitizeMeta({
