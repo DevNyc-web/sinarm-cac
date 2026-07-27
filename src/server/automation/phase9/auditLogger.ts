@@ -50,8 +50,12 @@ function toAuditValue(value: LabSafeValue): string | number | boolean {
  *   evidencia. A heuristica de "sequencia longa de digitos" do `labRedaction`
  *   existe para TEXTO LIVRE, onde um numero comprido costuma ser RG/serie —
  *   aqui, nao. Numero tambem nao vira string: o tipo e preservado;
- * - **string** -> sempre passa pela mascara (CPF, RG, e-mail, telefone, digitos
- *   longos). Um segredo escrito em texto livre continua com o backstop proprio;
+ * - **string** -> sempre passa pela mascara, em duas frentes: CREDENCIAL escrita
+ *   no meio do texto (`Bearer ...`, JWT, `senha=...`, `set-cookie: ...`, OTP por
+ *   contexto) e PII estruturada (CPF, RG, e-mail, telefone, digitos longos).
+ *   LIMITE conhecido: segredo em prosa, sem par `chave=valor` — "a senha e X" —
+ *   nao tem forma reconhecivel e NAO e mascarado; ali a protecao e a chave do
+ *   campo (docs/41 §5). Nao existe backstop universal para texto livre;
  * - **objeto/array** (chamador sem tipos) -> redigidos por inteiro e serializados.
  */
 export function sanitizeMeta(meta: Phase9AuditMeta): Phase9AuditMeta {

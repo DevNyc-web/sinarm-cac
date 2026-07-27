@@ -11,6 +11,17 @@
  *
  * Regra permanente (docs/00 §8): senha/OTP/cookie/token JAMAIS sao registrados,
  * nem mesmo mascarados — a CHAVE inteira e substituida, o valor nao sobrevive.
+ *
+ * DUAS camadas, com alcances diferentes (docs/41 §5):
+ * 1. por CHAVE (`isSecretKey`) — o valor nunca e visitado;
+ * 2. por CONTEUDO (`CREDENTIAL_PATTERNS`) — pega credencial escrita DENTRO de uma
+ *    string: `Bearer <token>`, JWT, `senha=...`, `set-cookie: ...`, OTP por
+ *    contexto.
+ *
+ * O que a camada 2 NAO promete: adivinhar segredo em prosa sem par
+ * `chave=valor` — "a senha do usuario e Trov@dor2026" nao tem forma
+ * reconhecivel e continua passando. Nesse caso a protecao e a camada 1: o campo
+ * precisa ter nome de segredo. Nao ha backstop universal para texto livre.
  */
 
 /** Marcador unico para chave de segredo removida. */
@@ -57,10 +68,15 @@ export interface LabRedactedError {
 /**
  * Termos INEQUIVOCOS de segredo: batem por SUBSTRING na chave normalizada, para
  * pegar tambem `govbrpassword`, `xAuthToken`, `set-cookie` etc.
+ *
+ * Criterio para entrar aqui: o termo nao pode aparecer DENTRO de uma palavra
+ * legitima do dominio. Quando aparece, o termo vai para
+ * `SECRET_KEY_EXACT_TOKENS` (ver a nota sobre `pin` lá embaixo).
  */
 const SECRET_KEY_SUBSTRINGS = [
   "password",
   "passwd",
+  "pwd",
   "senha",
   "token",
   "cookie",
@@ -73,14 +89,45 @@ const SECRET_KEY_SUBSTRINGS = [
   "accesskey",
   "privatekey",
   "sessionid",
+  // --- ampliacao do hardening (docs/41 §5, achados A2/A3) ---
+  "recoverycode",
+  "signature",
+  "assinatura",
+  "hmac",
+  "certificado",
+  "chaveprivada",
+  "chavesecreta",
 ] as const;
 
 /**
  * Termos CURTOS/AMBIGUOS: so batem como TOKEN inteiro da chave. Evita que
  * `passo`/`passos` (portugues, usado nos steps do lab) seja confundido com
  * `pass`, e que `author` vire `auth`.
+ *
+ * `pin` esta AQUI, e nao nas substrings, de proposito: por substring ele casaria
+ * dentro de `espingarda` (es-PIN-garda), `labStepInput` (Ste-pIn-put) e
+ * `processTypeMapping` (Map-pin-g) — tipo de arma e nome de etapa sao EVIDENCIA
+ * de auditoria e nao podem virar `[REDACTED]`.
+ *
+ * `codigo` e `chave` tambem sao tokens exatos. A tokenizacao quebra camelCase,
+ * entao `codigoVerificacao` e `chavePrivada` continuam pegos pelo token; o
+ * codebase usa `code`/`processTypeCode` em ingles para o codigo NAO sensivel,
+ * de modo que reservar `codigo` para segredo nao conflita com o dominio.
  */
-const SECRET_KEY_EXACT_TOKENS = new Set(["pass", "otp", "auth", "sessao", "session", "jwt"]);
+const SECRET_KEY_EXACT_TOKENS = new Set([
+  "pass",
+  "otp",
+  "auth",
+  "sessao",
+  "session",
+  "jwt",
+  // --- ampliacao do hardening (docs/41 §5, achado A2) ---
+  "codigo",
+  "pin",
+  "mfa",
+  "totp",
+  "chave",
+]);
 
 /** Quebra `xAuthToken`/`x-auth-token`/`x_auth_token` em tokens minusculos. */
 function tokenizeKey(key: string): string[] {
@@ -103,18 +150,177 @@ export function isSecretKey(key: string): boolean {
 // ----------------------------------------------------------------- valores
 
 /**
+ * Regra de mascaramento. `replace` e string fixa OU funcao — a funcao existe para
+ * preservar a parte NAO sensivel do casamento (ex.: manter a chave `senha` visivel
+ * como evidencia e matar so o valor).
+ */
+interface RedactionRule {
+  pattern: RegExp;
+  replace: string | ((match: string, ...groups: (string | undefined)[]) => string);
+}
+
+/**
+ * Esquemas de autenticacao HTTP cujo valor E a credencial (RFC 7235 e uso comum).
+ * `Bearer` sozinho nao basta: `Basic` carrega `base64(usuario:senha)` e foi o
+ * furo encontrado na 1a revisao do PR de hardening.
+ */
+const HTTP_AUTH_SCHEME_ALTERNATION = ["Bearer", "Basic", "Digest", "Negotiate", "Token"].join("|");
+
+/**
+ * Separador entre esquema e credencial. Alem de espaco, aceita as formas
+ * CODIFICADAS (`%20` de URL, `+` de formulario) e separadores degenerados
+ * (`,`/`;`) — sem isso, `authorization=Bearer%20<token>` escapava das DUAS
+ * regras: o esquema exigia espaco literal e o lookahead abaixo bloqueava o par
+ * `chave=valor`. O esquema virava escudo do atacante (2a revisao adversarial).
+ */
+const AUTH_SCHEME_SEPARATOR = String.raw`(?:\s+|%20|\+|,|;)`;
+
+/**
+ * Termos que, num par `chave=valor` escrito em TEXTO LIVRE, marcam o VALOR como
+ * segredo. Espelham `SECRET_KEY_*`, mas se aplicam a conteudo de string — nao a
+ * nome de campo.
+ *
+ * DUAS familias, pelo mesmo motivo que a camada por chave tem duas listas.
+ *
+ * FAMILIA A — termos INEQUIVOCOS: aceitam PREFIXO e SUFIXO, porque nome composto
+ * e a forma mais comum de credencial em log (`accessToken=`, `govbrPassword=`,
+ * `clientSecret=`, `setCookie=`). Sem prefixo livre, o `\b` inicial impedia o
+ * casamento — em `accessToken` nao ha fronteira antes de `Token` — e a
+ * credencial vazava, ainda que a camada por CHAVE protegesse o mesmo nome.
+ */
+const FREE_TEXT_SECRET_TERMS_A = [
+  "senhas?",
+  "password",
+  "passwd",
+  "pwd",
+  "tokens?",
+  "secret",
+  "segredo",
+  "api[_-]?key",
+  "access[_-]?key",
+  "private[_-]?key",
+  "session[_-]?id",
+  "credential",
+  "credencial",
+  "authorization",
+  "cookie",
+  "assinatura",
+  "signature",
+  "hmac",
+  "certificado",
+  "chave[_-]?privada",
+  "c[oó]digo[_-]?(?:verifica[cç][aã]o|acesso)",
+  "recovery[_-]?code",
+].join("|");
+
+/**
+ * FAMILIA B — termos CURTOS/AMBIGUOS: exigem fronteira dos DOIS lados, sem
+ * prefixo nem sufixo. Prefixo livre destruiria evidencia de dominio (`pin`
+ * casaria em `espingarda`, `shipping`, `processTypeMapping`); sufixo livre faria
+ * `auth` casar em `author` e `pass` em `passo` — ambos campos legitimos do lab.
+ */
+const FREE_TEXT_SECRET_TERMS_B = [
+  "otp",
+  "c[oó]digo",
+  "pin",
+  "jwt",
+  "bearer",
+  "auth",
+  "pass",
+  "chave",
+  "mfa",
+  "totp",
+  "sess(?:ion|ao|ão)",
+].join("|");
+
+/** Nome de chave sensivel em texto livre: familia A com afixos, B ancorada. */
+const FREE_TEXT_SECRET_KEY =
+  `(?:[a-z0-9_-]*(?:${FREE_TEXT_SECRET_TERMS_A})[a-z0-9_-]*` +
+  `|(?:${FREE_TEXT_SECRET_TERMS_B})\\b)`;
+
+/**
+ * CREDENCIAL EM TEXTO LIVRE — o que faltava antes do hardening (docs/41 §5).
+ *
+ * A redacao por CHAVE nao alcanca segredo escrito dentro de uma string: a
+ * `message` de um passo ou o texto de um erro podiam carregar `Bearer <token>`,
+ * um JWT ou `senha=...` e sobreviver intactos. Estas regras fecham isso.
+ *
+ * Alta confianca (valem tambem no modo "identifiers"): a forma so ocorre em
+ * credencial, entao mascarar nunca destroi caminho de artefato.
+ */
+const CREDENTIAL_PATTERNS: readonly RedactionRule[] = [
+  /**
+   * `Digest <k=v, k=v>` PRIMEIRO: o valor do Digest e uma LISTA de parametros com
+   * espaco e virgula, entao a regra de token unico (abaixo) casaria so `username=`
+   * e deixaria `admin, response=...` em claro. Consome pares `k=v` enquanto
+   * houver; prosa depois da lista nao casa (`palavra` sem `=` encerra).
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(Digest)\s+(?:[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|[^,\s]*)(?:\s*,\s*)?)+`,
+      "gi",
+    ),
+    replace: (_match, scheme) => `${scheme ?? "Digest"} ${LAB_REDACTED}`,
+  },
+  /**
+   * `<esquema> <credencial>` para os esquemas HTTP auth (RFC 7235 + uso comum).
+   * O ESQUEMA fica como evidencia; a credencial morre. Cobre tanto o header
+   * completo (`Authorization: Basic ...`, `proxy-authorization=Basic ...`) quanto
+   * o esquema solto no meio do texto.
+   *
+   * `Basic` e o caso critico: carrega `base64(usuario:senha)` — o par inteiro.
+   *
+   * Vies deliberado: `Token invalido` tambem vira `Token ${LAB_REDACTED}`. Este
+   * modulo resolve duvida MASCARANDO (mesma politica das heuristicas de valor);
+   * perder uma palavra de diagnostico e aceitavel, vazar credencial nao.
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(${HTTP_AUTH_SCHEME_ALTERNATION})${AUTH_SCHEME_SEPARATOR}[A-Za-z0-9\-._~+/%]+=*`,
+      "gi",
+    ),
+    replace: (_match, scheme) => `${scheme ?? ""} ${LAB_REDACTED}`.trim(),
+  },
+  // JWT: header base64url de `{"alg"...}` comeca sempre com `eyJ`
+  { pattern: /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}(?:\.[A-Za-z0-9_-]*)?/g, replace: LAB_REDACTED },
+  /**
+   * `chave=valor` / `chave: valor` com chave sensivel. A CHAVE fica (evidencia de
+   * auditoria, mesma politica do `isSecretKey`); o VALOR morre. Cobre
+   * `senha=...`, `token=...`, `set-cookie: ...`, `session=...`,
+   * `authorization: ...`.
+   *
+   * O lookahead evita DOIS defeitos: remarcar valor ja redigido, e comer so a
+   * palavra do esquema (`Basic`, `Bearer`...) deixando a credencial crua atras
+   * dela — o valor aqui para no espaco, entao `authorization=Basic dXNl` viraria
+   * `authorization=[REDACTED] dXNl`. Com o esquema no lookahead, o caso fica para
+   * a regra de esquema acima, que consome a credencial inteira.
+   *
+   * O lookahead exige o SEPARADOR depois do esquema (`Bearer ` / `Bearer%20`),
+   * nao so a fronteira de palavra: senao `authorization=Bearer%20<token>` era
+   * bloqueado aqui e ignorado la, e ninguem redigia nada.
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(${FREE_TEXT_SECRET_KEY})(\s*[:=]\s*)(?!\[REDACTED\]|(?:${HTTP_AUTH_SCHEME_ALTERNATION})${AUTH_SCHEME_SEPARATOR})("[^"]*"|'[^']*'|[^\s,;&)\]}]+)`,
+      "gi",
+    ),
+    replace: (_match, key, separator) => `${key ?? ""}${separator ?? ""}${LAB_REDACTED}`,
+  },
+];
+
+/**
  * Identificadores de ALTA CONFIANCA: a forma so ocorre em dado pessoal, entao
  * mascarar aqui nunca e falso positivo.
  *
  * Ordem importa: e-mail primeiro (pode conter digitos que o CPF comeria).
  */
-const STRONG_IDENTIFIER_PATTERNS: readonly { pattern: RegExp; mask: string }[] = [
+const STRONG_IDENTIFIER_PATTERNS: readonly RedactionRule[] = [
   // e-mail
-  { pattern: /[\w.+-]+@[\w-]+\.[\w.-]+/g, mask: "[EMAIL]" },
+  { pattern: /[\w.+-]+@[\w-]+\.[\w.-]+/g, replace: "[EMAIL]" },
   // CPF com ou sem pontuacao
-  { pattern: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, mask: "***.***.***-**" },
+  { pattern: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, replace: "***.***.***-**" },
   // RG formatado (o nao formatado cai na heuristica de sequencia longa)
-  { pattern: /\b\d{1,2}\.\d{3}\.\d{3}[-\s]?[\dxX]\b/g, mask: "**.***.***-*" },
+  { pattern: /\b\d{1,2}\.\d{3}\.\d{3}[-\s]?[\dxX]\b/g, replace: "**.***.***-*" },
 ];
 
 /**
@@ -123,22 +329,46 @@ const STRONG_IDENTIFIER_PATTERNS: readonly { pattern: RegExp; mask: string }[] =
  * livre a duvida se resolve mascarando; em NOME DE ARQUIVO nao, porque destruiria
  * o caminho do artefato (ver `redactLabText` modo "identifiers").
  */
-const HEURISTIC_PATTERNS: readonly { pattern: RegExp; mask: string }[] = [
+const HEURISTIC_PATTERNS: readonly RedactionRule[] = [
+  /**
+   * OTP/codigo curto identificado por CONTEXTO. Numero solto de 4-5 digitos NAO e
+   * mascarado (poderia ser qualquer coisa); mascara-se quando um termo sensivel
+   * aparece perto — `codigo OTP enviado: 4839`. Heuristica, logo fora do modo
+   * "identifiers".
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(?:otp|c[oó]digo|pin|token|senha|password)\b[^\n\d]{0,24}?(\d{4,8})\b`,
+      "gi",
+    ),
+    replace: (match, digits) => (digits ? match.replace(digits, "******") : match),
+  },
+  /**
+   * Token opaco de 3 segmentos base64url (JWT sem o header `eyJ`, ou similar).
+   * Heuristica: exige 3 segmentos longos, o que um nome de arquivo de artefato
+   * pode acidentalmente satisfazer — por isso NAO entra no modo "identifiers".
+   */
+  { pattern: /\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, replace: LAB_REDACTED },
   // telefone BR, com ou sem DDI/DDD/nono digito
-  { pattern: /(?:\+?55[\s.-]?)?\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}\b/g, mask: "[TELEFONE]" },
+  { pattern: /(?:\+?55[\s.-]?)?\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}\b/g, replace: "[TELEFONE]" },
   // qualquer sequencia longa de digitos (RG cru, serie, referencia...)
-  { pattern: /\b\d{6,}\b/g, mask: "******" },
+  { pattern: /\b\d{6,}\b/g, replace: "******" },
 ];
 
-const VALUE_PATTERNS: readonly { pattern: RegExp; mask: string }[] = [
+/** Credencial vem primeiro: mata o valor inteiro antes que outra regra o fatie. */
+const IDENTIFIER_RULES: readonly RedactionRule[] = [
+  ...CREDENTIAL_PATTERNS,
   ...STRONG_IDENTIFIER_PATTERNS,
-  ...HEURISTIC_PATTERNS,
 ];
+
+const VALUE_PATTERNS: readonly RedactionRule[] = [...IDENTIFIER_RULES, ...HEURISTIC_PATTERNS];
 
 /**
- * `"full"` (padrao) — identificadores + heuristicas; use em texto livre.
- * `"identifiers"` — so identificadores de alta confianca; use quando mascarar
- * digitos legitimos quebraria o valor (nome de arquivo, caminho de artefato).
+ * `"full"` (padrao) — credenciais + identificadores + heuristicas; use em texto
+ * livre.
+ * `"identifiers"` — credenciais e identificadores de alta confianca apenas; use
+ * quando mascarar digitos legitimos quebraria o valor (nome de arquivo, caminho
+ * de artefato). Credencial e mascarada nos DOIS modos.
  */
 export type LabRedactionMode = "full" | "identifiers";
 
@@ -154,13 +384,16 @@ export interface LabTextRedaction {
 export function redactLabText(text: string, mode: LabRedactionMode = "full"): LabTextRedaction {
   let masked = 0;
   let output = text;
-  const patterns = mode === "identifiers" ? STRONG_IDENTIFIER_PATTERNS : VALUE_PATTERNS;
+  const rules = mode === "identifiers" ? IDENTIFIER_RULES : VALUE_PATTERNS;
 
-  for (const { pattern, mask } of patterns) {
+  for (const { pattern, replace } of rules) {
     // `pattern` e global: recria o lastIndex a cada uso para nao depender de estado.
-    output = output.replace(new RegExp(pattern.source, pattern.flags), () => {
+    output = output.replace(new RegExp(pattern.source, pattern.flags), (match, ...args) => {
       masked += 1;
-      return mask;
+      if (typeof replace === "string") return replace;
+      // `args` termina com (offset, stringCompleta): fora os grupos capturados.
+      const groups = args.slice(0, Math.max(0, args.length - 2)) as (string | undefined)[];
+      return replace(match, ...groups);
     });
   }
 
