@@ -12,10 +12,31 @@
  * MFA e provedor real sao OBRIGATORIOS antes de producao (docs/15 §8).
  */
 import { cookies } from "next/headers";
+import { findUserById } from "@/server/repositories/userRepository";
 import { AUTH_MODE } from "./config";
 import { findMockUser, type AuthUser } from "./mockUsers";
 
 export const SESSION_COOKIE = "cac_mock_session";
+
+/**
+ * Resolve o usuario da sessao.
+ *
+ * Fonte de verdade: a tabela `users`. O fallback para a lista estatica cobre o
+ * banco fora do ar em dev — mesmo padrao do resto do app ("degradar com aviso,
+ * sem quebrar") — e vale SOMENTE em modo mock.
+ *
+ * REMOVER O FALLBACK junto com o modo real: em auth real, cair para uma lista
+ * estatica quando o banco falha seria bypass de autenticacao, nao resiliencia.
+ */
+async function resolveUser(userId: string): Promise<AuthUser | null> {
+  try {
+    const user = await findUserById(userId);
+    if (user) return user;
+  } catch {
+    // Banco indisponivel: em modo mock, segue para o fallback estatico.
+  }
+  return AUTH_MODE === "mock" ? findMockUser(userId) : null;
+}
 
 /** Le a sessao atual. Retorna null quando nao ha usuario "logado". */
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -25,12 +46,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const userId = store.get(SESSION_COOKIE)?.value;
   if (!userId) return null;
 
-  return findMockUser(userId);
+  return resolveUser(userId);
 }
 
 /** Inicia sessao mock. So pode ser chamado de Server Action / Route Handler. */
 export async function signInAsMockUser(userId: string): Promise<boolean> {
-  if (!findMockUser(userId)) return false;
+  if (!(await resolveUser(userId))) return false;
 
   const store = await cookies();
   store.set(SESSION_COOKIE, userId, {

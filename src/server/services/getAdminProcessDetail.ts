@@ -46,6 +46,7 @@ import { listPaymentsForProcess } from "@/server/repositories/paymentRepository"
 import { listDocumentsForAdmin } from "@/server/repositories/processDocumentRepository";
 import { listStatusEvents } from "@/server/repositories/processEventRepository";
 import { findProcessByIdForAdmin } from "@/server/repositories/processRepository";
+import { findUsersByIds } from "@/server/repositories/userRepository";
 
 const SHA256_PREFIX_LENGTH = 12;
 
@@ -188,10 +189,16 @@ export type AdminAuditSummary = {
   currentDocumentStatus: DocumentStatus | null;
 };
 
-function actorLabel(mockUserId: string, role: string): string {
-  const mockUser = findMockUser(mockUserId);
+/**
+ * Rotula um ator da trilha. Recebe o mapa JA CARREGADO em vez de consultar o
+ * banco: os chamadores estao dentro de `.map()` sincronos, e uma consulta por
+ * ator seria N+1. Quando o id nao resolve, cai para o proprio id — a trilha
+ * nunca fica sem autor.
+ */
+function actorLabel(users: ReadonlyMap<string, AuthUser>, userId: string, role: string): string {
+  const user = users.get(userId) ?? findMockUser(userId);
   const roleLabel = ROLE_LABELS[role as Role] ?? role;
-  return `${mockUser ? mockUser.name : mockUserId} (${roleLabel})`;
+  return `${user ? user.name : userId} (${roleLabel})`;
 }
 
 /**
@@ -221,6 +228,22 @@ export async function getAdminProcessDetail(
       listNotesForProcess(process.id, false),
       findManualExecution(process.id),
     ]);
+
+  // Pre-carrega TODOS os atores da pagina numa consulta so: dono, responsavel,
+  // autores de nota, revisores de documento, quem marcou checklist e quem
+  // registrou a execucao manual. Sem isto, cada `actorLabel` viraria uma query.
+  const users = await findUsersByIds([
+    process.userId,
+    process.assignedToMockUserId ?? "",
+    ...statusEvents.map((event) => event.actorMockUserId),
+    ...noteRows.map((note) => note.authorMockUserId),
+    ...checklistRows.map((row) => row.checkedByMockUserId ?? ""),
+    ...documentRows.map((doc) => doc.uploadedByMockUserId ?? ""),
+    ...documentRows.map((doc) => doc.reviewedByMockUserId ?? ""),
+    manualRow?.protocolRegisteredByMockUserId ?? "",
+    manualRow?.gruRegisteredByMockUserId ?? "",
+    manualRow?.gruPaymentRegisteredByMockUserId ?? "",
+  ]);
 
   // Documentos: sem visao completa, so tipo e status saem do servidor.
   const documents: AdminDocumentView[] = documentRows.map((doc) => {
@@ -265,22 +288,24 @@ export async function getAdminProcessDetail(
       checked: row?.checked ?? false,
       checkedByLabel:
         row?.checked && row.checkedByMockUserId
-          ? actorLabel(row.checkedByMockUserId, row.checkedByRole ?? "?")
+          ? actorLabel(users, row.checkedByMockUserId, row.checkedByRole ?? "?")
           : undefined,
       checkedAt: row?.checkedAt ?? undefined,
     };
   });
 
-  const owner = findMockUser(process.userId);
+  // Dono e responsavel saem do mapa ja carregado; `findMockUser` fica como
+  // fallback de dev quando o banco nao tem a linha (ver `mockUsers.ts`).
+  const owner = users.get(process.userId) ?? findMockUser(process.userId);
   const assigned = process.assignedToMockUserId
-    ? findMockUser(process.assignedToMockUserId)
+    ? (users.get(process.assignedToMockUserId) ?? findMockUser(process.assignedToMockUserId))
     : null;
 
   const notes: AdminNoteView[] = noteRows.map((note) => ({
     id: note.id,
     visibility: note.visibility,
     body: note.body,
-    authorLabel: actorLabel(note.authorMockUserId, note.authorRole),
+    authorLabel: actorLabel(users, note.authorMockUserId, note.authorRole),
     createdAt: note.createdAt,
   }));
 
@@ -326,7 +351,7 @@ export async function getAdminProcessDetail(
       id: event.id,
       at: event.createdAt,
       title,
-      detail: `por ${actorLabel(event.actorMockUserId, event.actorRole)}${event.note ? ` · ${event.note}` : ""}`,
+      detail: `por ${actorLabel(users, event.actorMockUserId, event.actorRole)}${event.note ? ` · ${event.note}` : ""}`,
     });
   }
   for (const item of checklist) {
@@ -353,14 +378,14 @@ export async function getAdminProcessDetail(
       id: `doc-up-${doc.id}`,
       at: doc.createdAt,
       title: `Documento enviado: ${docName}`,
-      detail: `por ${actorLabel(doc.uploadedByMockUserId, "USER")}`,
+      detail: `por ${actorLabel(users, doc.uploadedByMockUserId, "USER")}`,
     });
     if (doc.reviewedAt && doc.reviewedByMockUserId) {
       timeline.push({
         id: `doc-rev-${doc.id}`,
         at: doc.reviewedAt,
         title: `Documento ${DOCUMENT_STATUS_LABELS[doc.status].toLowerCase()}: ${docName}`,
-        detail: `por ${actorLabel(doc.reviewedByMockUserId, doc.reviewedByRole ?? "?")}${
+        detail: `por ${actorLabel(users, doc.reviewedByMockUserId, doc.reviewedByRole ?? "?")}${
           canViewFull && doc.rejectionReason ? ` · motivo: ${doc.rejectionReason}` : ""
         }`,
       });
@@ -403,6 +428,7 @@ export async function getAdminProcessDetail(
         protocolObservation: manualRow.protocolObservation,
         protocolRegisteredByLabel: manualRow.protocolRegisteredByMockUserId
           ? actorLabel(
+              users,
               manualRow.protocolRegisteredByMockUserId,
               manualRow.protocolRegisteredByRole ?? "?",
             )
@@ -413,13 +439,14 @@ export async function getAdminProcessDetail(
         gruAmountCents: manualRow.gruAmountCents,
         gruObservation: manualRow.gruObservation,
         gruRegisteredByLabel: manualRow.gruRegisteredByMockUserId
-          ? actorLabel(manualRow.gruRegisteredByMockUserId, manualRow.gruRegisteredByRole ?? "?")
+          ? actorLabel(users, manualRow.gruRegisteredByMockUserId, manualRow.gruRegisteredByRole ?? "?")
           : null,
         gruRegisteredAt: manualRow.gruRegisteredAt,
         gruPaidAt: manualRow.gruPaidAt,
         gruPaymentObservation: manualRow.gruPaymentObservation,
         gruPaymentRegisteredByLabel: manualRow.gruPaymentRegisteredByMockUserId
           ? actorLabel(
+              users,
               manualRow.gruPaymentRegisteredByMockUserId,
               manualRow.gruPaymentRegisteredByRole ?? "?",
             )
