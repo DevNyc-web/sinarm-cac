@@ -27,6 +27,9 @@ export function Footer() {
             separada do nosso serviço.
           </p>
           <nav className="flex flex-wrap gap-3 pt-1">
+            <Link href="/ajuda" className="underline-offset-2 hover:text-neutral-800 hover:underline">
+              Central de ajuda
+            </Link>
             <Link href="/termos" className="underline-offset-2 hover:text-neutral-800 hover:underline">
               Termos de uso
             </Link>

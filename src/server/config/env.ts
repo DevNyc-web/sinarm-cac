@@ -26,6 +26,12 @@ const envSchema = z.object({
   // porque o erro do Zod ecoaria o valor. `optional()` para o modo mock rodar sem
   // ele; o modo real falha FECHADO se faltar (ver `assertSessionSecret`).
   AUTH_SESSION_SECRET: z.string().min(32, "AUTH_SESSION_SECRET precisa de 32+ caracteres").optional(),
+  // Canal de suporte da central de ajuda. OPCIONAL: sem ela o botao "Falar com
+  // suporte" fica desabilitado, com aviso — nenhum numero real vive no codigo.
+  // A validacao efetiva (https + host de WhatsApp) fica em
+  // `src/server/support/supportChannel.ts`, que le `process.env` direto porque
+  // e consumida no caminho de render (mesmo motivo de `isMockAuthForDisplay`).
+  SUPPORT_WHATSAPP_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
