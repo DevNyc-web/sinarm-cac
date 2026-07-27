@@ -286,28 +286,65 @@ export const PHASE9_REAL_EXECUTION_ENABLED = false as const;
 
 ## 9. O que falta antes de qualquer ensaio real
 
-Achados desta auditoria, **para sua aprovação** — nenhum foi corrigido:
+Achados desta auditoria. **A1, A2 e A3 foram mitigados** pelo PR de hardening
+(ver §9.1); os demais seguem **para sua aprovação**, sem correção.
 
-| # | Pendência | Origem |
-|---|-----------|--------|
-| **A1** | Decidir se a redação ganha padrão para **segredo em texto livre** (JWT, `chave=valor`, `Bearer ...`) | §5, R1 |
-| **A2** | Ampliar `SECRET_KEY_*` para `pwd`, `codigo*`, `pin`, `assinatura`/`signature`/`hmac`, `mfa`/`totp`/`twoFactor`, `recoveryCode`, `chave*`, `certificado` | §5, R2 |
-| **A3** | Corrigir o comentário de `auditLogger.ts:53-54` (afirma backstop de texto livre que não existe) | §5 |
-| **A4** | Configurar **`redact`/serializer no `logger` pino** de aplicação, ou proibir por convenção que ele receba objeto não sanitizado | §4, R3 |
-| **A5** | Definir **persistência append-only** da trilha de auditoria + retenção | §4, R4; `docs/40 §3` (G-LOG) |
-| **A6** | Provar **descarte de sessão observado**, não declarado | §6; `docs/40 §3` (G-ROLLBACK) |
-| **A7** | Definir política de **screenshot/trace para ensaio real** | §4, R5 |
-| **A8** | Comparação *timing-safe* no `x-dev-webhook-secret` + validação oficial de assinatura HMAC | §2 |
-| **A9** | Cuidado ao adicionar env secreta como `enum` (mensagem do Zod ecoa valor recebido) | §2 |
-| **A10** | **Auth real + MFA** — hoje não existe modelo `User`; a sessão mock é um cookie não assinado | §3; `docs/23 §5` itens 1, 2 |
+| # | Pendência | Estado | Origem |
+|---|-----------|--------|--------|
+| **A1** | Decidir se a redação ganha padrão para **segredo em texto livre** (JWT, `chave=valor`, `Bearer ...`) | ✅ **mitigado** | §5, R1 |
+| **A2** | Ampliar `SECRET_KEY_*` para `pwd`, `codigo*`, `pin`, `assinatura`/`signature`/`hmac`, `mfa`/`totp`, `recoveryCode`, `chave*`, `certificado` | ✅ **mitigado** | §5, R2 |
+| **A3** | Corrigir o comentário de `auditLogger.ts:53-54` (afirma backstop de texto livre que não existe) | ✅ **resolvido** | §5 |
+| **A4** | Configurar **`redact`/serializer no `logger` pino** de aplicação, ou proibir por convenção que ele receba objeto não sanitizado | ⬜ aberto | §4, R3 |
+| **A5** | Definir **persistência append-only** da trilha de auditoria + retenção | ⬜ aberto | §4, R4; `docs/40 §3` (G-LOG) |
+| **A6** | Provar **descarte de sessão observado**, não declarado | ⬜ aberto | §6; `docs/40 §3` (G-ROLLBACK) |
+| **A7** | Definir política de **screenshot/trace para ensaio real** | ⬜ aberto | §4, R5 |
+| **A8** | Comparação *timing-safe* no `x-dev-webhook-secret` + validação oficial de assinatura HMAC | ⬜ aberto | §2 |
+| **A9** | Cuidado ao adicionar env secreta como `enum` (mensagem do Zod ecoa valor recebido) | ⬜ aberto | §2 |
+| **A10** | **Auth real + MFA** — hoje não existe modelo `User`; a sessão mock é um cookie não assinado | ⬜ aberto | §3; `docs/23 §5` itens 1, 2 |
 
-**Ordem sugerida:** A3 é trivial e puramente textual. A1, A2 e A4 são as que de
-fato reduzem risco de vazamento em log e deveriam vir **antes** de qualquer
-ensaio. A5–A7 são pré-condição de auditabilidade do ensaio. A8–A10 não bloqueiam
-o ensaio da Fase 9, mas bloqueiam piloto/produção.
+**Ordem sugerida:** A1–A3 foram feitos primeiro porque eram o que de fato reduzia
+risco de vazamento em log. A4 continua aberto e é do mesmo tema. A5–A7 são
+pré-condição de auditabilidade do ensaio. A8–A10 não bloqueiam o ensaio da
+Fase 9, mas bloqueiam piloto/produção.
 
-> **Nenhum item acima é uma tarefa liberada.** Cada um é uma decisão sua; A1, A2
-> e A4 mexem em código e exigem PR próprio sob revisão.
+> **Nenhum item aberto acima é tarefa liberada.** Cada um é decisão sua; A4 mexe
+> em código e exige PR próprio sob revisão.
+
+### 9.1. O que o hardening mudou (A1, A2, A3)
+
+Mitigação aplicada em `src/server/automation/redaction.ts` e no comentário de
+`src/server/automation/phase9/auditLogger.ts`:
+
+- **Duas camadas explícitas**: por **chave** (`isSecretKey`, inalterada em
+  espírito) e por **conteúdo** (`CREDENTIAL_PATTERNS`, nova).
+- **Credencial em texto livre** agora é mascarada: `Bearer <token>`, JWT
+  (`eyJ...`), token opaco de 3 segmentos, e par `chave=valor` sensível
+  (`senha=`, `token=`, `set-cookie:`, `session=`, `authorization:`). A **chave
+  permanece** visível como evidência; só o **valor** morre — mesma política da
+  camada por chave.
+- **OTP curto por contexto**: `codigo OTP enviado: 4839` é mascarado; um `4839`
+  solto **não** é, para não destruir número legítimo.
+- **Aliases ampliados**: `pwd`, `codigo`, `pin`, `mfa`, `totp`, `recoveryCode`,
+  `signature`, `assinatura`, `hmac`, `chave`, `chavePrivada`, `certificado`.
+- **`pin` entrou como token exato, não substring** — por substring ele casaria
+  dentro de `espingarda`, `labStepInput` e `processTypeMapping`, destruindo
+  evidência de auditoria. Há teste cobrindo isso.
+- **Métrica preservada**: `durationMs`, `bytes`, `attempt` e `tentativas`
+  continuam **números**, inclusive em evento que carrega credencial redigida.
+- **Modo `identifiers` preservado**: credencial é mascarada nos dois modos, mas a
+  heurística de token opaco fica fora dele, para não destruir caminho de
+  artefato com 3 segmentos longos.
+
+**Limite que permanece — e agora está testado.** Não existe backstop universal
+para prosa: `"a senha do usuário é X"`, sem par `chave=valor`, continua passando
+na parte alfabética. A proteção nesse caso é o **nome do campo**. O teste
+`LIMITE conhecido: segredo em prosa sem par chave=valor sobrevive` existe para
+manter isso visível em vez de virar surpresa.
+
+> **Isto não autoriza execução real.** O hardening reduz risco de vazamento em
+> log; **não** liga a Fase 9, **não** libera Gov.br/SINARM, **não** altera
+> `PHASE9_REAL_EXECUTION_ENABLED` e **não fecha gate nenhum** — inclusive o
+> G-SEC de `docs/40`, que exige revisão formal registrada, não só código.
 
 ---
 
@@ -320,9 +357,11 @@ o ensaio da Fase 9, mas bloqueiam piloto/produção.
   Não existe modelo de usuário; não existe campo de senha/token/cookie/OTP.
 - **Nenhum segredo real versionado.** `.env` é gitignored; `.env.example` só tem
   placeholders; artifacts do lab não são rastreados (só `.gitkeep`).
-- **A redação funciona** — comprovada em relatório real do laboratório — mas é
-  **por chave**. Segredo em **texto livre sobrevive**: este é o achado principal
-  (§5) e o principal risco de um ensaio real.
+- **A redação funciona** — comprovada em relatório real do laboratório. O achado
+  principal desta auditoria era que ela agia **só por chave**, deixando segredo em
+  texto livre sobreviver (§5). Isso foi **mitigado** pelo hardening (§9.1): agora
+  há uma segunda camada por conteúdo. Permanece o limite de prosa sem par
+  `chave=valor`, hoje coberto por teste.
 - **`sessionDiscarded` é declarado, não observado** (§6).
 - **A trilha de auditoria não persiste** — sem append-only, `docs/26 §15` segue
   sem atendimento.

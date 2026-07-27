@@ -203,6 +203,138 @@ test("a redacao e deterministica", () => {
   assert.deepEqual(primeira, segunda);
 });
 
+// ------------------------------------------- hardening de credenciais (docs/41)
+
+test("aliases sensiveis ampliados sao tratados como segredo", () => {
+  for (const key of [
+    "pwd",
+    "codigo",
+    "codigoVerificacao",
+    "pin",
+    "pinCode",
+    "mfa",
+    "totp",
+    "recoveryCode",
+    "signature",
+    "assinatura",
+    "hmac",
+    "chave",
+    "chavePrivada",
+    "certificado",
+    "secretKey",
+    "privateKey",
+    "accessToken",
+    "refreshToken",
+    "idToken",
+    "sessionToken",
+  ]) {
+    assert.equal(isSecretKey(key), true, `${key} deveria ser tratada como segredo`);
+  }
+});
+
+test("a ampliacao nao cria falso positivo em palavra do dominio", () => {
+  // `pin` por SUBSTRING casaria dentro de `espingarda` (es-PIN-garda),
+  // `labStepInput` (Ste-pIn-put) e `processTypeMapping` (Map-pin-g): tipo de arma e
+  // nome de etapa sao EVIDENCIA de auditoria e nao podem virar [REDACTED].
+  for (const key of [
+    "espingarda",
+    "labStepInput",
+    "processTypeMapping",
+    "passo",
+    "passos",
+    "author",
+    "durationMs",
+    "attempt",
+    "tentativas",
+    "processId",
+    "processTypeCode",
+    "code",
+  ]) {
+    assert.equal(isSecretKey(key), false, `${key} nao deveria ser tratada como segredo`);
+  }
+});
+
+test("Bearer token em texto livre e mascarado", () => {
+  const { text, masked } = redactLabText("Authorization: Bearer abc123XYZ.def-456");
+  assert.equal(text, `Authorization: Bearer ${LAB_REDACTED}`);
+  assert.equal(masked, 1);
+});
+
+test("JWT em texto livre e mascarado", () => {
+  const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payloadFicticio.assinaturaFicticia";
+  const { text } = redactLabText(`header ${jwt}`);
+  assert.equal(text.includes("payloadFicticio"), false);
+  assert.equal(text.includes(LAB_REDACTED), true);
+});
+
+test("token opaco de 3 segmentos e mascarado em texto livre", () => {
+  const opaco = "aBcDeFgHiJ12.KlMnOpQrSt34.UvWxYzAbCd56";
+  const { text } = redactLabText(`opaco ${opaco}`);
+  assert.equal(text.includes(opaco), false);
+});
+
+test("set-cookie e session= em texto livre sao mascarados", () => {
+  const cookie = redactLabText("set-cookie: session=9f8e7d6c5b4a; Path=/");
+  assert.equal(cookie.text.includes("9f8e7d6c5b4a"), false);
+  assert.equal(cookie.text.includes("set-cookie"), true, "a chave fica como evidencia");
+
+  const sessao = redactLabText("session=9f8e7d6c5b4a");
+  assert.equal(sessao.text, `session=${LAB_REDACTED}`);
+});
+
+test("senha=/password=/token=/chave= em texto livre sao mascarados", () => {
+  for (const [entrada, segredo] of [
+    ["senha=hunter2", "hunter2"],
+    ["password: 'p@ssFicticia'", "p@ssFicticia"],
+    ["token=abc-def-ghi", "abc-def-ghi"],
+    ["chave=abc-123", "abc-123"],
+    ["apiKey: k-ficticia-123", "k-ficticia-123"],
+  ] as const) {
+    const { text } = redactLabText(entrada);
+    assert.equal(text.includes(segredo), false, `"${segredo}" sobreviveu em "${entrada}"`);
+    assert.equal(text.includes(LAB_REDACTED), true, `sem marcador em "${entrada}"`);
+  }
+});
+
+test("OTP curto e mascarado por CONTEXTO; numero solto nao", () => {
+  // 4 digitos com termo sensivel perto -> mascara.
+  const comContexto = redactLabText("codigo OTP enviado: 4839");
+  assert.equal(comContexto.text.includes("4839"), false);
+
+  // 4 digitos sem contexto sensivel -> preservado (poderia ser qualquer coisa).
+  const semContexto = redactLabText("calibre 12 lote 4839");
+  assert.equal(semContexto.text, "calibre 12 lote 4839");
+  assert.equal(semContexto.masked, 0);
+});
+
+test("credencial e mascarada tambem no modo identifiers, sem quebrar caminho", () => {
+  // Credencial: mascarada nos dois modos.
+  const comToken = redactLabText("token=eyJhbGciOiJIUzI1NiJ9.abc.def", "identifiers");
+  assert.equal(comToken.text.includes("eyJhbGciOiJIUzI1NiJ9"), false);
+
+  // Caminho de artefato com 3 segmentos longos: NAO pode ser destruido.
+  const artefato = "phase9-artifacts-2026.1785046370511.screenshot.png";
+  const preservado = redactLabText(artefato, "identifiers");
+  assert.equal(preservado.text, artefato);
+  assert.equal(preservado.masked, 0);
+});
+
+test("PII estruturada continua mascarada depois do hardening", () => {
+  const { text } = redactLabText(`titular ${CPF} rg ${RG} email ${EMAIL} tel ${TELEFONE}`);
+  for (const pii of [CPF, RG, EMAIL, TELEFONE]) {
+    assert.equal(text.includes(pii), false, `${pii} sobreviveu`);
+  }
+});
+
+test("LIMITE conhecido: segredo em prosa sem par chave=valor sobrevive", () => {
+  // Documentado de proposito (docs/41 §5): nao existe backstop universal para
+  // texto livre. Sem `chave=valor`, a parte alfabetica do segredo passa — a
+  // protecao nesse caso e a CHAVE do campo, nao o conteudo. Este teste existe
+  // para que a limitacao seja VISIVEL, e nao uma surpresa.
+  const { text } = redactLabText("a senha do usuario e TrovadorFicticio");
+  assert.equal(text.includes("TrovadorFicticio"), true);
+});
+
 // ------------------------------------------------------------ trava estatica
 
 function codeOnly(source: string): string {

@@ -126,6 +126,63 @@ test("chave inocente em portugues nao e confundida com segredo", () => {
   assert.equal("_redactedKeys" in clean, false);
 });
 
+// ------------------------------------------- hardening de credenciais (docs/41)
+
+test("credencial em TEXTO LIVRE nao sobrevive no meta", () => {
+  // Antes do hardening, chave nao sensivel com credencial dentro da string
+  // passava intacta. `detalhe`/`nota` nao sao chaves de segredo.
+  const clean = sanitizeMeta({
+    detalhe: "Authorization: Bearer abc123XYZ.def-456",
+    nota: "set-cookie: session=9f8e7d6c5b4a; Path=/",
+    passo: "login ficticio senha=hunter2",
+  });
+
+  const serialized = JSON.stringify(clean);
+  for (const segredo of ["abc123XYZ.def-456", "9f8e7d6c5b4a", "hunter2"]) {
+    assert.equal(serialized.includes(segredo), false, `"${segredo}" vazou no evento`);
+  }
+  assert.equal(serialized.includes(LAB_REDACTED), true, "marcador de redacao presente");
+});
+
+test("metrica numerica sobrevive ao lado de credencial redigida", () => {
+  // O hardening nao pode custar a evidencia de auditoria: numero continua numero.
+  const clean = sanitizeMeta({
+    durationMs: 123456,
+    bytes: 987654,
+    attempt: 3,
+    tentativas: 2,
+    detalhe: "token=eyJhbGciOiJIUzI1NiJ9.abc.def",
+  });
+
+  assert.equal(clean.durationMs, 123456);
+  assert.equal(typeof clean.durationMs, "number");
+  assert.equal(clean.bytes, 987654);
+  assert.equal(typeof clean.bytes, "number");
+  assert.equal(clean.attempt, 3);
+  assert.equal(typeof clean.attempt, "number");
+  assert.equal(clean.tentativas, 2);
+  assert.equal(typeof clean.tentativas, "number");
+  assert.equal(String(clean.detalhe).includes("eyJhbGciOiJIUzI1NiJ9"), false);
+});
+
+test("message do evento tambem passa pela redacao de credencial", () => {
+  const audit = createPhase9AuditLogger();
+  audit.record({
+    type: "STEP_FAILED",
+    executionId: "exec-1",
+    step: "HUMAN_LOGIN",
+    message: "falha ao usar Authorization: Bearer tokenFicticio123",
+    meta: { durationMs: 42 },
+  });
+
+  const [event] = audit.events();
+  assert.equal(event?.message?.includes("tokenFicticio123"), false);
+  assert.equal(event?.message?.includes(LAB_REDACTED), true);
+  // metrica preservada no mesmo evento
+  assert.equal(event?.meta?.durationMs, 42);
+  assert.equal(typeof event?.meta?.durationMs, "number");
+});
+
 test("logger registra evento e devolve copia; nao vaza campo proibido", () => {
   const audit = createPhase9AuditLogger();
   audit.record({
