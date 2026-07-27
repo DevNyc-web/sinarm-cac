@@ -35,8 +35,19 @@ enum Role {
 /// do PRODUTO; credencial de orgao oficial continua proibida (docs/00 §8).
 model User {
   id        String   @id @default(uuid())
+  /// SEMPRE gravado normalizado (trim + minusculo) — o indice unico e
+  /// case-sensitive, entao normalizar so na leitura criaria conta inacessivel e
+  /// permitiria duplicata disfarcada. Ver `normalizeEmail` em `authenticate.ts`.
   email     String   @unique
   name      String
+  /// Senha do PRODUTO, formato versionado `scrypt$N$r$p$salt$hash`.
+  ///
+  /// NULLABLE de proposito: os usuarios de seed nao tem senha, e `null` significa
+  /// "nao entra por senha". NUNCA sai em DTO — `AuthUser` nao tem este campo.
+  ///
+  /// NAO E, e nunca sera, senha de Gov.br/SINARM: guardar credencial de orgao
+  /// oficial continua proibido (docs/00 §8).
+  passwordHash String? @map("password_hash")
   role      Role     @default(USER)
   /// Desativa o acesso sem apagar o historico (processos sao trilha operacional).
   active    Boolean  @default(true)
@@ -44,9 +55,30 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   processes Process[]
+  sessions  Session[]
 
   @@index([role])
   @@map("users")
+}
+
+/// Sessao OPACA do produto. O cookie carrega `<token>.<hmac>`; aqui fica apenas o
+/// SHA-256 do token — vazamento desta tabela NAO concede sessao.
+///
+/// `onDelete: Cascade` (ao contrario de `Process`, que e `Restrict`): sessao nao e
+/// trilha de auditoria, e sessao orfa nao tem sentido.
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hex do token. O token em claro nunca e persistido.
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
 /// Catalogo de tipos de processo. MVP: apenas Guia de Trafego. Ver docs/12 §3.4.

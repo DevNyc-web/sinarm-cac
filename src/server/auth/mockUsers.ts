@@ -9,26 +9,21 @@
  * PAPEL DEPOIS DA FUNDACAO DE AUTH: a fonte de verdade passou a ser a tabela
  * `users` (ver `userRepository.ts`). Este arquivo continua por dois motivos:
  *
- * 1. **`AuthUser` e o contrato estavel** consumido por `guards.ts` e por varios
- *    services — mante-lo aqui evita cascata de tipos no PR de fundacao;
- * 2. **`MOCK_USERS` e o fallback de DEV**: o seletor de perfil do login e o
+ * 1. **`MOCK_USERS` e o fallback de DEV**: o seletor de perfil do login e o
  *    `getCurrentUser` degradam para esta lista quando o banco esta fora do ar,
- *    seguindo o padrao do resto do app ("degradar com aviso, sem quebrar").
+ *    seguindo o padrao do resto do app ("degradar com aviso, sem quebrar");
+ * 2. **`SEEDED_USER_IDS`** trava a correspondencia com `prisma/seed.ts`.
  *
- * O fallback vale SOMENTE em `AUTH_MODE === "mock"`. Quando o modo real entrar,
- * ele precisa ser removido junto — fallback estatico em auth real seria um
- * bypass de autenticacao.
+ * O fallback vale SOMENTE em `AUTH_MODE === "mock"`. Em modo real ele nao e
+ * alcancado — fallback estatico em auth real seria bypass de autenticacao.
+ *
+ * `AuthUser` MUDOU DE CASA: agora vive em `types.ts`, para que o caminho de auth
+ * real nao importe nada de um arquivo chamado "mock". Reexportado aqui apenas
+ * para nao quebrar os imports existentes.
  */
-import { type Role } from "./roles";
+import { type AuthUser } from "./types";
 
-export type AuthUser = {
-  id: string;
-  /** Nome ficticio, apenas para navegar a UI. */
-  name: string;
-  /** E-mail ficticio em dominio de exemplo (RFC 2606). */
-  email: string;
-  role: Role;
-};
+export type { AuthUser };
 
 export const MOCK_USERS: readonly AuthUser[] = [
   {

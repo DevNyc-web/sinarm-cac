@@ -1,4 +1,4 @@
-import { AUTH_MODE } from "@/server/auth/config";
+import { isMockAuthForDisplay } from "@/server/auth/config";
 
 /**
  * Faixa de ambiente (docs/24 §11/§16).
@@ -8,7 +8,9 @@ import { AUTH_MODE } from "@/server/auth/config";
  * "sandbox") e a faixa some sozinha quando houver auth real.
  */
 export function EnvironmentBanner() {
-  if (AUTH_MODE !== "mock") return null;
+  // Renderiza em toda pagina, inclusive no prerender do build: usa a leitura
+  // leve de env, nao a validacao completa (ver `isMockAuthForDisplay`).
+  if (!isMockAuthForDisplay()) return null;
 
   return (
     <div className="border-b border-amber-300 bg-amber-100 px-4 py-1.5 text-center text-xs text-amber-900">
