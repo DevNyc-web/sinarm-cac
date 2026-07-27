@@ -19,8 +19,11 @@ export async function Header() {
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <Link href="/como-funciona" className={navLinkClass}>
+            <Link href="/como-funciona" className={`hidden sm:inline-block ${navLinkClass}`}>
               Como funciona
+            </Link>
+            <Link href="/ajuda" className={navLinkClass}>
+              Ajuda
             </Link>
 
             {user && !isInternalRole(user.role) ? (
