@@ -301,11 +301,18 @@ Achados desta auditoria. **A1, A2 e A3 foram mitigados** pelo PR de hardening
 | **A8** | Comparação *timing-safe* no `x-dev-webhook-secret` + validação oficial de assinatura HMAC | ⬜ aberto | §2 |
 | **A9** | Cuidado ao adicionar env secreta como `enum` (mensagem do Zod ecoa valor recebido) | ⬜ aberto | §2 |
 | **A10** | **Auth real + MFA** — hoje não existe modelo `User`; a sessão mock é um cookie não assinado | ⬜ aberto | §3; `docs/23 §5` itens 1, 2 |
+| **A11** | **Custo quadrático da redação** — medido: 4 k → 14 ms, 8 k → 55 ms, 16 k → 230 ms (4× por duplicação). Não há backtracking catastrófico, mas ~100 k caracteres ficariam na casa de segundos. Cabível um **teto de tamanho** antes de redigir | ⬜ aberto (dívida) | revisão do PR de hardening |
 
 **Ordem sugerida:** A1–A3 foram feitos primeiro porque eram o que de fato reduzia
 risco de vazamento em log. A4 continua aberto e é do mesmo tema. A5–A7 são
-pré-condição de auditabilidade do ensaio. A8–A10 não bloqueiam o ensaio da
-Fase 9, mas bloqueiam piloto/produção.
+pré-condição de auditabilidade do ensaio. A8–A11 não bloqueiam o ensaio da
+Fase 9, mas A8–A10 bloqueiam piloto/produção; A11 é dívida de robustez.
+
+> **Lição registrada.** A primeira versão do hardening passou em 14 testes verdes
+> **e ainda vazava** credencial em `Basic`/`Digest`/`Negotiate`/`Token`: os testes
+> cobriam o que havia sido pensado, não o que faltava. Suíte verde não é prova de
+> ausência de furo — o vazamento só apareceu numa sonda adversarial que varreu
+> esquemas não previstos.
 
 > **Nenhum item aberto acima é tarefa liberada.** Cada um é decisão sua; A4 mexe
 > em código e exige PR próprio sob revisão.
@@ -317,11 +324,19 @@ Mitigação aplicada em `src/server/automation/redaction.ts` e no comentário de
 
 - **Duas camadas explícitas**: por **chave** (`isSecretKey`, inalterada em
   espírito) e por **conteúdo** (`CREDENTIAL_PATTERNS`, nova).
-- **Credencial em texto livre** agora é mascarada: `Bearer <token>`, JWT
-  (`eyJ...`), token opaco de 3 segmentos, e par `chave=valor` sensível
-  (`senha=`, `token=`, `set-cookie:`, `session=`, `authorization:`). A **chave
-  permanece** visível como evidência; só o **valor** morre — mesma política da
-  camada por chave.
+- **Credencial em texto livre** agora é mascarada: JWT (`eyJ...`), token opaco de
+  3 segmentos, e par `chave=valor` sensível (`senha=`, `token=`, `set-cookie:`,
+  `session=`, `authorization:`). A **chave permanece** visível como evidência; só
+  o **valor** morre — mesma política da camada por chave.
+- **Todos os esquemas HTTP auth**, não só `Bearer`: `Basic`, `Digest`,
+  `Negotiate` e `Token`, em `Authorization` e `proxy-authorization`, com `:` ou
+  `=`. O **esquema fica** como evidência (`Authorization: Basic [REDACTED]`).
+  Corrigido depois da revisão do PR: a primeira versão cobria só `Bearer`, e a
+  regra `chave=valor` — que para no espaço — transformava
+  `authorization=Basic dXNl` em `authorization=[REDACTED] dXNl`, deixando a
+  credencial em claro. `Basic` era o pior caso, por carregar
+  `base64(usuário:senha)`. `Digest` tem regra própria, porque seu valor é uma
+  lista `k=v` com espaços e vírgulas.
 - **OTP curto por contexto**: `codigo OTP enviado: 4839` é mascarado; um `4839`
   solto **não** é, para não destruir número legítimo.
 - **Aliases ampliados**: `pwd`, `codigo`, `pin`, `mfa`, `totp`, `recoveryCode`,

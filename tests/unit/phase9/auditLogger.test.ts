@@ -144,6 +144,24 @@ test("credencial em TEXTO LIVRE nao sobrevive no meta", () => {
   assert.equal(serialized.includes(LAB_REDACTED), true, "marcador de redacao presente");
 });
 
+test("Authorization Basic no meta da Fase 9 nao vaza o par usuario:senha", () => {
+  // `Basic` carrega base64(usuario:senha). Antes da correcao, so `Bearer` era
+  // coberto e este caso vazava. `detalhe`/`nota` nao sao chaves de segredo.
+  const clean = sanitizeMeta({
+    detalhe: "Authorization: Basic dXNlcjpwYXNz",
+    nota: "proxy-authorization: Digest username=admin, response=abc123",
+    durationMs: 77,
+  });
+
+  const serialized = JSON.stringify(clean);
+  for (const segredo of ["dXNlcjpwYXNz", "abc123"]) {
+    assert.equal(serialized.includes(segredo), false, `"${segredo}" vazou no evento`);
+  }
+  // metrica intacta no mesmo evento
+  assert.equal(clean.durationMs, 77);
+  assert.equal(typeof clean.durationMs, "number");
+});
+
 test("metrica numerica sobrevive ao lado de credencial redigida", () => {
   // O hardening nao pode custar a evidencia de auditoria: numero continua numero.
   const clean = sanitizeMeta({

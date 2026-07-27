@@ -165,6 +165,13 @@ interface RedactionRule {
  * nome de campo. Fonte regex: usada com `\b` na frente, entao `pin` nao casa
  * dentro de `espingarda`.
  */
+/**
+ * Esquemas de autenticacao HTTP cujo valor E a credencial (RFC 7235 e uso comum).
+ * `Bearer` sozinho nao basta: `Basic` carrega `base64(usuario:senha)` e foi o
+ * furo encontrado na revisao do PR de hardening.
+ */
+const HTTP_AUTH_SCHEME_ALTERNATION = ["Bearer", "Basic", "Digest", "Negotiate", "Token"].join("|");
+
 const FREE_TEXT_SECRET_TERMS = [
   "senhas?",
   "password",
@@ -205,20 +212,55 @@ const FREE_TEXT_SECRET_TERMS = [
  * credencial, entao mascarar nunca destroi caminho de artefato.
  */
 const CREDENTIAL_PATTERNS: readonly RedactionRule[] = [
-  // `Bearer <token>` — inclusive dentro de `Authorization: Bearer ...`
-  { pattern: /\bBearer\s+[A-Za-z0-9\-._~+/]+=*/gi, replace: `Bearer ${LAB_REDACTED}` },
+  /**
+   * `Digest <k=v, k=v>` PRIMEIRO: o valor do Digest e uma LISTA de parametros com
+   * espaco e virgula, entao a regra de token unico (abaixo) casaria so `username=`
+   * e deixaria `admin, response=...` em claro. Consome pares `k=v` enquanto
+   * houver; prosa depois da lista nao casa (`palavra` sem `=` encerra).
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(Digest)\s+(?:[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|[^,\s]*)(?:\s*,\s*)?)+`,
+      "gi",
+    ),
+    replace: (_match, scheme) => `${scheme ?? "Digest"} ${LAB_REDACTED}`,
+  },
+  /**
+   * `<esquema> <credencial>` para os esquemas HTTP auth (RFC 7235 + uso comum).
+   * O ESQUEMA fica como evidencia; a credencial morre. Cobre tanto o header
+   * completo (`Authorization: Basic ...`, `proxy-authorization=Basic ...`) quanto
+   * o esquema solto no meio do texto.
+   *
+   * `Basic` e o caso critico: carrega `base64(usuario:senha)` — o par inteiro.
+   *
+   * Vies deliberado: `Token invalido` tambem vira `Token ${LAB_REDACTED}`. Este
+   * modulo resolve duvida MASCARANDO (mesma politica das heuristicas de valor);
+   * perder uma palavra de diagnostico e aceitavel, vazar credencial nao.
+   */
+  {
+    pattern: new RegExp(
+      String.raw`\b(${HTTP_AUTH_SCHEME_ALTERNATION})\s+[A-Za-z0-9\-._~+/]+=*`,
+      "gi",
+    ),
+    replace: (_match, scheme) => `${scheme ?? ""} ${LAB_REDACTED}`.trim(),
+  },
   // JWT: header base64url de `{"alg"...}` comeca sempre com `eyJ`
   { pattern: /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}(?:\.[A-Za-z0-9_-]*)?/g, replace: LAB_REDACTED },
   /**
    * `chave=valor` / `chave: valor` com chave sensivel. A CHAVE fica (evidencia de
    * auditoria, mesma politica do `isSecretKey`); o VALOR morre. Cobre
    * `senha=...`, `token=...`, `set-cookie: ...`, `session=...`,
-   * `authorization: ...`. O lookahead evita remarcar valor ja redigido e evita
-   * comer so a palavra `Bearer`, deixando o token cru atras dela.
+   * `authorization: ...`.
+   *
+   * O lookahead evita DOIS defeitos: remarcar valor ja redigido, e comer so a
+   * palavra do esquema (`Basic`, `Bearer`...) deixando a credencial crua atras
+   * dela — o valor aqui para no espaco, entao `authorization=Basic dXNl` viraria
+   * `authorization=[REDACTED] dXNl`. Com o esquema no lookahead, o caso fica para
+   * a regra de esquema acima, que consome a credencial inteira.
    */
   {
     pattern: new RegExp(
-      String.raw`\b((?:${FREE_TEXT_SECRET_TERMS})[a-z0-9_-]*)(\s*[:=]\s*)(?!\[REDACTED\]|Bearer\b)("[^"]*"|'[^']*'|[^\s,;&)\]}]+)`,
+      String.raw`\b((?:${FREE_TEXT_SECRET_TERMS})[a-z0-9_-]*)(\s*[:=]\s*)(?!\[REDACTED\]|(?:${HTTP_AUTH_SCHEME_ALTERNATION})\b)("[^"]*"|'[^']*'|[^\s,;&)\]}]+)`,
       "gi",
     ),
     replace: (_match, key, separator) => `${key ?? ""}${separator ?? ""}${LAB_REDACTED}`,

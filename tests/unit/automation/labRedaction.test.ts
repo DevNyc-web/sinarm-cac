@@ -260,6 +260,57 @@ test("Bearer token em texto livre e mascarado", () => {
   assert.equal(masked, 1);
 });
 
+test("todo esquema HTTP auth e mascarado, nao so Bearer", () => {
+  // Regressao do furo encontrado na revisao: a regra `chave=valor` para no espaco,
+  // entao `authorization=Basic dXNl` virava `authorization=[REDACTED] dXNl` e
+  // deixava a credencial em claro. `Basic` e o caso critico: carrega
+  // base64(usuario:senha). Todos os valores aqui sao FICTICIOS.
+  const casos: readonly (readonly [string, string])[] = [
+    ["Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["Authorization: Digest username=admin, response=abc123", "abc123"],
+    ["Authorization: Negotiate YIIKfwYGKwYBBQUCoIIK", "YIIKfwYGKwYBBQUCoIIK"],
+    ["authorization: Token abc123secreto", "abc123secreto"],
+    ["proxy-authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["proxy-authorization=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["Authorization: Bearer abc123secreto", "abc123secreto"],
+    // esquema como VALOR de uma chave sensivel: nao pode ser fatiado
+    ["senha=Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["token=Bearer abc123secreto", "abc123secreto"],
+  ];
+
+  for (const [entrada, segredo] of casos) {
+    const { text } = redactLabText(entrada);
+    assert.equal(text.includes(segredo), false, `"${segredo}" sobreviveu em "${entrada}"`);
+    assert.equal(text.includes(LAB_REDACTED), true, `sem marcador em "${entrada}"`);
+  }
+});
+
+test("o ESQUEMA auth permanece como evidencia; so a credencial morre", () => {
+  assert.equal(
+    redactLabText("Authorization: Basic dXNlcjpwYXNz").text,
+    `Authorization: Basic ${LAB_REDACTED}`,
+  );
+  assert.equal(
+    redactLabText("proxy-authorization=Negotiate YIIKfwYGKwYB").text,
+    `proxy-authorization=Negotiate ${LAB_REDACTED}`,
+  );
+});
+
+test("Digest: a lista de parametros inteira e consumida, a prosa depois sobrevive", () => {
+  // O valor do Digest tem espaco e virgula; a regra de token unico casaria so
+  // `username=` e deixaria o resto em claro.
+  const comAspas = redactLabText('Authorization: Digest username="ad min", response="abc123"');
+  assert.equal(comAspas.text.includes("abc123"), false);
+  assert.equal(comAspas.text, `Authorization: Digest ${LAB_REDACTED}`);
+
+  const comProsa = redactLabText(
+    "Authorization: Digest username=admin, response=abc invalido no passo 3",
+  );
+  assert.equal(comProsa.text.includes("response=abc"), false);
+  assert.equal(comProsa.text.includes("invalido no passo 3"), true, "diagnostico preservado");
+});
+
 test("JWT em texto livre e mascarado", () => {
   const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payloadFicticio.assinaturaFicticia";
   const { text } = redactLabText(`header ${jwt}`);
