@@ -13,11 +13,45 @@ import {
   SUPPORT_UNAVAILABLE_TEXT,
 } from "../../../src/server/support/supportChannel";
 
+/**
+ * Roda `fn` com `SUPPORT_WHATSAPP_URL` no estado pedido, restaurando depois.
+ *
+ * Existe porque `resolveWhatsAppSupport(undefined)` NAO representa "sem env":
+ * passar `undefined` explicitamente ATIVA o parametro default, que le
+ * `process.env`. O teste antigo so passava porque a env nao estava definida na
+ * maquina — e quebraria assim que o canal fosse configurado.
+ */
+function withEnv<T>(value: string | undefined, fn: () => T): T {
+  const anterior = process.env.SUPPORT_WHATSAPP_URL;
+  if (value === undefined) delete process.env.SUPPORT_WHATSAPP_URL;
+  else process.env.SUPPORT_WHATSAPP_URL = value;
+  try {
+    return fn();
+  } finally {
+    if (anterior === undefined) delete process.env.SUPPORT_WHATSAPP_URL;
+    else process.env.SUPPORT_WHATSAPP_URL = anterior;
+  }
+}
+
 test("sem env: canal indisponivel por 'nao-configurado'", () => {
-  assert.deepEqual(resolveWhatsAppSupport(undefined), {
-    available: false,
-    reason: "nao-configurado",
-  });
+  const channel = withEnv(undefined, () => resolveWhatsAppSupport());
+  assert.deepEqual(channel, { available: false, reason: "nao-configurado" });
+});
+
+test("o teste de ausencia NAO depende da env da maquina", () => {
+  // Com a env definida FORA do teste, "sem env" continua significando sem env.
+  const semEnv = withEnv("https://wa.me/5500000000000", () =>
+    withEnv(undefined, () => resolveWhatsAppSupport()),
+  );
+  assert.deepEqual(semEnv, { available: false, reason: "nao-configurado" });
+});
+
+test("le a env pelo parametro default quando chamado sem argumento", () => {
+  assert.equal(
+    withEnv("https://wa.me/5500000000000", () => resolveWhatsAppSupport()).available,
+    true,
+  );
+  assert.equal(withEnv("nao-e-url", () => resolveWhatsAppSupport()).available, false);
 });
 
 test("env vazia ou so espacos conta como nao configurada", () => {

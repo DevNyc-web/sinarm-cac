@@ -31,7 +31,9 @@ const REQUIRED_TOPIC_IDS = [
   "acompanhar-pedido",
   "gov-br",
   "status",
-  "suporte",
+  // "suporte-faq" e nao "suporte": `id="suporte"` pertence ao BLOCO de suporte
+  // na /ajuda, e ids repetidos quebrariam o atalho "Falar com suporte".
+  "suporte-faq",
 ];
 
 /** Texto de UI de TODO o conteudo da ajuda, concatenado, para varredura. */

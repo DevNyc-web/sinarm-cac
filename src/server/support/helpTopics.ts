@@ -84,7 +84,11 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     note: "Status é informação de acompanhamento do nosso serviço. Ele não substitui nem antecipa a decisão do órgão competente.",
   },
   {
-    id: "suporte",
+    // "suporte-faq", nao "suporte": o id vira ancora no DOM e `id="suporte"` ja
+    // pertence ao BLOCO de suporte (SupportChannelSection), o destino do atalho
+    // "Falar com suporte". Dois elementos com o mesmo id levariam o atalho para
+    // este card em vez do botao.
+    id: "suporte-faq",
     question: "Como falar com suporte",
     summary:
       "Você fala com uma pessoa da nossa equipe quando precisar, em qualquer etapa. Sem robô no lugar de gente quando o assunto é importante.",

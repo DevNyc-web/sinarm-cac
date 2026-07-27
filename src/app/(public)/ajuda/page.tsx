@@ -15,10 +15,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * Central de ajuda (/ajuda) — pagina publica e estatica.
+ * Central de ajuda (/ajuda) — pagina publica.
  *
- * Conteudo de PRODUTO: explica o uso do NOSSO sistema. Nao acessa banco, nao
- * consulta Gov.br/SINARM/PF e nao expoe processo de ninguem.
+ * O conteudo nao consulta banco nem integra servico externo: e texto de PRODUTO
+ * explicando o uso do NOSSO sistema. Nao consulta Gov.br/SINARM/PF e nao expoe
+ * processo de ninguem.
+ *
+ * A rota e renderizada sob demanda (nao estatica) porque o layout raiz monta o
+ * `Header`, que le cookie de sessao — comportamento global, nao desta pagina.
  */
 export default function AjudaPage() {
   return (

@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import AjudaPage from "../../../src/app/(public)/ajuda/page";
 import { ClientStatusGuideSection } from "../../../src/components/help/ClientStatusGuideSection";
 import { HelpTopicsSection } from "../../../src/components/help/HelpTopicsSection";
 import { SupportChannelSection } from "../../../src/components/help/SupportChannelSection";
@@ -104,6 +105,49 @@ test("suporte: env invalida NAO vira link — degrada para desabilitado", () => 
 test("suporte: sempre avisa que nunca pedimos credencial do Gov.br", () => {
   const html = renderWithEnv(SupportChannelSection, undefined);
   assert.ok(html.includes("nunca pede senha, código ou token do Gov.br"));
+});
+
+// ------------------------------------------------- pagina /ajuda montada
+//
+// As secoes acima sao testadas ISOLADAS, e foi por isso que um `id` duplicado
+// entre duas delas passou despercebido. Estes testes montam a pagina inteira.
+
+/** Todos os `id="..."` do HTML, na ordem em que aparecem. */
+function idsOf(html: string): string[] {
+  return [...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
+}
+
+/** Todas as ancoras `href="#..."` do HTML. */
+function anchorsOf(html: string): string[] {
+  return [...html.matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
+}
+
+test("/ajuda nao tem id duplicado", () => {
+  const ids = idsOf(renderWithEnv(AjudaPage, undefined));
+  const duplicados = ids.filter((id, index) => ids.indexOf(id) !== index);
+  assert.deepEqual(duplicados, [], `ids duplicados na pagina: ${duplicados.join(", ")}`);
+});
+
+test("/ajuda: toda ancora do indice aponta para um id existente", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  const ids = new Set(idsOf(html));
+  for (const anchor of anchorsOf(html)) {
+    assert.ok(ids.has(anchor), `ancora sem destino: #${anchor}`);
+  }
+});
+
+test("/ajuda: o atalho #suporte leva ao BLOCO de suporte, nao ao card de FAQ", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  const posSuporte = html.indexOf('id="suporte"');
+  const posFaq = html.indexOf('id="suporte-faq"');
+
+  assert.ok(posSuporte >= 0, "bloco de suporte deve manter id=suporte");
+  assert.ok(posFaq >= 0, "card de FAQ deve usar id=suporte-faq");
+  assert.ok(posFaq < posSuporte, "o card de FAQ vem antes; ids nao podem colidir");
+  assert.ok(
+    html.slice(posSuporte).includes("Falar com suporte"),
+    "o destino de #suporte deve conter o botao de suporte",
+  );
 });
 
 /** Trava estatica: as secoes sao so leitura — sem banco, sem automacao, sem Fase 9. */

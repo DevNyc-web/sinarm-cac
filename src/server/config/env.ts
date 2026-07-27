@@ -28,10 +28,14 @@ const envSchema = z.object({
   AUTH_SESSION_SECRET: z.string().min(32, "AUTH_SESSION_SECRET precisa de 32+ caracteres").optional(),
   // Canal de suporte da central de ajuda. OPCIONAL: sem ela o botao "Falar com
   // suporte" fica desabilitado, com aviso — nenhum numero real vive no codigo.
-  // A validacao efetiva (https + host de WhatsApp) fica em
-  // `src/server/support/supportChannel.ts`, que le `process.env` direto porque
-  // e consumida no caminho de render (mesmo motivo de `isMockAuthForDisplay`).
-  SUPPORT_WHATSAPP_URL: z.string().url().optional(),
+  //
+  // `string()` SEM `.url()` de proposito. `getEnv()` roda no caminho de render de
+  // toda pagina (Header -> getCurrentUser -> isMockAuth -> getAuthMode), entao
+  // validar formato aqui faria um TYPO numa variavel cosmetica e opcional
+  // derrubar a aplicacao inteira. A validacao efetiva (https + host de WhatsApp)
+  // fica em `src/server/support/supportChannel.ts`, que degrada para "canal
+  // indisponivel" em vez de lancar.
+  SUPPORT_WHATSAPP_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
