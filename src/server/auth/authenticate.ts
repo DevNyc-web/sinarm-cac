@@ -18,6 +18,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   hashPassword,
+  isBlankPassword,
   needsRehash,
   verifyPassword,
 } from "./password";
@@ -119,7 +120,11 @@ export const registerSchema = z.object({
   password: z
     .string()
     .min(PASSWORD_MIN_LENGTH, `A senha precisa de ao menos ${PASSWORD_MIN_LENGTH} caracteres.`)
-    .max(PASSWORD_MAX_LENGTH, "Senha muito longa."),
+    .max(PASSWORD_MAX_LENGTH, "Senha muito longa.")
+    // Comprimento sozinho aceitaria "          ". A senha NAO e aparada antes do
+    // hash (isso mudaria a senha escolhida por quem usa espaco de proposito); o
+    // que se recusa e a senha que nao tem nada alem de espaco.
+    .refine((value) => !isBlankPassword(value), "A senha não pode conter apenas espaços."),
 });
 
 export interface RegisterDeps {
@@ -133,6 +138,11 @@ export interface RegisterDeps {
   checkRateLimit?(key: string): { allowed: boolean };
   /** Chave do limite — IP, quando disponivel. Cai para um balde global sem ele. */
   rateLimitKey?: string;
+  /**
+   * Costura de teste. O padrao e o `hashPassword` real; injetar permite observar
+   * a ORDEM das operacoes, que aqui e propriedade de seguranca (ver `register`).
+   */
+  hashPassword?(plain: string): Promise<string>;
 }
 
 /**
@@ -141,8 +151,21 @@ export interface RegisterDeps {
  * `role` e literal `"USER"` e NAO vem do formulario — perfil interno so por
  * processo administrativo. Um campo `role` no corpo do request nao tem efeito.
  *
- * SEM verificacao de e-mail neste PR: qualquer endereco cria conta. Isso e
- * pendencia registrada e pre-condicao de producao ampla.
+ * ORDEM DAS OPERACOES E PROPRIEDADE DE SEGURANCA. O hash da senha e calculado
+ * ANTES de consultar se o e-mail existe, e o resultado e descartado quando ja
+ * existe. Parece desperdicio — e e, ~70ms no caminho duplicado — mas e o que
+ * iguala o tempo de resposta dos dois caminhos.
+ *
+ * Sem isso, o duplicado respondia em ~0,7ms contra ~76ms do novo: 115x de
+ * diferenca, cronometravel de fora, e a mensagem generica virava enfeite. Num
+ * servico CAC, descobrir que um e-mail tem conta sugere que a pessoa possui arma
+ * (docs/32 §9 registra risco a seguranca fisica dos titulares).
+ *
+ * Se alguem mover o `findUserByEmail` para antes do hash, o oraculo volta — ha
+ * teste travando a ordem.
+ *
+ * SEM verificacao de e-mail neste PR: qualquer endereco cria conta. Pendencia
+ * registrada e pre-condicao de producao ampla.
  */
 export async function register(
   input: { name: string; email: string; password: string },
@@ -163,16 +186,22 @@ export async function register(
   }
 
   const email = normalizeEmail(parsed.data.email);
+
+  // PRIMEIRO o custo, DEPOIS a consulta — ver a nota de ordem acima.
+  const hash = deps.hashPassword ?? hashPassword;
+  const passwordHash = await hash(parsed.data.password);
+
   if (await deps.findUserByEmail(email)) {
-    // O chamador deve exibir mensagem GENERICA — dizer "ja cadastrado" confirma
-    // a existencia da conta para quem so chutou o e-mail.
+    // Hash descartado de proposito: o trabalho existiu para igualar o tempo.
+    // O chamador exibe mensagem GENERICA — dizer "ja cadastrado" confirmaria a
+    // existencia da conta para quem so chutou o e-mail.
     return { ok: false, reason: "EMAIL_TAKEN" };
   }
 
   const user = await deps.createUser({
     name: parsed.data.name,
     email,
-    passwordHash: await hashPassword(parsed.data.password),
+    passwordHash,
     role: "USER",
   });
 

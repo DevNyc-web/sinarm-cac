@@ -20,7 +20,7 @@ import {
   revokeSession,
   toAuthUser,
 } from "../../../src/server/auth/authenticate";
-import { hashPassword } from "../../../src/server/auth/password";
+import { hashPassword, verifyPassword } from "../../../src/server/auth/password";
 
 const SENHA = "SenhaFicticia123";
 
@@ -215,6 +215,93 @@ test("cadastro grava hash, nunca a senha", async () => {
   assert.match(criado.passwordHash, /^scrypt\$/);
   assert.equal(criado.passwordHash.includes(SENHA), false);
   assert.equal(JSON.stringify(criado).includes(SENHA), false);
+});
+
+test("cadastro faz o HASH antes de consultar o e-mail — nos dois caminhos", async () => {
+  // Este teste existe por causa de um oraculo de TEMPO encontrado em revisao
+  // adversarial: o caminho duplicado retornava em ~0,7ms e o novo em ~76ms,
+  // porque so o novo pagava o scrypt. A mensagem generica virava enfeite — bastava
+  // cronometrar para enumerar contas.
+  //
+  // Ele FALHA se alguem mover `findUserByEmail` para antes do hash.
+  for (const [cenario, existente] of [
+    ["e-mail novo", null],
+    ["e-mail duplicado", await usuarioFicticio({ email: "ocupado@example.com" })],
+  ] as const) {
+    const ordem: string[] = [];
+    await register(
+      { name: "Fulano Ficticio", email: "ocupado@example.com", password: SENHA },
+      {
+        findUserByEmail: async () => {
+          ordem.push("lookup");
+          return existente;
+        },
+        createUser: async (d) => {
+          ordem.push("create");
+          return { id: "x", name: d.name, email: d.email, role: d.role };
+        },
+        hashPassword: async () => {
+          ordem.push("hash");
+          return "scrypt$fake";
+        },
+      },
+    );
+
+    assert.equal(ordem[0], "hash", `${cenario}: o hash tem de vir primeiro (ordem: ${ordem})`);
+    assert.ok(ordem.includes("lookup"), `${cenario}: a consulta precisa acontecer`);
+  }
+});
+
+test("o custo do cadastro nao denuncia e-mail existente", async () => {
+  // Contraparte medida do teste acima. Limiar folgado de proposito: o objetivo e
+  // pegar diferenca de ORDEM DE GRANDEZA (era 115x), nao medir microssegundos.
+  const existente = await usuarioFicticio({ email: "ocupado@example.com" });
+  const medir = async (email: string, achado: StoredUser | null) => {
+    const inicio = process.hrtime.bigint();
+    await register(
+      { name: "Fulano Ficticio", email, password: SENHA },
+      {
+        findUserByEmail: async () => achado,
+        createUser: async (d) => ({ id: "x", name: d.name, email: d.email, role: d.role }),
+      },
+    );
+    return Number(process.hrtime.bigint() - inicio) / 1e6;
+  };
+
+  const duplicado = await medir("ocupado@example.com", existente);
+  const novo = await medir("livre@example.com", null);
+  const razao = Math.max(duplicado, novo) / Math.max(Math.min(duplicado, novo), 0.01);
+
+  assert.ok(
+    razao < 5,
+    `tempos devem ser da mesma ordem: duplicado=${duplicado.toFixed(1)}ms novo=${novo.toFixed(1)}ms (${razao.toFixed(1)}x)`,
+  );
+});
+
+test("cadastro recusa senha composta so de espacos", async () => {
+  const so_espacos = await register(
+    { name: "Fulano Ficticio", email: "novo@example.com", password: "          " },
+    registerDeps(),
+  );
+  assert.equal(so_espacos.ok, false);
+  assert.equal(so_espacos.ok === false && so_espacos.reason, "INVALID_INPUT");
+
+  // Espaco INTERNO continua valido — e a senha nao pode ser aparada, porque isso
+  // mudaria silenciosamente a senha escolhida.
+  const deps = registerDeps();
+  const comEspaco = await register(
+    { name: "Fulano Ficticio", email: "novo@example.com", password: "senha com espaco" },
+    deps,
+  );
+  assert.equal(comEspaco.ok, true, "espaco interno e legitimo");
+
+  const gravado = (deps.criados[0] as { passwordHash: string }).passwordHash;
+  assert.equal(
+    await verifyPassword("senha com espaco", gravado),
+    true,
+    "a senha gravada e exatamente a digitada, sem trim",
+  );
+  assert.equal(await verifyPassword("senhacomespaco", gravado), false);
 });
 
 test("cadastro valida entrada", async () => {

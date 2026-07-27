@@ -41,6 +41,28 @@ export const PASSWORD_MAX_LENGTH = 128;
 /** Minimo por COMPRIMENTO, sem regra de composicao (NIST 800-63B). */
 export const PASSWORD_MIN_LENGTH = 10;
 
+/**
+ * Tamanhos MINIMOS aceitos ao interpretar um hash armazenado.
+ *
+ * Sem este piso, um hash de 1 byte era aceito pelo parser — e `verifyPassword`
+ * derivava 1 byte e comparava, casando com senha arbitraria em ~1/256. Explorar
+ * exigia escrita no banco, mas restauracao truncada ou gravacao parcial chegariam
+ * ao mesmo estado. Achado da revisao adversarial do PR de auth real.
+ */
+const MIN_STORED_HASH_BYTES = 32;
+const MIN_STORED_SALT_BYTES = 8;
+
+/**
+ * `true` quando a senha e so espaco em branco.
+ *
+ * Nao aplicamos `trim` na senha antes do hash — isso alteraria silenciosamente a
+ * senha escolhida por quem usa espaco de proposito. O que se recusa e a senha que
+ * NAO TEM nada alem de espaco.
+ */
+export function isBlankPassword(plain: string): boolean {
+  return typeof plain !== "string" || plain.trim().length === 0;
+}
+
 function toB64Url(buffer: Buffer): string {
   return buffer.toString("base64url");
 }
@@ -87,7 +109,10 @@ export function parsePasswordHash(stored: string): ParsedHash | null {
   try {
     const salt = Buffer.from(rawSalt ?? "", "base64url");
     const hash = Buffer.from(rawHash ?? "", "base64url");
-    if (salt.length === 0 || hash.length === 0) return null;
+    // Piso de tamanho: hash curto reduz o espaco de busca a ponto de qualquer
+    // senha casar por sorte (ver MIN_STORED_HASH_BYTES).
+    if (salt.length < MIN_STORED_SALT_BYTES) return null;
+    if (hash.length < MIN_STORED_HASH_BYTES) return null;
     return { N, r, p, salt, hash };
   } catch {
     return null;
@@ -96,7 +121,8 @@ export function parsePasswordHash(stored: string): ParsedHash | null {
 
 /** Gera o hash versionado de uma senha em claro. */
 export async function hashPassword(plain: string): Promise<string> {
-  if (typeof plain !== "string" || plain.length === 0) {
+  if (isBlankPassword(plain)) {
+    // Cobre "" e tambem "     ": senha que so tem espaco nao e senha.
     throw new Error("Senha vazia nao pode ser transformada em hash.");
   }
   if (plain.length > PASSWORD_MAX_LENGTH) {
