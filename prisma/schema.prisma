@@ -1,6 +1,6 @@
-// Schema Prisma inicial MINIMO — Fase 1 (docs/16 §11).
-// Sem PII, sem pagamento, sem documentos. Apenas o necessario para provar a stack.
-// NAO ha migrations nesta fase (schema ainda nao congelado — docs/12 §20 / docs/15 §7).
+// Schema Prisma — evoluido desde a Fase 1 (docs/16 §11).
+// A partir da fundacao de auth, o schema passou a ser versionado por MIGRATIONS
+// (prisma/migrations/). `db push` deixa de ser o caminho: producao exige historico.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,6 +9,44 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// Perfis de acesso. Espelha `src/server/auth/roles.ts` — a paridade entre os dois
+/// e travada por teste (`tests/unit/auth/authFoundation.test.ts`). O banco recusar
+/// papel invalido e a razao de ser um enum, e nao `String`.
+enum Role {
+  USER
+  ADMIN
+  OPERADOR
+  FINANCEIRO
+  SUPORTE
+
+  @@map("role")
+}
+
+/// Usuario do produto — cliente final e equipe interna na MESMA tabela, separados
+/// por `role` (docs/11 §2).
+///
+/// FUNDACAO de auth, nao auth real: NAO ha campo de senha, sessao nem MFA neste
+/// modelo. Login real, `passwordHash` e sessao assinada entram no PR seguinte —
+/// campo de credencial sem fluxo de login seria superficie de risco sem uso.
+///
+/// NADA aqui guarda credencial de Gov.br/SINARM. A senha que existira no futuro e
+/// do PRODUTO; credencial de orgao oficial continua proibida (docs/00 §8).
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(USER)
+  /// Desativa o acesso sem apagar o historico (processos sao trilha operacional).
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  processes Process[]
+
+  @@index([role])
+  @@map("users")
 }
 
 /// Catalogo de tipos de processo. MVP: apenas Guia de Trafego. Ver docs/12 §3.4.
@@ -33,6 +71,10 @@ model Process {
   id               String           @id @default(uuid())
   code             String           @unique
   userId           String           @map("user_id")
+  /// `onDelete: Restrict` de proposito: apagar usuario NAO pode arrastar processo.
+  /// Processo e registro operacional (e potencialmente fiscal) — desativa-se o
+  /// usuario via `User.active`, nao se apaga a trilha.
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   processTypeId    String           @map("process_type_id")
   processType      ProcessType      @relation(fields: [processTypeId], references: [id])
   internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
