@@ -162,6 +162,22 @@ test("Authorization Basic no meta da Fase 9 nao vaza o par usuario:senha", () =>
   assert.equal(typeof clean.durationMs, "number");
 });
 
+test("nome COMPOSTO de credencial dentro de string do meta nao vaza", () => {
+  // A camada por chave ja protegia `accessToken` como CAMPO. Este teste cobre o
+  // mesmo nome escrito DENTRO de uma string, sob chave nao sensivel.
+  const SEGREDO = "SEGREDOFICTICIO";
+  const clean = sanitizeMeta({
+    detalhe: `resposta continha accessToken=${SEGREDO}`,
+    nota: `govbrPassword=${SEGREDO} e clientSecret=${SEGREDO}`,
+    passo: `authorization=Bearer%20${SEGREDO}`,
+    durationMs: 55,
+  });
+
+  assert.equal(JSON.stringify(clean).includes(SEGREDO), false, "credencial composta vazou");
+  assert.equal(clean.durationMs, 55);
+  assert.equal(typeof clean.durationMs, "number");
+});
+
 test("metrica numerica sobrevive ao lado de credencial redigida", () => {
   // O hardening nao pode custar a evidencia de auditoria: numero continua numero.
   const clean = sanitizeMeta({

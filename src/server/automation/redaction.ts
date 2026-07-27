@@ -160,19 +160,35 @@ interface RedactionRule {
 }
 
 /**
- * Termos que, num par `chave=valor` escrito em TEXTO LIVRE, marcam o VALOR como
- * segredo. Espelham `SECRET_KEY_*`, mas se aplicam a conteudo de string — nao a
- * nome de campo. Fonte regex: usada com `\b` na frente, entao `pin` nao casa
- * dentro de `espingarda`.
- */
-/**
  * Esquemas de autenticacao HTTP cujo valor E a credencial (RFC 7235 e uso comum).
  * `Bearer` sozinho nao basta: `Basic` carrega `base64(usuario:senha)` e foi o
- * furo encontrado na revisao do PR de hardening.
+ * furo encontrado na 1a revisao do PR de hardening.
  */
 const HTTP_AUTH_SCHEME_ALTERNATION = ["Bearer", "Basic", "Digest", "Negotiate", "Token"].join("|");
 
-const FREE_TEXT_SECRET_TERMS = [
+/**
+ * Separador entre esquema e credencial. Alem de espaco, aceita as formas
+ * CODIFICADAS (`%20` de URL, `+` de formulario) e separadores degenerados
+ * (`,`/`;`) — sem isso, `authorization=Bearer%20<token>` escapava das DUAS
+ * regras: o esquema exigia espaco literal e o lookahead abaixo bloqueava o par
+ * `chave=valor`. O esquema virava escudo do atacante (2a revisao adversarial).
+ */
+const AUTH_SCHEME_SEPARATOR = String.raw`(?:\s+|%20|\+|,|;)`;
+
+/**
+ * Termos que, num par `chave=valor` escrito em TEXTO LIVRE, marcam o VALOR como
+ * segredo. Espelham `SECRET_KEY_*`, mas se aplicam a conteudo de string — nao a
+ * nome de campo.
+ *
+ * DUAS familias, pelo mesmo motivo que a camada por chave tem duas listas.
+ *
+ * FAMILIA A — termos INEQUIVOCOS: aceitam PREFIXO e SUFIXO, porque nome composto
+ * e a forma mais comum de credencial em log (`accessToken=`, `govbrPassword=`,
+ * `clientSecret=`, `setCookie=`). Sem prefixo livre, o `\b` inicial impedia o
+ * casamento — em `accessToken` nao ha fronteira antes de `Token` — e a
+ * credencial vazava, ainda que a camada por CHAVE protegesse o mesmo nome.
+ */
+const FREE_TEXT_SECRET_TERMS_A = [
   "senhas?",
   "password",
   "passwd",
@@ -181,25 +197,46 @@ const FREE_TEXT_SECRET_TERMS = [
   "secret",
   "segredo",
   "api[_-]?key",
+  "access[_-]?key",
+  "private[_-]?key",
+  "session[_-]?id",
   "credential",
   "credencial",
+  "authorization",
+  "cookie",
+  "assinatura",
+  "signature",
+  "hmac",
+  "certificado",
+  "chave[_-]?privada",
+  "c[oó]digo[_-]?(?:verifica[cç][aã]o|acesso)",
+  "recovery[_-]?code",
+].join("|");
+
+/**
+ * FAMILIA B — termos CURTOS/AMBIGUOS: exigem fronteira dos DOIS lados, sem
+ * prefixo nem sufixo. Prefixo livre destruiria evidencia de dominio (`pin`
+ * casaria em `espingarda`, `shipping`, `processTypeMapping`); sufixo livre faria
+ * `auth` casar em `author` e `pass` em `passo` — ambos campos legitimos do lab.
+ */
+const FREE_TEXT_SECRET_TERMS_B = [
   "otp",
   "c[oó]digo",
   "pin",
   "jwt",
   "bearer",
-  "authorization",
-  "cookie",
-  "sess(?:ion|ao|ão)",
-  "assinatura",
-  "signature",
-  "hmac",
+  "auth",
+  "pass",
   "chave",
-  "certificado",
   "mfa",
   "totp",
-  "recovery[_-]?code",
+  "sess(?:ion|ao|ão)",
 ].join("|");
+
+/** Nome de chave sensivel em texto livre: familia A com afixos, B ancorada. */
+const FREE_TEXT_SECRET_KEY =
+  `(?:[a-z0-9_-]*(?:${FREE_TEXT_SECRET_TERMS_A})[a-z0-9_-]*` +
+  `|(?:${FREE_TEXT_SECRET_TERMS_B})\\b)`;
 
 /**
  * CREDENCIAL EM TEXTO LIVRE — o que faltava antes do hardening (docs/41 §5).
@@ -239,7 +276,7 @@ const CREDENTIAL_PATTERNS: readonly RedactionRule[] = [
    */
   {
     pattern: new RegExp(
-      String.raw`\b(${HTTP_AUTH_SCHEME_ALTERNATION})\s+[A-Za-z0-9\-._~+/]+=*`,
+      String.raw`\b(${HTTP_AUTH_SCHEME_ALTERNATION})${AUTH_SCHEME_SEPARATOR}[A-Za-z0-9\-._~+/%]+=*`,
       "gi",
     ),
     replace: (_match, scheme) => `${scheme ?? ""} ${LAB_REDACTED}`.trim(),
@@ -257,10 +294,14 @@ const CREDENTIAL_PATTERNS: readonly RedactionRule[] = [
    * dela — o valor aqui para no espaco, entao `authorization=Basic dXNl` viraria
    * `authorization=[REDACTED] dXNl`. Com o esquema no lookahead, o caso fica para
    * a regra de esquema acima, que consome a credencial inteira.
+   *
+   * O lookahead exige o SEPARADOR depois do esquema (`Bearer ` / `Bearer%20`),
+   * nao so a fronteira de palavra: senao `authorization=Bearer%20<token>` era
+   * bloqueado aqui e ignorado la, e ninguem redigia nada.
    */
   {
     pattern: new RegExp(
-      String.raw`\b((?:${FREE_TEXT_SECRET_TERMS})[a-z0-9_-]*)(\s*[:=]\s*)(?!\[REDACTED\]|(?:${HTTP_AUTH_SCHEME_ALTERNATION})\b)("[^"]*"|'[^']*'|[^\s,;&)\]}]+)`,
+      String.raw`\b(${FREE_TEXT_SECRET_KEY})(\s*[:=]\s*)(?!\[REDACTED\]|(?:${HTTP_AUTH_SCHEME_ALTERNATION})${AUTH_SCHEME_SEPARATOR})("[^"]*"|'[^']*'|[^\s,;&)\]}]+)`,
       "gi",
     ),
     replace: (_match, key, separator) => `${key ?? ""}${separator ?? ""}${LAB_REDACTED}`,

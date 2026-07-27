@@ -347,6 +347,142 @@ test("senha=/password=/token=/chave= em texto livre sao mascarados", () => {
   }
 });
 
+test("nome COMPOSTO de credencial em texto livre nao vaza", () => {
+  // Furo da 2a revisao adversarial: a regra exigia fronteira antes do termo, e em
+  // `accessToken` nao ha fronteira antes de `Token`. A camada por CHAVE ja
+  // protegia esses nomes — a camada por CONTEUDO nao. Valores FICTICIOS.
+  const SEGREDO = "SEGREDOFICTICIO";
+  for (const chave of [
+    "accessToken",
+    "refreshToken",
+    "idToken",
+    "sessionToken",
+    "userPassword",
+    "govbrPassword",
+    "xAuthToken",
+    "setCookie",
+    "mySecret",
+    "clientSecret",
+    "privateKey",
+    "secretKey",
+  ]) {
+    const { text } = redactLabText(`${chave}=${SEGREDO}`);
+    assert.equal(text.includes(SEGREDO), false, `"${chave}=" deixou o segredo passar`);
+    assert.equal(text, `${chave}=${LAB_REDACTED}`, `chave deveria ficar como evidencia`);
+  }
+});
+
+test("as duas camadas concordam: o que e segredo por chave tambem e por conteudo", () => {
+  // A inconsistencia era o pior sintoma: a MESMA credencial vazava ou nao
+  // dependendo de aparecer como campo ou como texto.
+  const SEGREDO = "SEGREDOFICTICIO";
+  for (const nome of [
+    "accessToken",
+    "refreshToken",
+    "idToken",
+    "userPassword",
+    "govbrPassword",
+    "xAuthToken",
+    "setCookie",
+    "mySecret",
+    "clientSecret",
+    "apiKey",
+  ]) {
+    const protegidoPorChave = isSecretKey(nome);
+    const protegidoPorConteudo = !redactLabText(`${nome}=${SEGREDO}`).text.includes(SEGREDO);
+    assert.equal(
+      protegidoPorChave,
+      protegidoPorConteudo,
+      `${nome}: chave=${protegidoPorChave} conteudo=${protegidoPorConteudo}`,
+    );
+  }
+});
+
+test("esquema CODIFICADO nao vira escudo do atacante", () => {
+  // `%20`/`+` no lugar do espaco escapavam das duas regras: a de esquema exigia
+  // espaco literal e o lookahead da regra `chave=valor` bloqueava o casamento.
+  const SEGREDO = "SEGREDOFICTICIO";
+  for (const entrada of [
+    `authorization=Bearer%20${SEGREDO}`,
+    `authorization=Bearer+${SEGREDO}`,
+    `token=Basic%20${SEGREDO}`,
+    `authorization=Bearer,${SEGREDO}`,
+    `authorization=Bearer;${SEGREDO}`,
+  ]) {
+    const { text } = redactLabText(entrada);
+    assert.equal(text.includes(SEGREDO), false, `segredo sobreviveu em "${entrada}"`);
+  }
+});
+
+test("espacamento do header nao muda o resultado", () => {
+  const b64 = "dXNlcjpwYXNz";
+  for (const entrada of [
+    `Authorization:Basic ${b64}`,
+    `Authorization: Basic ${b64}`,
+    `Authorization:    Basic    ${b64}`,
+    `Authorization:\tBasic\t${b64}`,
+    `AUTHORIZATION: BASIC ${b64}`,
+  ]) {
+    assert.equal(redactLabText(entrada).text.includes(b64), false, `vazou em "${entrada}"`);
+  }
+});
+
+test("combinatorio: prefixo x termo x sufixo x separador x valor", () => {
+  // Property-style simples, sem biblioteca nova: gera a FAMILIA de nomes em vez
+  // de enumerar casos a mao — foi a enumeracao manual que deixou passar
+  // `accessToken` na primeira versao.
+  const prefixos = ["", "access", "refresh", "client", "govbr", "user", "x"];
+  const termos = ["Token", "Password", "Secret", "Cookie", "ApiKey"];
+  const sufixos = ["", "Value", "Atual"];
+  const separadores = ["=", ":", " = ", ": "];
+  const valores = ["SEGREDOFICTICIO", "abc123secreto", "eyJhbGciOi.fake.sig"];
+
+  let combinacoes = 0;
+  for (const prefixo of prefixos) {
+    for (const termo of termos) {
+      for (const sufixo of sufixos) {
+        for (const separador of separadores) {
+          for (const valor of valores) {
+            const entrada = `${prefixo}${termo}${sufixo}${separador}${valor}`;
+            const { text } = redactLabText(entrada);
+            assert.equal(text.includes(valor), false, `valor sobreviveu em "${entrada}"`);
+            assert.equal(text.includes(LAB_REDACTED), true, `sem marcador em "${entrada}"`);
+            combinacoes += 1;
+          }
+        }
+      }
+    }
+  }
+  assert.equal(combinacoes, 1260, "a matriz deveria cobrir 1260 combinacoes");
+});
+
+test("combinatorio: termo ambiguo com afixo NAO mascara dominio legitimo", () => {
+  // A contraparte do teste acima: familia B nao pode aceitar prefixo/sufixo.
+  const legitimos = [
+    "espingarda=12",
+    "espingardaCalibre: 12",
+    "labStepInput=HEALTH_CHECK",
+    "processTypeMapping: GUIA_TRAFEGO",
+    "shipping=expressa",
+    "pinned=true",
+    "author=operador-ficticio",
+    "passo=HEALTH_CHECK",
+    "passos=12",
+    "processTypeCode: GUIA_TRAFEGO",
+    "durationMs=42",
+    "bytes=2048",
+    "attempt=2",
+    "tentativas=3",
+    "certificado de registro conferido",
+    "assinatura de documento conferida",
+    "codigo de processo conferido",
+    "protocolo sintetico LAB-0001",
+  ];
+  for (const entrada of legitimos) {
+    assert.equal(redactLabText(entrada).text, entrada, `"${entrada}" nao deveria ser alterado`);
+  }
+});
+
 test("OTP curto e mascarado por CONTEXTO; numero solto nao", () => {
   // 4 digitos com termo sensivel perto -> mascara.
   const comContexto = redactLabText("codigo OTP enviado: 4839");
