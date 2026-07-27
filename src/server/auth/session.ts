@@ -1,75 +1,151 @@
 /**
- * Sessao MOCK/DEV — Fase 2 (docs/15 §3.8).
+ * Sessao do PRODUTO — dois modos, sem ponte entre eles.
  *
- * Guarda apenas o id de um usuario ficticio num cookie. NAO e autenticacao:
- * nao ha senha, token assinado, MFA nem verificacao de identidade. Serve so
- * para destravar guards, layout autenticado e navegacao com dados ficticios.
+ * - **mock** (`AUTH_MODE=mock`): cookie com o id de um perfil ficticio. NAO e
+ *   autenticacao: sem senha, sem assinatura, sem MFA. So destrava a navegacao em
+ *   desenvolvimento.
+ * - **real** (`AUTH_MODE=real`): cookie `<token>.<hmac>`; o banco guarda apenas o
+ *   SHA-256 do token. Cookie adulterado morre na verificacao do HMAC, antes de
+ *   qualquer consulta.
  *
- * PONTO DE SUBSTITUICAO: quando o provedor real (Supabase Auth / Auth.js / outro)
- * for decidido, apenas `getCurrentUser` precisa passar a ler a sessao real —
- * `guards.ts` e `permissions.ts` seguem inalterados.
+ * REGRA DURA: **o modo real NUNCA cai no fallback estatico.** Os dois caminhos usam
+ * cookies de nomes diferentes e funcoes diferentes; nao ha ramo em que o modo real
+ * alcance `findMockUser`.
  *
- * MFA e provedor real sao OBRIGATORIOS antes de producao (docs/15 §8).
+ * A sessao aqui e do NOSSO app. Sessao/cookie de Gov.br/SINARM continua proibida
+ * de ser criada ou persistida (docs/00 §8).
  */
 import { cookies } from "next/headers";
-import { findUserById } from "@/server/repositories/userRepository";
-import { AUTH_MODE } from "./config";
-import { findMockUser, type AuthUser } from "./mockUsers";
+import {
+  createSession,
+  deleteSessionByTokenHash,
+  findSessionByTokenHash,
+  touchSession,
+} from "@/server/repositories/sessionRepository";
+import { findUserById, findUserByIdWithSecrets } from "@/server/repositories/userRepository";
+import { resolveSession, revokeSession } from "./authenticate";
+import { getAuthMode, getSessionSecret, isMockAuth } from "./config";
+import { findMockUser } from "./mockUsers";
+import {
+  assertSessionSecret,
+  issueSessionToken,
+  parseSessionCookie,
+  sessionExpiryFrom,
+} from "./sessionToken";
+import { type AuthUser } from "./types";
 
+/** Cookie do modo MOCK. Nome distinto de proposito: os modos nao se misturam. */
 export const SESSION_COOKIE = "cac_mock_session";
 
+/** Cookie do modo REAL. */
+export const REAL_SESSION_COOKIE = "cac_session";
+
+const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+
+function cookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    // Em dev o app roda em http://localhost; `secure` ali impediria o cookie.
+    secure: process.env.NODE_ENV === "production",
+    maxAge: COOKIE_MAX_AGE_SECONDS,
+  };
+}
+
+// ----------------------------------------------------------------- modo mock
+
 /**
- * Resolve o usuario da sessao.
+ * Resolve o usuario do cookie mock.
  *
- * Fonte de verdade: a tabela `users`. Distinguir DUAS situacoes e o ponto todo
- * desta funcao:
- *
- * - **O banco RESPONDEU `null`** — usuario inexistente ou com `active = false`.
- *   Isso e uma NEGACAO e precisa ser respeitada. Cair para a lista estatica aqui
- *   ressuscitaria um usuario desativado e tornaria `users.active` decorativo.
- * - **O banco NAO RESPONDEU** (exception) — indisponibilidade. Só nesse caso vale
- *   degradar para a lista estatica, e SOMENTE em modo mock, seguindo o padrao do
- *   resto do app ("degradar com aviso, sem quebrar").
- *
- * REMOVER O FALLBACK junto com o modo real: em auth real, cair para uma lista
- * estatica quando o banco falha seria bypass de autenticacao, nao resiliencia.
+ * O banco e a autoridade: `null` dele significa "nao existe ou esta inativo" e
+ * NEGA. O fallback estatico so cobre banco indisponivel — e so existe aqui.
  */
-async function resolveUser(userId: string): Promise<AuthUser | null> {
+async function resolveMockUser(userId: string): Promise<AuthUser | null> {
   try {
-    // `null` do banco e resposta valida: nega o acesso.
     return await findUserById(userId);
   } catch {
-    // So aqui o banco falhou de fato.
-    return AUTH_MODE === "mock" ? findMockUser(userId) : null;
+    return findMockUser(userId);
   }
 }
 
-/** Le a sessao atual. Retorna null quando nao ha usuario "logado". */
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  if (AUTH_MODE !== "mock") return null;
+// ----------------------------------------------------------------- modo real
 
-  const store = await cookies();
-  const userId = store.get(SESSION_COOKIE)?.value;
-  if (!userId) return null;
+/** Le a sessao real: valida o HMAC, consulta o banco, confere validade e usuario. */
+async function resolveRealUser(cookieValue: string | undefined): Promise<AuthUser | null> {
+  const parsed = parseSessionCookie(cookieValue, getSessionSecret());
+  if (!parsed) return null;
 
-  return resolveUser(userId);
+  const user = await resolveSession(parsed.tokenHash, {
+    findSessionByTokenHash,
+    findUserById: findUserByIdWithSecrets,
+    deleteSessionByTokenHash,
+  });
+
+  if (user) void touchSession(parsed.tokenHash);
+  return user;
 }
 
-/** Inicia sessao mock. So pode ser chamado de Server Action / Route Handler. */
-export async function signInAsMockUser(userId: string): Promise<boolean> {
-  if (!(await resolveUser(userId))) return false;
+/**
+ * Inicia a sessao real de um usuario JA autenticado por `login()`.
+ * Token novo a cada chamada — fecha fixacao de sessao.
+ */
+export async function startRealSession(userId: string): Promise<void> {
+  const secret = getSessionSecret();
+  assertSessionSecret(secret);
+
+  const { cookieValue, tokenHash } = issueSessionToken(secret);
+  await createSession({ userId, tokenHash, expiresAt: sessionExpiryFrom(new Date()) });
 
   const store = await cookies();
-  store.set(SESSION_COOKIE, userId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-  });
+  store.set(REAL_SESSION_COOKIE, cookieValue, cookieOptions());
+}
+
+// -------------------------------------------------------------------- comum
+
+/** Le a sessao atual. `null` quando nao ha usuario autenticado. */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const store = await cookies();
+
+  if (isMockAuth()) {
+    const userId = store.get(SESSION_COOKIE)?.value;
+    return userId ? resolveMockUser(userId) : null;
+  }
+
+  return resolveRealUser(store.get(REAL_SESSION_COOKIE)?.value);
+}
+
+/**
+ * Inicia sessao mock. Recusa em modo real — nao pode existir atalho que ignore
+ * senha quando o produto esta em producao.
+ */
+export async function signInAsMockUser(userId: string): Promise<boolean> {
+  if (!isMockAuth()) return false;
+  if (!(await resolveMockUser(userId))) return false;
+
+  const store = await cookies();
+  store.set(SESSION_COOKIE, userId, cookieOptions());
   return true;
 }
 
-/** Encerra a sessao mock. So pode ser chamado de Server Action / Route Handler. */
+/**
+ * Encerra a sessao. No modo real REVOGA a linha no banco antes de limpar o
+ * cookie — logout sem revogacao deixaria o token valido em quem o copiou.
+ *
+ * O cookie e apagado mesmo se a revogacao falhar.
+ */
 export async function signOut(): Promise<void> {
   const store = await cookies();
+
+  if (getAuthMode() === "real") {
+    const parsed = parseSessionCookie(store.get(REAL_SESSION_COOKIE)?.value, getSessionSecret());
+    try {
+      await revokeSession(parsed?.tokenHash ?? null, { deleteSessionByTokenHash });
+    } catch {
+      // Banco fora do ar nao pode impedir o usuario de sair da sessao local.
+    }
+  }
+
+  store.delete(REAL_SESSION_COOKIE);
   store.delete(SESSION_COOKIE);
 }

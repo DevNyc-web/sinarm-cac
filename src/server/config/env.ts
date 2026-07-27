@@ -18,6 +18,14 @@ const envSchema = z.object({
   PAYMENT_PROVIDER: z.enum(["fake", "mercadopago"]).default("fake"),
   MERCADO_PAGO_ACCESS_TOKEN: z.string().optional(),
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().optional(),
+  // Autenticacao do PRODUTO (nao Gov.br). "mock" = perfis ficticios de dev;
+  // "real" = e-mail/senha com sessao opaca. `enum` aqui e seguro porque NAO e
+  // segredo — a mensagem de erro do Zod cita o valor recebido (docs/41, A9).
+  AUTH_MODE: z.enum(["mock", "real"]).default("mock"),
+  // Segredo de assinatura da sessao. `string().min(32)`, NUNCA `enum`, justamente
+  // porque o erro do Zod ecoaria o valor. `optional()` para o modo mock rodar sem
+  // ele; o modo real falha FECHADO se faltar (ver `assertSessionSecret`).
+  AUTH_SESSION_SECRET: z.string().min(32, "AUTH_SESSION_SECRET precisa de 32+ caracteres").optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

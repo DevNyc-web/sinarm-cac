@@ -7,7 +7,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { AUTH_MODE } from "@/server/auth/config";
+import { isMockAuth } from "@/server/auth/config";
 import { requireUser } from "@/server/auth/guards";
 import { isDocumentKind } from "@/server/documents";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
@@ -91,7 +91,7 @@ export async function simulatePaymentApprovedAction(formData: FormData) {
   const paymentId = String(formData.get("paymentId") ?? "");
   const base = `/processos/${encodeURIComponent(processId)}`;
 
-  if ((AUTH_MODE as string) !== "mock") {
+  if (!isMockAuth()) {
     redirect(`${base}?erro=${encodeURIComponent("Simulacao disponivel apenas em modo dev/mock.")}`);
   }
 

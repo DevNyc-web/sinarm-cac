@@ -110,30 +110,30 @@ test("o seed usa os ids literais dos mocks, e nao ids gerados", () => {
 
 // ------------------------------------------- 4. fallback estatico da sessao
 
-/** Isola o corpo de `resolveUser` em `session.ts`. */
-function resolveUserSource(): { tryBlock: string; catchBlock: string } {
-  const source = readFileSync("src/server/auth/session.ts", "utf8");
-  const start = source.indexOf("async function resolveUser");
-  assert.ok(start >= 0, "resolveUser nao encontrada em session.ts");
+const SESSION_SOURCE = () => readFileSync("src/server/auth/session.ts", "utf8");
 
-  // Da assinatura ate a primeira chave de fechamento na coluna 0.
+/** Isola o corpo de uma funcao de `session.ts` pelo nome. */
+function corpoDaFuncao(nome: string): string {
+  const source = SESSION_SOURCE();
+  const start = source.indexOf(`async function ${nome}`);
+  assert.ok(start >= 0, `${nome} nao encontrada em session.ts`);
   const end = source.indexOf("\n}", start);
-  assert.ok(end > start, "nao consegui delimitar o corpo de resolveUser");
-  const body = source.slice(start, end);
-
-  const split = body.indexOf("} catch");
-  assert.ok(split > 0, "resolveUser precisa ter try/catch");
-  return { tryBlock: body.slice(0, split), catchBlock: body.slice(split) };
+  assert.ok(end > start, `nao consegui delimitar o corpo de ${nome}`);
+  return source.slice(start, end);
 }
 
 /**
- * Teste ESTRUTURAL, nao comportamental: `resolveUser` nao e exportada e depende
- * de banco + contexto de request, entao nao da para exercita-la sem Postgres.
- * O que se trava aqui e a FORMA do controle — suficiente para pegar a regressao
- * especifica que este teste existe para impedir.
+ * Testes ESTRUTURAIS, nao comportamentais: estas funcoes nao sao exportadas e
+ * dependem de banco + contexto de request, entao nao ha como exercita-las sem
+ * Postgres. O que se trava e a FORMA do controle — suficiente para pegar as
+ * regressoes especificas que estes testes existem para impedir.
  */
 test("o fallback estatico so vale quando o BANCO FALHA, nunca quando responde null", () => {
-  const { tryBlock, catchBlock } = resolveUserSource();
+  const corpo = corpoDaFuncao("resolveMockUser");
+  const split = corpo.indexOf("} catch");
+  assert.ok(split > 0, "resolveMockUser precisa ter try/catch");
+  const tryBlock = corpo.slice(0, split);
+  const catchBlock = corpo.slice(split);
 
   // O caminho feliz devolve o resultado do banco DIRETO. Um `if (user) return user`
   // seguido de fallback fora do catch faria `null` (usuario inexistente ou
@@ -144,21 +144,62 @@ test("o fallback estatico so vale quando o BANCO FALHA, nunca quando responde nu
     /findMockUser/,
     "findMockUser no try faria o banco responder null virar acesso concedido",
   );
-
-  // O fallback existe, mas so no catch e so em modo mock.
   assert.match(catchBlock, /findMockUser/, "o catch deve ter o fallback de indisponibilidade");
-  assert.match(catchBlock, /AUTH_MODE\s*===\s*"mock"/, "o fallback deve ser restrito ao modo mock");
 });
 
-test("session.ts nao tem fallback estatico fora do catch", () => {
-  // Rede mais ampla: qualquer uso de findMockUser fora do bloco catch reabre o
-  // mesmo buraco por outro caminho.
-  const source = readFileSync("src/server/auth/session.ts", "utf8");
-  const usos = source.split(/\r?\n/).filter((line) => /findMockUser\s*\(/.test(line));
+test("o caminho do modo REAL nao encosta no fallback mock", () => {
+  // A regressao mais grave possivel aqui: modo real caindo em usuario ficticio.
+  const real = corpoDaFuncao("resolveRealUser");
+  assert.doesNotMatch(real, /findMockUser|MOCK_USERS/, "modo real nao pode usar lista estatica");
+  assert.match(real, /parseSessionCookie/, "modo real valida o HMAC antes de tudo");
+
+  const inicio = corpoDaFuncao("startRealSession");
+  assert.doesNotMatch(inicio, /findMockUser|MOCK_USERS/);
+  assert.match(inicio, /assertSessionSecret/, "sem segredo, o modo real nao inicia sessao");
+});
+
+test("signInAsMockUser recusa em modo real", () => {
+  // O atalho sem senha nao pode existir quando o produto esta em modo real.
+  const corpo = corpoDaFuncao("signInAsMockUser");
+  assert.match(corpo, /isMockAuth\(\)/, "precisa checar o modo");
+  assert.match(corpo, /if\s*\(!isMockAuth\(\)\)\s*return false/, "e recusar cedo");
+});
+
+test("os dois modos usam cookies de nomes diferentes", () => {
+  // Nome compartilhado permitiria um cookie de um modo ser lido pelo outro.
+  const source = SESSION_SOURCE();
+  assert.match(source, /SESSION_COOKIE = "cac_mock_session"/);
+  assert.match(source, /REAL_SESSION_COOKIE = "cac_session"/);
+});
+
+test("o cookie de sessao e httpOnly, sameSite=lax e secure em producao", () => {
+  const source = SESSION_SOURCE();
+  assert.match(source, /httpOnly:\s*true/);
+  assert.match(source, /sameSite:\s*"lax"/);
+  assert.match(source, /secure:\s*process\.env\.NODE_ENV === "production"/);
+});
+
+test("logout revoga a sessao no banco antes de limpar o cookie", () => {
+  const corpo = corpoDaFuncao("signOut");
+  assert.match(corpo, /revokeSession/, "logout sem revogacao deixaria o token valido");
+  assert.match(corpo, /store\.delete\(REAL_SESSION_COOKIE\)/);
+  assert.match(corpo, /store\.delete\(SESSION_COOKIE\)/);
+});
+
+test("session.ts nao tem fallback estatico fora do catch do modo mock", () => {
+  // Rede mais ampla: qualquer uso de findMockUser fora daquele catch reabre o
+  // mesmo buraco por outro caminho — inclusive no modo real.
+  const usos = SESSION_SOURCE()
+    .split(/\r?\n/)
+    .filter((line) => /findMockUser\s*\(/.test(line));
   assert.equal(usos.length, 1, `findMockUser deveria ser chamada 1x, encontrei ${usos.length}`);
 
-  const { catchBlock } = resolveUserSource();
-  assert.ok(catchBlock.includes(usos[0]?.trim() ?? ""), "a unica chamada deve estar no catch");
+  const corpo = corpoDaFuncao("resolveMockUser");
+  const catchBlock = corpo.slice(corpo.indexOf("} catch"));
+  assert.ok(
+    catchBlock.includes(usos[0]?.trim() ?? ""),
+    "a unica chamada deve estar no catch de resolveMockUser",
+  );
 });
 
 test("nenhum usuario de seed carrega dado real ou campo de credencial", () => {
@@ -173,7 +214,30 @@ test("nenhum usuario de seed carrega dado real ou campo de credencial", () => {
     assert.equal(Object.prototype.hasOwnProperty.call(user, "passwordHash"), false);
   }
 
+});
+
+test("o hash mora no BANCO, nunca no tipo que o app enxerga", () => {
+  // O `User` do banco TEM `password_hash` (senha do produto). O que nao pode e
+  // esse campo atravessar a fronteira: `AuthUser` e o DTO de saida.
   const schema = readFileSync("prisma/schema.prisma", "utf8");
-  const userModel = schema.match(/model\s+User\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.doesNotMatch(userModel, /password|senha|token|secret/i, "User nao tem campo de credencial");
+  const userModel = schema.match(/model\s+User\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(userModel, /passwordHash\s+String\?/, "o hash e nullable no banco");
+
+  const types = readFileSync("src/server/auth/types.ts", "utf8");
+  const authUser = types.match(/export type AuthUser = \{([\s\S]*?)\}/)?.[1] ?? "";
+  assert.ok(authUser.length > 0, "AuthUser nao encontrado em types.ts");
+  assert.doesNotMatch(
+    authUser,
+    /password|senha|hash|token|secret/i,
+    "AuthUser nao pode carregar credencial",
+  );
+});
+
+test("nenhuma credencial de Gov.br/SINARM e modelada", () => {
+  // Regra permanente (docs/00 §8). A senha deste produto e nossa; a do orgao
+  // nao pode nem existir como campo.
+  const schema = readFileSync("prisma/schema.prisma", "utf8");
+  for (const proibido of [/govbr[a-z]*password/i, /govbr[a-z]*token/i, /otp/i, /sinarm[a-z]*senha/i]) {
+    assert.doesNotMatch(schema, proibido, `o schema nao pode ter ${proibido}`);
+  }
 });
