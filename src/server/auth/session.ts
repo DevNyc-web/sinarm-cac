@@ -21,21 +21,27 @@ export const SESSION_COOKIE = "cac_mock_session";
 /**
  * Resolve o usuario da sessao.
  *
- * Fonte de verdade: a tabela `users`. O fallback para a lista estatica cobre o
- * banco fora do ar em dev — mesmo padrao do resto do app ("degradar com aviso,
- * sem quebrar") — e vale SOMENTE em modo mock.
+ * Fonte de verdade: a tabela `users`. Distinguir DUAS situacoes e o ponto todo
+ * desta funcao:
+ *
+ * - **O banco RESPONDEU `null`** — usuario inexistente ou com `active = false`.
+ *   Isso e uma NEGACAO e precisa ser respeitada. Cair para a lista estatica aqui
+ *   ressuscitaria um usuario desativado e tornaria `users.active` decorativo.
+ * - **O banco NAO RESPONDEU** (exception) — indisponibilidade. Só nesse caso vale
+ *   degradar para a lista estatica, e SOMENTE em modo mock, seguindo o padrao do
+ *   resto do app ("degradar com aviso, sem quebrar").
  *
  * REMOVER O FALLBACK junto com o modo real: em auth real, cair para uma lista
  * estatica quando o banco falha seria bypass de autenticacao, nao resiliencia.
  */
 async function resolveUser(userId: string): Promise<AuthUser | null> {
   try {
-    const user = await findUserById(userId);
-    if (user) return user;
+    // `null` do banco e resposta valida: nega o acesso.
+    return await findUserById(userId);
   } catch {
-    // Banco indisponivel: em modo mock, segue para o fallback estatico.
+    // So aqui o banco falhou de fato.
+    return AUTH_MODE === "mock" ? findMockUser(userId) : null;
   }
-  return AUTH_MODE === "mock" ? findMockUser(userId) : null;
 }
 
 /** Le a sessao atual. Retorna null quando nao ha usuario "logado". */

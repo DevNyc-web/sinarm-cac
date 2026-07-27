@@ -108,6 +108,59 @@ test("o seed usa os ids literais dos mocks, e nao ids gerados", () => {
   assert.match(seed, /userId:\s*"mock-user"/, "o processo de demo aponta para o id literal");
 });
 
+// ------------------------------------------- 4. fallback estatico da sessao
+
+/** Isola o corpo de `resolveUser` em `session.ts`. */
+function resolveUserSource(): { tryBlock: string; catchBlock: string } {
+  const source = readFileSync("src/server/auth/session.ts", "utf8");
+  const start = source.indexOf("async function resolveUser");
+  assert.ok(start >= 0, "resolveUser nao encontrada em session.ts");
+
+  // Da assinatura ate a primeira chave de fechamento na coluna 0.
+  const end = source.indexOf("\n}", start);
+  assert.ok(end > start, "nao consegui delimitar o corpo de resolveUser");
+  const body = source.slice(start, end);
+
+  const split = body.indexOf("} catch");
+  assert.ok(split > 0, "resolveUser precisa ter try/catch");
+  return { tryBlock: body.slice(0, split), catchBlock: body.slice(split) };
+}
+
+/**
+ * Teste ESTRUTURAL, nao comportamental: `resolveUser` nao e exportada e depende
+ * de banco + contexto de request, entao nao da para exercita-la sem Postgres.
+ * O que se trava aqui e a FORMA do controle — suficiente para pegar a regressao
+ * especifica que este teste existe para impedir.
+ */
+test("o fallback estatico so vale quando o BANCO FALHA, nunca quando responde null", () => {
+  const { tryBlock, catchBlock } = resolveUserSource();
+
+  // O caminho feliz devolve o resultado do banco DIRETO. Um `if (user) return user`
+  // seguido de fallback fora do catch faria `null` (usuario inexistente ou
+  // active=false) cair na lista estatica — ressuscitando quem foi desativado.
+  assert.match(tryBlock, /return\s+await\s+findUserById/, "o try deve retornar o banco direto");
+  assert.doesNotMatch(
+    tryBlock,
+    /findMockUser/,
+    "findMockUser no try faria o banco responder null virar acesso concedido",
+  );
+
+  // O fallback existe, mas so no catch e so em modo mock.
+  assert.match(catchBlock, /findMockUser/, "o catch deve ter o fallback de indisponibilidade");
+  assert.match(catchBlock, /AUTH_MODE\s*===\s*"mock"/, "o fallback deve ser restrito ao modo mock");
+});
+
+test("session.ts nao tem fallback estatico fora do catch", () => {
+  // Rede mais ampla: qualquer uso de findMockUser fora do bloco catch reabre o
+  // mesmo buraco por outro caminho.
+  const source = readFileSync("src/server/auth/session.ts", "utf8");
+  const usos = source.split(/\r?\n/).filter((line) => /findMockUser\s*\(/.test(line));
+  assert.equal(usos.length, 1, `findMockUser deveria ser chamada 1x, encontrei ${usos.length}`);
+
+  const { catchBlock } = resolveUserSource();
+  assert.ok(catchBlock.includes(usos[0]?.trim() ?? ""), "a unica chamada deve estar no catch");
+});
+
 test("nenhum usuario de seed carrega dado real ou campo de credencial", () => {
   // Regra permanente (docs/00 §8): sem PII real. E esta fase nao tem senha.
   for (const user of MOCK_USERS) {
