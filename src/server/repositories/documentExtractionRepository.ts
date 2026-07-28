@@ -114,6 +114,39 @@ export function findLatestExtractionWithFieldsForDocument(
   });
 }
 
+/**
+ * Tentativa mais recente COM os campos extraidos (PII) para VARIOS documentos.
+ *
+ * UMA query para N documentos. A versao singular acima, chamada em laco, geraria
+ * N+1: a tela de um processo tem varios documentos, e a fila de automacao percorre
+ * varios processos. O `orderBy` desc + "primeiro visto vence" reproduz exatamente
+ * o criterio da singular — a mais recente por documento.
+ *
+ * Mesmo aviso de PII da singular, e pelo mesmo motivo: o nome diz "WithFields"
+ * para que ninguem a chame sem perceber que esta pedindo o conteudo do documento
+ * do cliente. Quem chama tem de ter direito de ver esses campos — por posse do
+ * processo (o dono) ou por `process.pii.viewFull` (a equipe).
+ *
+ * Lista vazia NAO consulta o banco: `in: []` seria uma ida inutil ao Postgres.
+ */
+export async function findLatestExtractionsWithFieldsForDocuments(
+  documentIds: readonly string[],
+): Promise<ExtractionRowWithFields[]> {
+  if (documentIds.length === 0) return [];
+
+  const rows: ExtractionRowWithFields[] = await getPrisma().documentExtraction.findMany({
+    where: { documentId: { in: [...documentIds] } },
+    orderBy: { createdAt: "desc" },
+    select: { ...EXTRACTION_BASE_SELECT, ...EXTRACTION_FIELDS_SELECT },
+  });
+
+  const latestByDocument = new Map<string, ExtractionRowWithFields>();
+  for (const row of rows) {
+    if (!latestByDocument.has(row.documentId)) latestByDocument.set(row.documentId, row);
+  }
+  return [...latestByDocument.values()];
+}
+
 /** Historico completo do documento, mais recentes primeiro, SEM PII. */
 export function listExtractionsForDocument(documentId: string): Promise<ExtractionRow[]> {
   return getPrisma().documentExtraction.findMany({

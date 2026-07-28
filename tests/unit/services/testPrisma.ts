@@ -21,14 +21,52 @@ import { randomUUID } from "node:crypto";
 
 export type Row = Record<string, unknown>;
 
-/** Valor de filtro aceito: escalar, `null` ou operador `{ gt }`. */
+/** Valor de filtro aceito: escalar, `Date`, `null` ou operador `{ gt }` / `{ in }`. */
 type Where = Record<string, unknown>;
 
+/**
+ * Operadores que o fake entende de verdade.
+ *
+ * Fechado de proposito: qualquer outro operador LANCA, em vez de cair no
+ * `===` e devolver "nenhuma linha". Um filtro nao suportado que retorna vazio e
+ * a pior falha possivel num fake — o teste fica verde afirmando que o
+ * repositorio nao achou nada, quando na verdade o fake e que nao sabe procurar.
+ */
+const SUPPORTED_OPERATORS = ["gt", "in"] as const;
+
+/** `true` quando o valor e um operador (`{ gt }`), nao um escalar comparavel. */
+function isOperator(expected: unknown): expected is Row {
+  return (
+    typeof expected === "object" &&
+    expected !== null &&
+    !(expected instanceof Date) &&
+    !Array.isArray(expected)
+  );
+}
+
 function matchesValue(rowValue: unknown, expected: unknown): boolean {
-  if (expected !== null && typeof expected === "object" && "gt" in (expected as Row)) {
-    const limit = (expected as { gt: unknown }).gt;
-    if (rowValue == null) return false;
-    return (rowValue as Date) > (limit as Date);
+  if (isOperator(expected)) {
+    for (const operator of Object.keys(expected)) {
+      if (!(SUPPORTED_OPERATORS as readonly string[]).includes(operator)) {
+        throw new Error(
+          `[fake-prisma] filtro nao suportado: { ${operator}: ... }. ` +
+            `Ensine o fake antes de usa-lo no repositorio.`,
+        );
+      }
+    }
+
+    if ("gt" in expected) {
+      const limit = (expected as { gt: unknown }).gt;
+      if (rowValue == null) return false;
+      return (rowValue as Date) > (limit as Date);
+    }
+
+    // `in`: pertinencia por igualdade, como o Prisma faz para escalares.
+    const list = (expected as { in: unknown }).in;
+    if (!Array.isArray(list)) {
+      throw new Error("[fake-prisma] filtro `in` exige um array.");
+    }
+    return list.includes(rowValue);
   }
   return rowValue === expected;
 }
