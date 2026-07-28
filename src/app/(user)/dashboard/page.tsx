@@ -30,6 +30,34 @@ export default async function DashboardPage() {
   // esta comecando esconderia que a lista falhou em carregar.
   const semPedidos = !dbUnavailable && processes.length === 0;
 
+  /*
+    Checklist fora do pedido: o painel de documentos do processo so aparece em
+    /processos/[id], entao quem ainda nao abriu pedido nao teria como saber o que
+    precisa reunir.
+
+    Declarado uma vez e posicionado nos dois ramos abaixo pelo mesmo criterio do
+    ClientStartPanel: orientacao ANTES da lista para quem esta comecando, DEPOIS
+    dela para quem ja tem pedidos — a lista e o conteudo principal de quem volta.
+  */
+  const documentosCard = (
+    <Card className="mt-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium">Documentos</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            Veja o checklist do que normalmente precisamos conferir para preparar sua Guia de
+            Tráfego.
+          </p>
+        </div>
+        <Link href="/dashboard/documentos" className="flex-none">
+          <Button variant="secondary" className="w-full sm:w-auto">
+            Ver checklist
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  );
+
   return (
     <Container>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -57,32 +85,13 @@ export default async function DashboardPage() {
       </Card>
 
       {/*
-        Checklist fora do pedido: o painel de documentos do processo so aparece
-        em /processos/[id], entao quem ainda nao abriu pedido nao teria como
-        saber o que precisa reunir.
-      */}
-      <Card className="mt-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="font-medium">Documentos</p>
-            <p className="mt-1 text-sm text-neutral-600">
-              Veja o checklist do que normalmente precisamos conferir para preparar sua Guia de
-              Tráfego.
-            </p>
-          </div>
-          <Link href="/dashboard/documentos" className="flex-none">
-            <Button variant="secondary" className="w-full sm:w-auto">
-              Ver checklist
-            </Button>
-          </Link>
-        </div>
-      </Card>
-
-      {/*
         Cliente sem pedido ve a jornada completa; quem ja tem pedido ve so o
         essencial DEPOIS da lista, para a lista nao ser empurrada para baixo.
       */}
       {semPedidos ? <ClientStartPanel name={user.name} /> : null}
+
+      {/* Antes da lista so para quem ainda nao tem pedido — ver `documentosCard`. */}
+      {semPedidos ? documentosCard : null}
 
       <div className="mt-6">
         {dbUnavailable ? (
@@ -129,6 +138,8 @@ export default async function DashboardPage() {
           </ul>
         )}
       </div>
+
+      {semPedidos ? null : documentosCard}
 
       {semPedidos ? null : <ClientStartPanel name={user.name} variant="compact" />}
     </Container>

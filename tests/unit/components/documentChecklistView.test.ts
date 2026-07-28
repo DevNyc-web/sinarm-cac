@@ -142,6 +142,25 @@ test("o dashboard aponta para /dashboard/documentos", () => {
   assert.ok(dashboard.includes("Ver checklist"), "falta a acao do card");
 });
 
+test("o card de documentos nao empurra a lista de quem ja tem pedidos", () => {
+  const dashboard = readFileSync("src/app/(user)/dashboard/page.tsx", "utf8");
+  // Mesmo criterio do ClientStartPanel: orientacao antes da lista so para quem
+  // esta comecando. Render incondicional acima da lista seria regressao.
+  assert.ok(
+    dashboard.includes("semPedidos ? documentosCard : null"),
+    "quem nao tem pedido deve ver o card antes da lista",
+  );
+  assert.ok(
+    dashboard.includes("semPedidos ? null : documentosCard"),
+    "quem ja tem pedido deve ver o card depois da lista",
+  );
+  const declaracao = dashboard.indexOf("const documentosCard");
+  const lista = dashboard.indexOf("processes.map(");
+  const depoisDaLista = dashboard.indexOf("semPedidos ? null : documentosCard");
+  assert.ok(declaracao !== -1, "o card deve ser declarado uma vez");
+  assert.ok(lista !== -1 && depoisDaLista > lista, "o segundo render fica abaixo da lista");
+});
+
 test("a rota /dashboard/documentos exige usuario logado e nao consulta o banco", () => {
   const page = codeOnly(readFileSync("src/app/(user)/dashboard/documentos/page.tsx", "utf8"));
   assert.match(page, /requireUser\(\)/, "a rota precisa exigir sessao");
