@@ -685,13 +685,17 @@ test("snapshotFromRow continua PURO — sem Prisma, sem loader, sem I/O", () => 
   assert.match(code, /extractionFields/, "recebe a fonte por parametro");
 });
 
-test("fila e gate passam mapa VAZIO — sem PII de terceiro no admin", () => {
+test("fila e gate leem persistido pelo loader de READINESS, nunca pelo do dono", () => {
+  // Invertido no #47C-2: a fila passou a ler persistido. O que continua proibido
+  // e usar o loader OWNER-SCOPED aqui — caminho de equipe nao tem posse a
+  // invocar; o que o autoriza e nao divulgar, nao ser dono.
   for (const arquivo of [
     "src/server/services/getAutomationQueue.ts",
     "src/server/services/submitToAutomationQueue.ts",
   ]) {
     const code = codeOnly(readFileSync(arquivo, "utf8"));
-    assert.match(code, /snapshotFromRow\([^)]*NO_EXTRACTION_FIELDS\)/, `${arquivo}: mapa vazio`);
+    assert.match(code, /loadReadinessExtractionFields\(/, `${arquivo}: le persistido`);
+    assert.match(code, /snapshotFromRow\([^)]*extractionFields\)/, `${arquivo}: passa o mapa real`);
     assert.doesNotMatch(
       code,
       /loadOwnerExtractionFields/,

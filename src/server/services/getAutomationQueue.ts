@@ -20,7 +20,7 @@ import {
   type AutomationQueueCategory,
 } from "@/server/automation/automationQueue";
 import { snapshotFromRow } from "@/server/automation/automationReadinessInput";
-import { NO_EXTRACTION_FIELDS } from "@/server/documents";
+import { loadReadinessExtractionFields } from "@/server/automation/readinessExtractionFields";
 import { wasSubmittedToAutomationQueue } from "@/server/automation/automationQueueSubmission";
 import { listAutomationQueue } from "@/server/repositories/processRepository";
 
@@ -41,13 +41,17 @@ export type AutomationQueueRow = {
 export async function getAutomationQueue(): Promise<AutomationQueueRow[]> {
   const rows = await listAutomationQueue();
 
+  // UMA leitura em lote para a fila inteira — buscar por processo seria N+1.
+  // Os campos sao INSUMO da decisao e morrem aqui dentro: o DTO abaixo nao tem
+  // onde guarda-los. Ver `readinessExtractionFields` para a regra de PII.
+  const extractionFields = await loadReadinessExtractionFields(
+    rows.flatMap((row) => row.documents.map((document) => document.id)),
+  );
+
   return rows.map((row) => {
     // Snapshot montado pelo mesmo adaptador do gate — regras so em
     // deriveAutomationReadiness (nada de checklist reimplementado aqui).
-    // Sem extracao persistida: por `fields` (PII) no select desta LISTA exigiria
-    // decidir a regra de `process.pii.viewFull` no admin — PR proprio. Ver
-    // `snapshotFromRow`.
-    const readiness = deriveAutomationReadiness(snapshotFromRow(row, NO_EXTRACTION_FIELDS));
+    const readiness = deriveAutomationReadiness(snapshotFromRow(row, extractionFields));
 
     const classification = classifyReadiness(readiness);
     const owner = findMockUser(row.userId);

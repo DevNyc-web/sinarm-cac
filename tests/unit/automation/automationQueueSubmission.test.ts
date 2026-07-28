@@ -71,8 +71,8 @@ test("wasSubmitted detecta o marcador por igualdade exata", () => {
   );
 });
 
-function doc(type: DocumentType, status: DocumentStatus) {
-  return { type, status, createdAt: new Date("2026-01-01T10:00:00Z") };
+function doc(type: DocumentType, status: DocumentStatus, id = `doc-${type}`) {
+  return { id, type, status, createdAt: new Date("2026-01-01T10:00:00Z") };
 }
 
 /** Linha "pronta" do banco; cada teste quebra so o que precisa. */
