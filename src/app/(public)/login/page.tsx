@@ -39,8 +39,11 @@ export default async function LoginPage({
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-semibold">Entrar na sua conta</h1>
         <p className="mt-2 text-sm text-neutral-600">
-          É aqui que você acompanha seus pedidos, envia documentos, confere pagamentos e vê o
-          status de cada etapa.
+          Sua conta permite acompanhar seus pedidos em um só lugar: documentos enviados,
+          pagamentos e o status de cada etapa.
+        </p>
+        <p className="mt-2 text-xs text-neutral-500">
+          A senha desta tela é <strong>do nosso sistema</strong>. Não somos órgão público.
         </p>
 
         <Notice tone="info" className="mt-4">
@@ -141,12 +144,27 @@ export default async function LoginPage({
           </Card>
         ) : null}
 
-        <p className="mt-6 text-center text-sm text-neutral-600">
-          Com dúvida em alguma etapa?{" "}
-          <Link href="/ajuda" className="font-medium text-neutral-900 underline underline-offset-2">
-            Ver a central de ajuda
-          </Link>
-        </p>
+        <Card className="mt-6">
+          <p className="text-sm font-medium text-neutral-900">Com dúvida em alguma etapa?</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            A central de ajuda explica como criar a conta, enviar documentos e acompanhar o
+            pedido — e como falar com uma pessoa da nossa equipe.
+          </p>
+          <p className="mt-3 flex flex-wrap gap-4 text-sm">
+            <Link
+              href="/ajuda"
+              className="font-medium text-neutral-900 underline underline-offset-2"
+            >
+              Central de ajuda
+            </Link>
+            <Link
+              href="/ajuda#suporte"
+              className="font-medium text-neutral-900 underline underline-offset-2"
+            >
+              Falar com suporte
+            </Link>
+          </p>
+        </Card>
       </div>
     </Container>
   );

@@ -30,6 +30,13 @@ export function Footer() {
             <Link href="/ajuda" className="underline-offset-2 hover:text-neutral-800 hover:underline">
               Central de ajuda
             </Link>
+            {/* Rede de seguranca: o Footer alcanca "Como funciona" em qualquer largura. */}
+            <Link
+              href="/como-funciona"
+              className="underline-offset-2 hover:text-neutral-800 hover:underline"
+            >
+              Como funciona
+            </Link>
             <Link href="/termos" className="underline-offset-2 hover:text-neutral-800 hover:underline">
               Termos de uso
             </Link>

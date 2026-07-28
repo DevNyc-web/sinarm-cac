@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ClientStartPanel } from "@/components/client/ClientStartPanel";
 import { requireUser } from "@/server/auth/guards";
 import {
   OPERATIONAL_STATUS_USER_LABELS,
@@ -24,6 +25,10 @@ export default async function DashboardPage() {
   } catch {
     dbUnavailable = true;
   }
+
+  // Banco fora do ar NAO conta como "sem pedidos": mostrar a jornada de quem
+  // esta comecando esconderia que a lista falhou em carregar.
+  const semPedidos = !dbUnavailable && processes.length === 0;
 
   return (
     <Container>
@@ -50,6 +55,12 @@ export default async function DashboardPage() {
           <strong>não garantimos aprovação</strong>. Você confere os dados antes de qualquer envio.
         </p>
       </Card>
+
+      {/*
+        Cliente sem pedido ve a jornada completa; quem ja tem pedido ve so o
+        essencial DEPOIS da lista, para a lista nao ser empurrada para baixo.
+      */}
+      {semPedidos ? <ClientStartPanel name={user.name} /> : null}
 
       <div className="mt-6">
         {dbUnavailable ? (
@@ -96,6 +107,8 @@ export default async function DashboardPage() {
           </ul>
         )}
       </div>
+
+      {semPedidos ? null : <ClientStartPanel name={user.name} variant="compact" />}
     </Container>
   );
 }

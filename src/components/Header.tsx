@@ -4,8 +4,11 @@ import { signOutAction } from "@/app/(public)/login/actions";
 import { getCurrentUser } from "@/server/auth/guards";
 import { isInternalRole, ROLE_LABELS } from "@/server/auth/roles";
 
+// `px-1.5` no mobile: com "Como funciona" + "Ajuda" na barra, o padding maior
+// estourava a largura em telas pequenas. Esconder um dos links (como se fez
+// antes) tirava navegacao essencial de quem esta no celular.
 const navLinkClass =
-  "rounded-md px-2 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900";
+  "rounded-md px-1.5 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 sm:px-2";
 
 export async function Header() {
   const user = await getCurrentUser();
@@ -19,7 +22,7 @@ export async function Header() {
           </Link>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <Link href="/como-funciona" className={`hidden sm:inline-block ${navLinkClass}`}>
+            <Link href="/como-funciona" className={navLinkClass}>
               Como funciona
             </Link>
             <Link href="/ajuda" className={navLinkClass}>
