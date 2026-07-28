@@ -45,6 +45,21 @@ export type RequestExtractionResult =
   | { ok: false; error: string };
 
 /**
+ * `true` para violacao de unique — inclusive a do indice parcial
+ * `document_extractions_one_active_per_document`.
+ *
+ * Checagem ESTRUTURAL, nao `instanceof PrismaClientKnownRequestError`, de
+ * proposito: `instanceof` falharia contra o fake dos testes, e ai o caminho de
+ * recuperacao de corrida — justamente o que precisa de cobertura — so existiria
+ * em producao, sem nunca ter sido exercitado.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002"
+  );
+}
+
+/**
  * Abre (ou reusa) a tentativa corrente do documento.
  *
  * SEM parametro `actor` de proposito: nao ha coluna `requestedBy` em
@@ -67,17 +82,40 @@ export async function requestDocumentExtraction(
       return { ok: true, extraction: latest, reused: true };
     }
 
-    const extraction = await createPendingExtractionForDocument({
-      documentId,
-      engine: MOCK_ENGINE_NAME,
-      engineVersion: MOCK_ENGINE_VERSION,
-    });
+    try {
+      const extraction = await createPendingExtractionForDocument({
+        documentId,
+        engine: MOCK_ENGINE_NAME,
+        engineVersion: MOCK_ENGINE_VERSION,
+      });
+      return { ok: true, extraction, reused: false };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
 
-    return { ok: true, extraction, reused: false };
+      // CORRIDA ESPERADA, nao falha: entre o `findLatest` acima e este INSERT,
+      // outro chamador abriu a tentativa e o indice parcial recusou a segunda.
+      // A constraint funcionando e o resultado desejado — devolver 500 aqui
+      // transformaria o mecanismo de protecao em erro para o usuario.
+      const concorrente = await findLatestExtractionForDocument(documentId);
+      if (concorrente && ACTIVE_EXTRACTION_STATES.includes(concorrente.state)) {
+        return { ok: true, extraction: concorrente, reused: true };
+      }
+
+      // Colidiu e nao ha ativa: a vencedora ja terminou entre o INSERT e esta
+      // releitura. Nao inventamos uma tentativa — quem chamou pede de novo.
+      return {
+        ok: false,
+        error: "Outra extracao para este documento acabou de ser concluida. Tente novamente.",
+      };
+    }
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel abrir a extracao. Verifique o Postgres local (npm run db:push).",
+      // `db:migrate`, NAO `db:push`: esta tabela tem um indice unico parcial em
+      // SQL cru (ver `20260729000000_extraction_single_active`), e `db push`
+      // sincroniza o banco com o schema — que nao o declara. Mandar rodar
+      // `db push` aqui seria instruir a apagar a protecao que este service usa.
+      error: "Nao foi possivel abrir a extracao. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }

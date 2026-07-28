@@ -124,7 +124,7 @@ function project(row: Row, select?: Row): Row {
       // RECENTE, e varios services leem `[0]` direto. Cortar antes de ordenar
       // devolveria o mais ANTIGO com cara de deliberado: o `take` teria sido
       // respeitado, e o teste afirmaria o oposto da producao sem quebrar.
-      const { orderBy, take } = wanted as { orderBy?: Row; take?: number };
+      const { orderBy, take } = wanted as { orderBy?: Row | readonly Row[]; take?: number };
       const ordenados = sortRows(value as Row[], orderBy);
       const cortados = typeof take === "number" ? ordenados.slice(0, take) : ordenados;
       out[key] = cortados.map((item) => project(item, nested));
@@ -137,17 +137,33 @@ function project(row: Row, select?: Row): Row {
   return out;
 }
 
-/** Ordena por UM campo, como `orderBy: { campo: "asc" | "desc" }`. */
-function sortRows(rows: Row[], orderBy?: Row): Row[] {
+/**
+ * Ordena por um OU MAIS campos: `{ campo: "desc" }` ou
+ * `[{ createdAt: "desc" }, { id: "desc" }]`.
+ *
+ * O array importa de verdade: o repositorio de extracao usa
+ * `[{ createdAt: "desc" }, { id: "desc" }]` para desempatar "a mais recente"
+ * quando dois `created_at` caem no mesmo milissegundo. Um fake que lesse so a
+ * primeira chave deixaria o desempate sem cobertura — e ele existe exatamente
+ * porque, sem desempate, a mesma pergunta podia ter duas respostas.
+ */
+function sortRows(rows: Row[], orderBy?: Row | readonly Row[]): Row[] {
   if (!orderBy) return rows;
-  const [key, direction] = Object.entries(orderBy)[0] ?? [];
-  if (!key) return rows;
-  const factor = direction === "desc" ? -1 : 1;
+
+  const criterios = (Array.isArray(orderBy) ? orderBy : [orderBy])
+    .flatMap((criterio) => Object.entries(criterio as Row))
+    .filter(([key]) => key);
+  if (criterios.length === 0) return rows;
+
   return [...rows].sort((a, b) => {
-    const left = a[key] as number | Date;
-    const right = b[key] as number | Date;
-    if (left === right) return 0;
-    return (left < right ? -1 : 1) * factor;
+    for (const [key, direction] of criterios) {
+      const left = a[key] as number | Date | string;
+      const right = b[key] as number | Date | string;
+      if (left === right) continue;
+      // Empate no primeiro criterio cai para o proximo — igual ao Postgres.
+      return (left < right ? -1 : 1) * (direction === "desc" ? -1 : 1);
+    }
+    return 0;
   });
 }
 
@@ -175,7 +191,7 @@ class FakeTable {
     where: Where;
     include?: Row;
     select?: Row;
-    orderBy?: Row;
+    orderBy?: Row | readonly Row[];
   }): Promise<Row | null> {
     const candidatos = sortRows(
       this.rows.filter((row) => matches(row, args.where)),

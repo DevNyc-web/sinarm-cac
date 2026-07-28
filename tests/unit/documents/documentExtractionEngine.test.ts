@@ -208,6 +208,7 @@ test("run grava EXTRAIDA com fields, confidence, engine e extractedAt", async ()
   const result = await runDocumentExtraction(DOC_ID);
 
   assert.ok(result.ok);
+  assert.ok(result.claimed, "quem abriu a tentativa claima");
   assert.equal(result.extraction.state, "EXTRAIDA");
   assert.equal(result.extraction.engine, MOCK_ENGINE_NAME);
   assert.equal(result.extraction.engineVersion, MOCK_ENGINE_VERSION);
@@ -222,6 +223,7 @@ test("run NAO devolve PII", async () => {
   await requestDocumentExtraction(DOC_ID);
   const result = await runDocumentExtraction(DOC_ID);
   assert.ok(result.ok);
+  assert.ok(result.claimed);
   assert.ok(!("fields" in result.extraction), "quem executa nao recebe PII de volta");
 });
 
@@ -235,6 +237,7 @@ test("falha da engine grava FALHOU com codigo fechado", async () => {
   try {
     const result = await runDocumentExtraction(DOC_ID);
     assert.ok(result.ok);
+    assert.ok(result.claimed);
     assert.equal(result.extraction.state, "FALHOU");
     assert.equal(result.extraction.failureReason, "ARQUIVO_ILEGIVEL");
     assert.ok(
@@ -248,11 +251,15 @@ test("falha da engine grava FALHOU com codigo fechado", async () => {
   }
 });
 
-test("run recusa tentativa que nao esta PENDENTE", async () => {
+test("run NAO reexecuta tentativa que nao esta PENDENTE", async () => {
   await requestDocumentExtraction(DOC_ID);
   await runDocumentExtraction(DOC_ID);
   const segunda = await runDocumentExtraction(DOC_ID);
-  assert.equal(segunda.ok, false, "EXTRAIDA nao pode ser reexecutada sem novo request");
+
+  // Mudou no #47C-4: nao claimar deixou de ser ERRO e virou um resultado
+  // proprio. Um worker que perde o claim nao falhou — a tentativa nao era dele.
+  assert.ok(segunda.ok, "nao claimar nao e falha");
+  assert.equal(segunda.claimed, false, "EXTRAIDA nao pode ser reexecutada sem novo request");
 });
 
 test("run sem tentativa aberta falha de forma segura", async () => {

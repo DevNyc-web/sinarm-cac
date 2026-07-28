@@ -38,6 +38,23 @@ const EXTRACTION_BASE_SELECT = {
 /** PII — so para quem tem `process.pii.viewFull`. */
 const EXTRACTION_FIELDS_SELECT = { fields: true } as const;
 
+/**
+ * Ordem de "a extracao mais recente deste documento".
+ *
+ * `created_at` e TIMESTAMP(3): duas linhas no MESMO milissegundo empatavam, e o
+ * desempate era o que o Postgres devolvesse — podia alternar entre execucoes e
+ * fazer a mesma pergunta ter duas respostas. `id DESC` torna o resultado ESTAVEL.
+ *
+ * Honestidade sobre o que isso e: `id` e uuid v4, aleatorio. O desempate e
+ * REPRODUTIVEL, nao semanticamente "mais novo". Com o unique parcial de
+ * `20260729000000`, duas ATIVAS deixam de existir, entao o empate so pode
+ * ocorrer entre linhas terminais criadas no mesmo milissegundo.
+ */
+const LATEST_FIRST: Prisma.DocumentExtractionOrderByWithRelationInput[] = [
+  { createdAt: "desc" },
+  { id: "desc" },
+];
+
 /** Tentativa SEM os campos extraidos. */
 export type ExtractionRow = {
   id: string;
@@ -91,7 +108,7 @@ export function findLatestExtractionForDocument(
 ): Promise<ExtractionRow | null> {
   return getPrisma().documentExtraction.findFirst({
     where: { documentId },
-    orderBy: { createdAt: "desc" },
+    orderBy: LATEST_FIRST,
     select: EXTRACTION_BASE_SELECT,
   });
 }
@@ -109,7 +126,7 @@ export function findLatestExtractionWithFieldsForDocument(
 ): Promise<ExtractionRowWithFields | null> {
   return getPrisma().documentExtraction.findFirst({
     where: { documentId },
-    orderBy: { createdAt: "desc" },
+    orderBy: LATEST_FIRST,
     select: { ...EXTRACTION_BASE_SELECT, ...EXTRACTION_FIELDS_SELECT },
   });
 }
@@ -136,7 +153,7 @@ export async function findLatestExtractionsWithFieldsForDocuments(
 
   const rows: ExtractionRowWithFields[] = await getPrisma().documentExtraction.findMany({
     where: { documentId: { in: [...documentIds] } },
-    orderBy: { createdAt: "desc" },
+    orderBy: LATEST_FIRST,
     select: { ...EXTRACTION_BASE_SELECT, ...EXTRACTION_FIELDS_SELECT },
   });
 
@@ -151,9 +168,30 @@ export async function findLatestExtractionsWithFieldsForDocuments(
 export function listExtractionsForDocument(documentId: string): Promise<ExtractionRow[]> {
   return getPrisma().documentExtraction.findMany({
     where: { documentId },
-    orderBy: { createdAt: "desc" },
+    orderBy: LATEST_FIRST,
     select: EXTRACTION_BASE_SELECT,
   });
+}
+
+/**
+ * CLAIM: transiciona PENDENTE -> PROCESSANDO, e devolve se ESTE chamador venceu.
+ *
+ * O `where` carrega `id` E `state` de proposito — e o coracao da funcao. Um
+ * `update` por id apenas sobrescreveria o estado, e dois runners que lessem
+ * "PENDENTE" ao mesmo tempo passariam os dois, rodando a engine em duplicidade
+ * sobre o mesmo documento. Com `state` no `where`, o Postgres resolve: o UPDATE
+ * e uma unica instrucao atomica, so uma transacao encontra a linha em PENDENTE,
+ * e o perdedor recebe `count: 0` ANTES de chamar a engine.
+ *
+ * Nao ha transacao explicita nem `FOR UPDATE`: um UPDATE condicional ja e a
+ * primitiva certa, e e mais barato que segurar lock por toda a extracao.
+ */
+export async function claimPendingExtraction(id: string): Promise<boolean> {
+  const { count } = await getPrisma().documentExtraction.updateMany({
+    where: { id, state: "PENDENTE" },
+    data: { state: "PROCESSANDO" },
+  });
+  return count === 1;
 }
 
 export type UpdateExtractionStateData = {
