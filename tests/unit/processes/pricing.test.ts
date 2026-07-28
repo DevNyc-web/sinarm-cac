@@ -9,7 +9,7 @@
  * Modulo puro: sem banco, sem rede, sem provider real.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import {
   GRU_ESTIMATED_CENTS,
@@ -23,6 +23,7 @@ import { checklistLabel } from "../../../src/server/processes/checklistDefinitio
 const CREATE_PIX = "src/server/services/createPixPayment.ts";
 const PRICING = "src/server/processes/pricing.ts";
 const CHECKLIST = "src/server/processes/checklistDefinition.ts";
+const MANUAL_EXECUTION = "src/server/services/manualExecution.ts";
 
 function codeOnly(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -78,6 +79,48 @@ test("o pricing e o unico lugar que declara os centavos do servico", () => {
   assert.match(pricing, /GRU_ESTIMATED_CENTS\s*=\s*2_000/);
   // A parcela de assistencia e DERIVADA, nunca um terceiro numero solto.
   assert.match(pricing, /SERVICE_FEE_CENTS\s*=\s*SERVICE_TOTAL_CENTS\s*-\s*GRU_ESTIMATED_CENTS/);
+});
+
+/** Todos os `.ts`/`.tsx` de src/, para varreduras de duplicacao. */
+function sourceFiles(dir = "src"): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return sourceFiles(full);
+    return /\.tsx?$/.test(entry.name) ? [full] : [];
+  });
+}
+
+test("nenhum arquivo fora do pricing declara constante de preco concorrente", () => {
+  // A revisao do PR #45 encontrou EXPECTED_GRU_CENTS = 2000 vivendo em paralelo.
+  // Varrer src/ inteiro impede que outra constante equivalente reapareca.
+  const suspeitos: string[] = [];
+  for (const file of sourceFiles()) {
+    if (file === PRICING) continue;
+    const code = codeOnly(readFileSync(file, "utf8"));
+    // Constante cujo nome sugere preco/GRU E que recebe um literal numerico.
+    const matches = code.match(
+      /(?:const|let|var)\s+\w*(?:PRICE|CENTS|GRU|VALOR|AMOUNT)\w*\s*(?::[^=]+)?=\s*\d[\d_]*/gi,
+    );
+    if (matches) suspeitos.push(`${file}: ${matches.join(", ")}`);
+  }
+  assert.deepEqual(suspeitos, [], `constante de preco fora do pricing:\n${suspeitos.join("\n")}`);
+});
+
+test("nenhum arquivo reimplementa a formatacao de real", () => {
+  const suspeitos = sourceFiles().filter((file) => {
+    if (file === PRICING) return false;
+    const code = codeOnly(readFileSync(file, "utf8"));
+    // A assinatura da copia: dividir por 100 e trocar ponto por virgula.
+    return /\/\s*100\)?\.toFixed\(2\)\.replace\(/.test(code);
+  });
+  assert.deepEqual(suspeitos, [], `copia de formatBRL em: ${suspeitos.join(", ")}`);
+});
+
+test("o valor esperado da GRU na execucao manual vem do pricing", () => {
+  const code = codeOnly(readFileSync(MANUAL_EXECUTION, "utf8"));
+  assert.ok(!code.includes("EXPECTED_GRU_CENTS"), "a constante paralela nao pode voltar");
+  assert.match(code, /GRU_ESTIMATED_CENTS/, "a conferencia compara com a fonte unica");
+  assert.doesNotMatch(code, /R\$\s*\d/, "sem valor em real escrito a mao no alerta");
 });
 
 test("a GRU estimada bate com a do catalogo da Guia", () => {

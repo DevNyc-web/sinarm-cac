@@ -11,6 +11,9 @@
 import { type ManualExecutionStatus } from "@prisma/client";
 import { type AuthUser } from "@/server/auth/mockUsers";
 import { MANUAL_EXECUTION_LABELS } from "@/server/processes/statusLabels";
+// Valor esperado da GRU (docs/09 §15.11) vem da fonte unica de preco: a
+// conferencia do operador e justamente contra esse numero.
+import { GRU_ESTIMATED_CENTS, formatBRL } from "@/server/processes/pricing";
 import {
   findManualExecution,
   upsertManualExecution,
@@ -22,9 +25,6 @@ import {
 } from "@/server/repositories/processRepository";
 
 export const MAX_OBSERVATION_LENGTH = 500;
-
-/** Valor esperado da GRU (docs/09 §15.11) — referencia de conferencia, nao fixacao. */
-export const EXPECTED_GRU_CENTS = 2000;
 
 export type ManualResult = { ok: true } | { ok: false; error: string };
 
@@ -199,13 +199,13 @@ export async function registerManualGru(
     await recordOperationalEvent({
       processId,
       kind: "GRU_MANUAL",
-      toValue: `ref ${ref} · R$ ${(amountCents / 100).toFixed(2).replace(".", ",")}`,
+      toValue: `ref ${ref} · ${formatBRL(amountCents)}`,
       actorMockUserId: actor.id,
       actorRole: actor.role,
       note:
-        amountCents === EXPECTED_GRU_CENTS
+        amountCents === GRU_ESTIMATED_CENTS
           ? "dados lidos pelo operador na tela do orgao (ficticio/dev)"
-          : "ATENCAO: valor diferente do esperado (R$ 20,00) — conferir",
+          : `ATENCAO: valor diferente do esperado (${formatBRL(GRU_ESTIMATED_CENTS)}) — conferir`,
     });
     return { ok: true };
   } catch {
