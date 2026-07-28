@@ -32,6 +32,7 @@ import {
 } from "@/server/services/submitToAutomationQueue";
 import { AutomationSubmitPanel } from "@/components/automation/AutomationSubmitPanel";
 import { ProcessRequirementsSummary } from "@/components/processes/ProcessRequirementsSummary";
+import { DOCUMENT_FILE_PERMISSION, documentFileHref } from "@/server/documents/documentAccess";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
@@ -109,6 +110,9 @@ export default async function AdminProcessoDetalhePage({
   if (!detail) notFound();
 
   const canReview = hasPermission(admin, "review.checklist");
+  // Mesma permissao exigida pela rota do arquivo: o link so aparece para quem
+  // a rota deixaria passar, sem prometer um botao que responderia 404.
+  const canOpenDocumentFile = hasPermission(admin, DOCUMENT_FILE_PERMISSION);
   const canSubmitAutomation = hasPermission(admin, "automation.queue.submit");
   const canOperate =
     hasPermission(admin, "process.assign") ||
@@ -352,6 +356,14 @@ export default async function AdminProcessoDetalhePage({
                   </p>
                   {doc.rejectionReason ? (
                     <p className="mt-1 text-xs text-red-700">Motivo: {doc.rejectionReason}</p>
+                  ) : null}
+                  {canOpenDocumentFile ? (
+                    <a
+                      href={documentFileHref(doc.id)}
+                      className="mt-2 inline-block text-xs font-medium underline"
+                    >
+                      Abrir documento
+                    </a>
                   ) : null}
                   {doc.canBeReviewed ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DocumentIntakePanel } from "@/components/documents/DocumentIntakePanel";
+import { documentFileHref } from "@/server/documents/documentAccess";
 import { AutomationReadinessPanel } from "@/components/automation/AutomationReadinessPanel";
 import { requireUser } from "@/server/auth/guards";
 import {
@@ -217,6 +218,13 @@ export default async function ProcessoRevisaoPage({
                   {doc.status === "REJEITADO" && doc.rejectionReason ? (
                     <p className="mt-1 text-xs text-red-700">Motivo: {doc.rejectionReason}</p>
                   ) : null}
+                  {/* Dono do processo: a rota autoriza pelo vinculo, sem permissao interna. */}
+                  <a
+                    href={documentFileHref(doc.id)}
+                    className="mt-2 inline-block text-xs font-medium underline"
+                  >
+                    Ver documento enviado
+                  </a>
                 </li>
               ))}
             </ul>
