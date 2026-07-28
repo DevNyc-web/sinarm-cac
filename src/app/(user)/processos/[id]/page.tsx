@@ -280,7 +280,7 @@ export default async function ProcessoRevisaoPage({
                 <li key={payment.id} className="rounded-md border border-neutral-200 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium text-neutral-800">
-                      R$ {(payment.amountCents / 100).toFixed(2).replace(".", ",")} ·{" "}
+                      {formatBRL(payment.amountCents)} ·{" "}
                       {payment.provider}
                     </p>
                     <Badge>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>

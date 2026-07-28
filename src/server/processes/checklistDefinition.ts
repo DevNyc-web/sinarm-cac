@@ -8,6 +8,7 @@
  *   fluxo real, antecede o ato irreversivel (docs/11 §7, docs/10 §13).
  */
 import { type ChecklistGroup } from "@prisma/client";
+import { GRU_ESTIMATED_CENTS, formatBRL } from "./pricing";
 
 export const CHECKLIST_ITEMS = [
   // --- Grupo REVISAO (docs/11 §6) ---
@@ -20,7 +21,13 @@ export const CHECKLIST_ITEMS = [
 
   // --- Grupo GRU (docs/11 §7) — conferencia ficticia, sem SINARM ---
   { key: "gru_service_correct", group: "GRU", label: "Servico correto: Emitir Guia de Trafego PF (CAC)" },
-  { key: "gru_amount_expected", group: "GRU", label: "Valor da GRU esperado conferido (R$ 20,00)" },
+  // Valor DERIVADO de `pricing`: escrito a mao, o label mentiria caso a
+  // estimativa da GRU mudasse (a conferencia e justamente sobre esse valor).
+  {
+    key: "gru_amount_expected",
+    group: "GRU",
+    label: `Valor da GRU esperado conferido (${formatBRL(GRU_ESTIMATED_CENTS)})`,
+  },
   { key: "gru_contributor_checked", group: "GRU", label: "Contribuinte/dados ficticios conferidos" },
   { key: "gru_destination_checked", group: "GRU", label: "Destino conferido" },
   { key: "gru_firearm_checked", group: "GRU", label: "Arma/PCE ficticia conferida" },

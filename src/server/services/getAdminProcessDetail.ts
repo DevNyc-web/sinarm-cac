@@ -30,6 +30,7 @@ import { hasPermission } from "@/server/auth/guards";
 import { findMockUser, type AuthUser } from "@/server/auth/mockUsers";
 import { ROLE_LABELS, type Role } from "@/server/auth/roles";
 import { CHECKLIST_ITEMS } from "@/server/processes/checklistDefinition";
+import { formatBRL } from "@/server/processes/pricing";
 import {
   deriveOperationalIndicators,
   type OperationalIndicators,
@@ -368,7 +369,7 @@ export async function getAdminProcessDetail(
     timeline.push({
       id: `pay-${payment.id}`,
       at: payment.createdAt,
-      title: `Cobranca Pix criada (sandbox/dev) — R$ ${(payment.amountCents / 100).toFixed(2).replace(".", ",")}`,
+      title: `Cobranca Pix criada (sandbox/dev) — ${formatBRL(payment.amountCents)}`,
       detail: `provider ${payment.provider} · status atual: ${PAYMENT_STATUS_LABELS[payment.status]}`,
     });
   }
