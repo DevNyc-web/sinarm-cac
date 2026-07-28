@@ -5,12 +5,15 @@ import { Notice } from "@/components/ui/Notice";
 import {
   CONFIDENCE_LABELS,
   DOCUMENT_KIND_LABELS,
-  SUGGESTION_SOURCE_LABELS,
+  REVIEW_SOURCE_BADGES,
+  SUGGESTION_ORIGIN_LABELS,
   SUGGESTION_STATUS_LABELS,
+  aggregateReviewSource,
   buildFieldSuggestions,
   groupSuggestionsByArea,
   isNoOpSuggestion,
   isSuggestionApplicable,
+  sourceReadTheFile,
   type DocumentReview,
   type ProcessCurrentValues,
 } from "@/server/documents";
@@ -39,12 +42,20 @@ export function DocumentFieldSuggestionsPanel({
 }) {
   const suggestions = buildFieldSuggestions(reviews, current);
   const groups = groupSuggestionsByArea(suggestions);
+  // Mesma origem do painel de conferencia — as sugestoes saem dos mesmos reviews,
+  // entao os dois cards nao podem dizer coisas diferentes sobre o mesmo dado.
+  const aggregate = aggregateReviewSource(reviews);
+  // Mesma regra unica do painel de conferencia — ver `sourceReadTheFile`.
+  const leuOArquivo =
+    aggregate !== null && aggregate !== "MISTA" && sourceReadTheFile(aggregate);
 
   return (
     <Card className="mt-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-medium">Sugestões para preenchimento</p>
-        <Badge>demonstração</Badge>
+        {aggregate && aggregate !== "MISTA" ? (
+          <Badge>{REVIEW_SOURCE_BADGES[aggregate]}</Badge>
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-neutral-500">
         <strong>Nada é aplicado automaticamente.</strong> São propostas a partir da conferência —{" "}
@@ -107,7 +118,7 @@ export function DocumentFieldSuggestionsPanel({
                     </dl>
 
                     <p className="mt-1 text-xs text-neutral-500">
-                      Origem: {SUGGESTION_SOURCE_LABELS[suggestion.source]} —{" "}
+                      Origem: {SUGGESTION_ORIGIN_LABELS[suggestion.source]} —{" "}
                       {DOCUMENT_KIND_LABELS[suggestion.sourceDocumentType]}
                     </p>
 
@@ -158,9 +169,32 @@ export function DocumentFieldSuggestionsPanel({
       )}
 
       <Notice tone="info" className="mt-3">
-        <strong>Preenchimento assistido ainda não habilitado.</strong> Os valores vêm da conferência
-        de demonstração — não há OCR nem IA. Nenhuma sugestão altera seu processo, e{" "}
-        <strong>nada é enviado automaticamente</strong>.
+        {leuOArquivo ? (
+          <>
+            <strong>Preenchimento assistido ainda não habilitado.</strong> Os valores foram lidos
+            automaticamente do seu documento e <strong>precisam ser conferidos</strong>. Nenhuma
+            sugestão altera seu processo sozinha, e{" "}
+            <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : aggregate === "MISTA" ? (
+          <>
+            <strong>Preenchimento assistido ainda não habilitado.</strong> A origem dos valores
+            varia por documento — veja o rótulo de cada sugestão. Nenhuma sugestão altera seu
+            processo sozinha, e <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : aggregate === "PERSISTED_MOCK_ENGINE" ? (
+          <>
+            <strong>Preenchimento assistido ainda não habilitado.</strong> Os valores vêm de uma
+            conferência simulada — não há OCR nem IA. Nenhuma sugestão altera seu processo, e{" "}
+            <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : (
+          <>
+            <strong>Preenchimento assistido ainda não habilitado.</strong> Os valores vêm da
+            conferência de demonstração — não há OCR nem IA. Nenhuma sugestão altera seu processo,
+            e <strong>nada é enviado automaticamente</strong>.
+          </>
+        )}
       </Notice>
     </Card>
   );

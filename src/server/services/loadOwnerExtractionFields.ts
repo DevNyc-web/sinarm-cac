@@ -31,11 +31,15 @@
  * OCR, NAO chama engine, NAO cria extracao, NAO grava nada — so le.
  */
 import { usableExtractionFields } from "@/server/documents/documentExtractionFields";
-import { type MockExtractionField } from "@/server/documents/documentExtractionMock";
+import {
+  type ExtractionFieldsByDocument,
+  type PersistedExtraction,
+} from "@/server/documents";
+import { sourceForEngine } from "@/server/extraction/reviewSource";
 import { findLatestExtractionsWithFieldsForDocuments } from "@/server/repositories/documentExtractionRepository";
 
-/** Campos utilizaveis por `documentId`. Documento AUSENTE => sem extracao confiavel. */
-export type OwnerExtractionFields = ReadonlyMap<string, readonly MockExtractionField[]>;
+/** Extracoes utilizaveis por `documentId`. Documento AUSENTE => sem extracao confiavel. */
+export type OwnerExtractionFields = ExtractionFieldsByDocument;
 
 /**
  * Identificacao minima do documento ja lido sob checagem de posse.
@@ -66,12 +70,14 @@ export async function loadOwnerExtractionFields(
       documents.map((document) => document.id),
     );
 
-    const byDocument = new Map<string, readonly MockExtractionField[]>();
+    const byDocument = new Map<string, PersistedExtraction>();
     for (const row of rows) {
       const fields = usableExtractionFields(row.state, row.fields);
       // Sem campos confiaveis => fica FORA do mapa. Gravar uma lista vazia diria
       // "extraiu nada", que o chamador nao tem como distinguir de "nao ha linha".
-      if (fields) byDocument.set(row.documentId, fields);
+      if (fields) {
+        byDocument.set(row.documentId, { fields, source: sourceForEngine(row.engine) });
+      }
     }
     return byDocument;
   } catch {

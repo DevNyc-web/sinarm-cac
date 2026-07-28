@@ -12,7 +12,7 @@
  * ha onde aplicar.
  */
 import type { DocumentReview } from "./documentExtractionReview";
-import type { ConfidenceLevel } from "./documentExtractionStatus";
+import type { ConfidenceLevel, ReviewSource } from "./documentExtractionStatus";
 import type { DocumentKind } from "./documentTypes";
 
 /** Campo do processo que uma sugestao pretende preencher. */
@@ -61,13 +61,20 @@ export const SUGGESTION_STATUS_LABELS: Record<SuggestionStatus, string> = {
   CAMPO_FUTURO: "Campo ainda não existe",
 };
 
-/** De onde a sugestao veio — hoje sempre a conferencia de demonstracao. */
-export const SUGGESTION_SOURCES = ["CONFERENCIA_MOCK"] as const;
-
-export type SuggestionSource = (typeof SUGGESTION_SOURCES)[number];
-
-export const SUGGESTION_SOURCE_LABELS: Record<SuggestionSource, string> = {
-  CONFERENCIA_MOCK: "Conferência de demonstração",
+/**
+ * Rotulo de ORIGEM da sugestao, por `ReviewSource`.
+ *
+ * Nao ha enum proprio: a origem de uma sugestao E a origem do review de onde ela
+ * saiu — nao existe outra procedencia. O antigo `SUGGESTION_SOURCES` tinha um
+ * unico valor (`CONFERENCIA_MOCK`) escrito na mao, e por isso continuaria
+ * dizendo "demonstracao" sobre dado lido de verdade. Um vocabulario so
+ * (`ReviewSource`) torna a divergencia impossivel; aqui muda apenas a FRASE,
+ * porque o contexto e "Origem: ..." e nao um badge.
+ */
+export const SUGGESTION_ORIGIN_LABELS: Record<ReviewSource, string> = {
+  MOCK_FALLBACK: "Conferência de demonstração",
+  PERSISTED_MOCK_ENGINE: "Conferência simulada",
+  PERSISTED_REAL_ENGINE: "Leitura automática do documento",
 };
 
 export interface DocumentFieldSuggestion {
@@ -76,7 +83,8 @@ export interface DocumentFieldSuggestion {
   sourceDocumentId: string;
   sourceDocumentType: DocumentKind;
   sourceField: string;
-  source: SuggestionSource;
+  /** Herdada do review: a sugestao nao tem origem propria. */
+  source: ReviewSource;
   targetField: ProcessFieldTarget;
   area: SuggestionArea;
   label: string;
@@ -225,7 +233,7 @@ export function buildFieldSuggestions(
         sourceDocumentId: review.documentId,
         sourceDocumentType: review.kind,
         sourceField: field.key,
-        source: "CONFERENCIA_MOCK",
+        source: review.source,
         targetField,
         area: areaFor(targetField),
         label: field.label,

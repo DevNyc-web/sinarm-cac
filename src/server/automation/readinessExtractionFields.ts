@@ -32,8 +32,11 @@ import {
   inspectExtractionFields,
   type ExtractionRejectReason,
 } from "@/server/documents/documentExtractionFields";
-import { type ExtractionFieldsByDocument } from "@/server/documents";
-import { type MockExtractionField } from "@/server/documents/documentExtractionMock";
+import {
+  type ExtractionFieldsByDocument,
+  type PersistedExtraction,
+} from "@/server/documents";
+import { sourceForEngine } from "@/server/extraction/reviewSource";
 import { findLatestExtractionsWithFieldsForDocuments } from "@/server/repositories/documentExtractionRepository";
 import { logger } from "@/lib/logger";
 
@@ -77,11 +80,14 @@ export async function loadReadinessExtractionFields(
   try {
     const rows = await findLatestExtractionsWithFieldsForDocuments(documentIds);
 
-    const byDocument = new Map<string, readonly MockExtractionField[]>();
+    const byDocument = new Map<string, PersistedExtraction>();
     for (const row of rows) {
       const inspection = inspectExtractionFields(row.state, row.fields);
       if (inspection.ok) {
-        byDocument.set(row.documentId, inspection.fields);
+        byDocument.set(row.documentId, {
+          fields: inspection.fields,
+          source: sourceForEngine(row.engine),
+        });
       } else {
         logRejection(row.documentId, inspection.reason);
       }

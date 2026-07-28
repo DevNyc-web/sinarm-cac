@@ -4,33 +4,68 @@ import { Notice } from "@/components/ui/Notice";
 import {
   CONFIDENCE_LABELS,
   DOCUMENT_KIND_LABELS,
+  REVIEW_SOURCE_BADGES,
+  REVIEW_SOURCE_HELP,
   REVIEW_STATUS_HELP,
   REVIEW_STATUS_LABELS,
+  aggregateReviewSource,
+  sourceReadTheFile,
+  type AggregateSource,
   type DocumentReview,
 } from "@/server/documents";
 
 /**
- * Painel de CONFERENCIA dos dados de cada documento (mock/dev).
+ * Painel de CONFERENCIA dos dados de cada documento.
  *
- * Os valores exibidos sao de DEMONSTRACAO e nao vieram do arquivo enviado: nao
- * ha OCR, nao ha IA, nao ha rede. Nada e gravado e nada e enviado — o botao de
- * confirmar fica desabilitado porque a persistencia da conferencia ainda nao
- * existe (seria mentira oferece-lo funcionando).
+ * O que a tela diz sobre TER LIDO ou nao o arquivo do cliente acompanha a ORIGEM
+ * de cada documento (`review.source`), nunca um texto fixo. Antes do #47C-3 esta
+ * pagina afirmava "nao foram lidos do seu arquivo" em qualquer caso — verdade
+ * enquanto so existia a engine mock, e mentira no dia em que um motor real
+ * gravasse campos. As duas inversoes sao inaceitaveis: dizer que lemos quando e
+ * demonstracao, e dizer que nao lemos quando lemos.
+ *
+ * Nada e gravado e nada e enviado — o botao de confirmar fica desabilitado
+ * porque a persistencia da conferencia ainda nao existe (seria mentira
+ * oferece-lo funcionando).
  */
+
+/** Subtitulo do painel — so afirma algo global quando TODOS compartilham a origem. */
+const PANEL_INTRO: Record<Exclude<AggregateSource, null>, string> = {
+  MOCK_FALLBACK:
+    "Os valores abaixo são exemplos de demonstração e não foram lidos do seu arquivo. Servem para mostrar como será a conferência.",
+  PERSISTED_MOCK_ENGINE:
+    "Os valores abaixo vêm de uma extração simulada (ambiente de desenvolvimento). Seu arquivo não foi lido por OCR ou IA.",
+  PERSISTED_REAL_ENGINE:
+    "Os valores abaixo foram lidos automaticamente do seu arquivo e precisam ser conferidos por uma pessoa antes de qualquer uso.",
+  MISTA:
+    "A origem dos valores varia por documento — veja o rótulo de cada um. Todos precisam ser conferidos por uma pessoa antes de qualquer uso.",
+};
+
 export function DocumentExtractionReviewPanel({
   reviews,
 }: {
   reviews: readonly DocumentReview[];
 }) {
+  const aggregate = aggregateReviewSource(reviews);
+  // A decisao de AFIRMAR leitura passa por `sourceReadTheFile`, nunca por
+  // comparacao literal aqui. Com uma comparacao, uma origem nova (outro motor
+  // real no #47D) cairia no `else` — que e o texto de demonstracao — e a tela
+  // negaria uma leitura que aconteceu. A regra vive num lugar so.
+  const leuOArquivo =
+    aggregate !== null && aggregate !== "MISTA" && sourceReadTheFile(aggregate);
+
   return (
     <Card className="mt-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-medium">Conferência dos dados do documento</p>
-        <Badge>demonstração</Badge>
+        {aggregate && aggregate !== "MISTA" ? (
+          <Badge>{REVIEW_SOURCE_BADGES[aggregate]}</Badge>
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-neutral-500">
-        Os valores abaixo são <strong>exemplos de demonstração</strong>, não foram lidos do seu
-        arquivo. Servem para mostrar como será a conferência.
+        {aggregate
+          ? PANEL_INTRO[aggregate]
+          : "A conferência aparece aqui depois que você anexar um arquivo."}
       </p>
 
       {reviews.length === 0 ? (
@@ -54,9 +89,15 @@ export function DocumentExtractionReviewPanel({
                     {review.originalFileName}
                   </p>
                 </div>
-                <Badge>{REVIEW_STATUS_LABELS[review.status]}</Badge>
+                <div className="flex flex-none items-center gap-2">
+                  <Badge>{REVIEW_SOURCE_BADGES[review.source]}</Badge>
+                  <Badge>{REVIEW_STATUS_LABELS[review.status]}</Badge>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-neutral-500">{REVIEW_STATUS_HELP[review.status]}</p>
+              {/* Origem e status sao coisas diferentes: uma diz de onde o dado
+                  veio, a outra em que ponto da conferencia ele esta. */}
+              <p className="mt-1 text-xs text-neutral-500">{REVIEW_SOURCE_HELP[review.source]}</p>
+              <p className="text-xs text-neutral-500">{REVIEW_STATUS_HELP[review.status]}</p>
 
               <ul className="mt-2 space-y-1">
                 {review.fields.map((field) => (
@@ -95,9 +136,31 @@ export function DocumentExtractionReviewPanel({
       )}
 
       <Notice tone="info" className="mt-3">
-        <strong>Extração automática ainda é demonstração.</strong> Nenhum arquivo foi lido: não há
-        OCR nem IA. Os dados <strong>precisam ser conferidos por uma pessoa</strong> antes de
-        qualquer uso, e <strong>nada é enviado automaticamente</strong>.
+        {leuOArquivo ? (
+          <>
+            <strong>Os valores foram lidos automaticamente do seu arquivo.</strong> Eles{" "}
+            <strong>precisam ser conferidos por uma pessoa</strong> antes de qualquer uso, e{" "}
+            <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : aggregate === "MISTA" ? (
+          <>
+            <strong>A origem dos valores varia por documento.</strong> Veja o rótulo de cada um.
+            Todos <strong>precisam ser conferidos por uma pessoa</strong> antes de qualquer uso, e{" "}
+            <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : aggregate === "PERSISTED_MOCK_ENGINE" ? (
+          <>
+            <strong>Extração registrada em modo simulado.</strong> Nenhum arquivo foi lido: não há
+            OCR nem IA. Os dados <strong>precisam ser conferidos por uma pessoa</strong> antes de
+            qualquer uso, e <strong>nada é enviado automaticamente</strong>.
+          </>
+        ) : (
+          <>
+            <strong>Extração automática ainda é demonstração.</strong> Nenhum arquivo foi lido: não
+            há OCR nem IA. Os dados <strong>precisam ser conferidos por uma pessoa</strong> antes de
+            qualquer uso, e <strong>nada é enviado automaticamente</strong>.
+          </>
+        )}
       </Notice>
     </Card>
   );

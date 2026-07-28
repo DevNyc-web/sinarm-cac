@@ -143,7 +143,7 @@ test("devolve a tentativa MAIS RECENTE por documento", async () => {
   assert.equal(rows.length, 1, "uma linha por documento, nao o historico inteiro");
 
   const mapa = await loadOwnerExtractionFields([{ id: DOC_A }]);
-  assert.equal(mapa.get(DOC_A)?.[0].value, "TENTATIVA NOVA", "reprocessamento vence o historico");
+  assert.equal(mapa.get(DOC_A)?.fields[0].value, "TENTATIVA NOVA", "reprocessamento vence o historico");
 });
 
 test("cada documento recebe a propria extracao", async () => {
@@ -155,8 +155,8 @@ test("cada documento recebe a propria extracao", async () => {
   });
 
   const mapa = await loadOwnerExtractionFields([{ id: DOC_A }, { id: DOC_B }]);
-  assert.equal(mapa.get(DOC_A)?.[0].value, "DO DOCUMENTO A");
-  assert.equal(mapa.get(DOC_B)?.[0].value, "DO DOCUMENTO B");
+  assert.equal(mapa.get(DOC_A)?.fields[0].value, "DO DOCUMENTO A");
+  assert.equal(mapa.get(DOC_B)?.fields[0].value, "DO DOCUMENTO B");
 });
 
 test("documento sem tentativa nenhuma fica fora do mapa", async () => {
@@ -169,11 +169,15 @@ test("documento sem tentativa nenhuma fica fora do mapa", async () => {
 
 /* --------------------------------------------------------------- estados --- */
 
-test("campos validos em estado utilizavel entram no mapa", async () => {
+test("campos validos em estado utilizavel entram no mapa, COM a origem", async () => {
   seedExtraction(DOC_A);
   const mapa = await loadOwnerExtractionFields([{ id: DOC_A }]);
 
-  assert.deepEqual(mapa.get(DOC_A), CAMPOS_VALIDOS);
+  assert.deepEqual(mapa.get(DOC_A), {
+    fields: CAMPOS_VALIDOS,
+    // A engine semeada e a mock: registro existe, leitura nao houve.
+    source: "PERSISTED_MOCK_ENGINE",
+  });
 });
 
 test("os tres estados utilizaveis entregam campos", async () => {
@@ -359,7 +363,7 @@ test("nem o repositorio nem o loader conhecem storage", () => {
 test("o loader nao devolve nada alem dos campos do contrato", async () => {
   seedExtraction(DOC_A);
   const mapa = await loadOwnerExtractionFields([{ id: DOC_A }]);
-  const campos = mapa.get(DOC_A);
+  const campos = mapa.get(DOC_A)?.fields;
 
   assert.ok(campos);
   for (const campo of campos) {
@@ -477,10 +481,22 @@ test("NEUTRALIDADE: a engine mock persistida produz a MESMA conferencia do mock"
     });
     assert.ok(resultado.ok);
 
-    const comPersistido = buildExtractionReview([doc], new Map([["d1", resultado.fields]]));
-    const semPersistido = buildExtractionReview([doc], NO_EXTRACTION_FIELDS);
+    const [comPersistido] = buildExtractionReview(
+      [doc],
+      new Map([["d1", { fields: resultado.fields, source: "PERSISTED_MOCK_ENGINE" as const }]]),
+    );
+    const [semPersistido] = buildExtractionReview([doc], NO_EXTRACTION_FIELDS);
 
-    assert.deepEqual(comPersistido, semPersistido, `${kind}: a troca de fonte mudou a saida`);
+    // Os DADOS continuam identicos — e essa e a neutralidade que importa.
+    const { source: _com, ...dadosCom } = comPersistido;
+    const { source: _sem, ...dadosSem } = semPersistido;
+    assert.deepEqual(dadosCom, dadosSem, `${kind}: a troca de fonte mudou os dados`);
+
+    // A ORIGEM difere de proposito: e o unico efeito visivel do #47C-3, e o
+    // motivo de ele existir. Afirmar as duas coisas separadamente impede que
+    // esta trava vire uma que aceita qualquer divergencia.
+    assert.equal(semPersistido.source, "MOCK_FALLBACK", `${kind}: sem linha => fallback`);
+    assert.equal(comPersistido.source, "PERSISTED_MOCK_ENGINE", `${kind}: com linha => simulada`);
   }
 });
 
@@ -490,7 +506,7 @@ test("persistido SUBSTITUI o mock quando presente", () => {
     { key: "nome", label: "Nome", value: "VALOR PERSISTIDO", confidence: "ALTA" as const },
   ];
 
-  const [review] = buildExtractionReview([doc], new Map([["d1", persistido]]));
+  const [review] = buildExtractionReview([doc], new Map([["d1", { fields: persistido, source: "PERSISTED_MOCK_ENGINE" as const }]]));
 
   assert.deepEqual(review.fields, [{ ...persistido[0], confirmed: false }]);
   assert.equal(review.hasLowConfidence, false, "confianca deriva dos campos EFETIVOS");
@@ -505,7 +521,7 @@ test("o mapa e por documento — um persistido nao contamina o vizinho", () => {
     { key: "nome", label: "Nome", value: "SO DESTE", confidence: "ALTA" as const },
   ];
 
-  const reviews = buildExtractionReview(docs, new Map([["com", persistido]]));
+  const reviews = buildExtractionReview(docs, new Map([["com", { fields: persistido, source: "PERSISTED_MOCK_ENGINE" as const }]]));
 
   assert.equal(reviews[0].documentId, "com", "ordenacao por createdAt desc nao mudou");
   assert.equal(reviews[0].fields[0].value, "SO DESTE");

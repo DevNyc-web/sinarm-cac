@@ -102,7 +102,7 @@ test("a prontidao USA o persistido quando existe", async () => {
   seedExtracao();
   const mapa = await loadReadinessExtractionFields([DOC]);
 
-  assert.equal(mapa.get(DOC)?.[0].value, VALOR_PERSISTIDO);
+  assert.equal(mapa.get(DOC)?.fields[0].value, VALOR_PERSISTIDO);
 });
 
 test("persistido SUBSTITUI o mock na decisao da fila", async () => {
