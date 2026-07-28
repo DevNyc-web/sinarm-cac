@@ -16,7 +16,7 @@ import {
   type AutomationReadiness,
 } from "@/server/automation/automationReadiness";
 import { snapshotFromRow } from "@/server/automation/automationReadinessInput";
-import { NO_EXTRACTION_FIELDS } from "@/server/documents";
+import { loadReadinessExtractionFields } from "@/server/automation/readinessExtractionFields";
 import {
   AUTOMATION_QUEUE_SUBMISSION_MARKER,
   AUTOMATION_QUEUE_SUBMISSION_NOTE,
@@ -41,8 +41,12 @@ export async function getProcessReadinessState(
   const row = await findProcessForAutomationReadiness(processId);
   if (!row) return { found: false };
 
-  // Mapa vazio pelo mesmo motivo da fila — ver `snapshotFromRow`.
-  const readiness = deriveAutomationReadiness(snapshotFromRow(row, NO_EXTRACTION_FIELDS));
+  // Mesma fonte da fila: o gate nao pode decidir sobre dados diferentes dos que
+  // a fila mostra. Os campos ficam neste escopo — o retorno leva so `readiness`.
+  const extractionFields = await loadReadinessExtractionFields(
+    row.documents.map((document) => document.id),
+  );
+  const readiness = deriveAutomationReadiness(snapshotFromRow(row, extractionFields));
   const alreadySubmitted = wasSubmittedToAutomationQueue(row.statusEvents);
   return { found: true, readiness, alreadySubmitted };
 }

@@ -180,7 +180,11 @@ export function listAutomationQueue() {
         select: { eventName: true, uf: true, city: true, street: true, number: true },
       },
       firearm: { select: { id: true } },
-      documents: { select: { type: true, status: true, createdAt: true } },
+      // `id` NAO e PII: e a chave que permite a prontidao casar cada documento
+      // com a extracao persistida (#47C-2). `fields` continua FORA deste select —
+      // a leitura de PII vive em `documentExtractionRepository`, e o que ela
+      // produz nunca entra no DTO da fila.
+      documents: { select: { id: true, type: true, status: true, createdAt: true } },
       payments: { select: { status: true }, orderBy: { createdAt: "desc" } },
       // Marcador de "enviado para a fila de automacao" (docs/25) — so `toValue`,
       // rotulo curto sem PII, para derivar se o processo ja foi liberado.
@@ -206,7 +210,11 @@ export function findProcessForAutomationReadiness(processId: string) {
         select: { eventName: true, uf: true, city: true, street: true, number: true },
       },
       firearm: { select: { id: true } },
-      documents: { select: { type: true, status: true, createdAt: true } },
+      // `id` NAO e PII: e a chave que permite a prontidao casar cada documento
+      // com a extracao persistida (#47C-2). `fields` continua FORA deste select —
+      // a leitura de PII vive em `documentExtractionRepository`, e o que ela
+      // produz nunca entra no DTO da fila.
+      documents: { select: { id: true, type: true, status: true, createdAt: true } },
       payments: { select: { status: true }, orderBy: { createdAt: "desc" } },
       statusEvents: { select: { toValue: true } },
     },

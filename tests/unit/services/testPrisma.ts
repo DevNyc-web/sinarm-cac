@@ -89,17 +89,50 @@ function notFound(model: string): Error {
 }
 
 /**
- * Projeta a linha conforme o `select` do Prisma.
+ * Projeta a linha conforme o `select` do Prisma, INCLUSIVE aninhado.
  *
- * Precisa existir de verdade: o repositorio de extracao usa `select` como GATE DE
- * PII (o select base nao inclui `fields`). Um fake que devolvesse a linha inteira
- * faria o teste de "PII nao vaza" passar em falso.
+ * Precisa existir de verdade: os repositorios usam `select` como GATE DE PII (o
+ * select base de extracao nao inclui `fields`; o da fila de automacao nao inclui
+ * `fields` nem `storageKey`). Um fake que devolvesse a linha inteira faria o
+ * teste de "PII nao vaza" passar em falso.
+ *
+ * O aninhamento e projetado de verdade, nao repassado: `{ documents: { select:
+ * { id, type } } }` devolve SO essas chaves de cada documento semeado. Repassar
+ * o objeto semeado inteiro seria confortavel e destruiria a garantia — um teste
+ * poderia semear `fields` num documento e ve-lo sair por um select que, em
+ * producao, nunca o traria.
  */
 function project(row: Row, select?: Row): Row {
   if (!select) return row;
   const out: Row = {};
+
   for (const [key, wanted] of Object.entries(select)) {
-    if (wanted === true) out[key] = row[key] ?? null;
+    if (wanted === true) {
+      out[key] = row[key] ?? null;
+      continue;
+    }
+    // Relacao: `{ select: {...}, orderBy?, take? }`. Só `select` projeta.
+    if (!wanted || typeof wanted !== "object") continue;
+
+    const nested = (wanted as { select?: Row }).select;
+    if (!nested) continue;
+
+    const value = row[key];
+    if (Array.isArray(value)) {
+      // ORDEM ANTES DE `take` — nesta sequencia, sempre. Os selects da fila e do
+      // admin usam `orderBy: { createdAt: "desc" }, take: 1` para pegar o MAIS
+      // RECENTE, e varios services leem `[0]` direto. Cortar antes de ordenar
+      // devolveria o mais ANTIGO com cara de deliberado: o `take` teria sido
+      // respeitado, e o teste afirmaria o oposto da producao sem quebrar.
+      const { orderBy, take } = wanted as { orderBy?: Row; take?: number };
+      const ordenados = sortRows(value as Row[], orderBy);
+      const cortados = typeof take === "number" ? ordenados.slice(0, take) : ordenados;
+      out[key] = cortados.map((item) => project(item, nested));
+    } else if (value && typeof value === "object") {
+      out[key] = project(value as Row, nested);
+    } else {
+      out[key] = null;
+    }
   }
   return out;
 }

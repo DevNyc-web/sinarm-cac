@@ -29,31 +29,34 @@ export interface AutomationReadinessRow {
   } | null;
   /** So a EXISTENCIA importa — `firearm: { id }` ou `null`. */
   firearm: { id: string } | null;
-  documents: ReadonlyArray<{ type: DocumentType; status: DocumentStatus; createdAt: Date }>;
+  documents: ReadonlyArray<{
+    /** Chave real do documento — casa com o mapa de extracao (#47C-2). */
+    id: string;
+    type: DocumentType;
+    status: DocumentStatus;
+    createdAt: Date;
+  }>;
   payments: ReadonlyArray<{ status: PaymentStatus }>;
 }
 
 /**
  * Monta o snapshot para `deriveAutomationReadiness`.
  *
- * `rejectionReason`/`originalFileName`/`id` de documento NAO sao buscados
- * (need-to-know) e NAO afetam a prontidao — usamos placeholders. As sugestoes
+ * `rejectionReason`/`originalFileName` de documento NAO sao buscados
+ * (need-to-know) e NAO afetam a prontidao — usamos placeholders. `id` passou a
+ * ser buscado no #47C-2 por ser a chave da extracao, e nao PII. As sugestoes
  * sao regeradas no servidor, exatamente como na tela do usuario.
  *
- * `extractionFields` e OBRIGATORIO para que a troca do #47C nao possa esquecer
- * este caminho, mas os dois chamadores de hoje passam `NO_EXTRACTION_FIELDS`, e
- * isso e DELIBERADO:
+ * `extractionFields` chega PRONTO do chamador — este modulo continua sem I/O.
+ * Desde o #47C-2 a fila e o gate passam o mapa REAL, chaveado pelo `id` do
+ * documento (que o `select` agora busca), e nao mais um mapa vazio.
  *
- *   1. Os ids de documento aqui sao FABRICADOS (`doc-0`, `doc-1`) porque o
- *      `select` da fila nao busca `documents.id`. Um mapa chaveado por id real
- *      nunca casaria com eles.
- *   2. Trazer os campos exigiria por `fields` — PII — no `select` da FILA do
- *      admin, uma lista de muitos processos, num caminho que nao checa
- *      `process.pii.viewFull`. Isso e decisao de exposicao de PII, nao fiacao.
- *
- * Enquanto so existir a engine mock, mapa vazio aqui produz exatamente a mesma
- * prontidao de antes. A leitura real neste caminho tem PR proprio, ANTES do
- * worker do #47D — ate la, a fila deriva do mock de propósito.
+ * REGRA QUE SUSTENTA ISSO: permissao governa DIVULGACAO, nao COMPUTACAO. Os
+ * campos extraidos entram aqui como insumo de decisao e saem reduzidos a
+ * contagem de bloqueios; nenhum valor chega ao DTO da fila, ao payload RSC ou a
+ * log. E por isso que a prontidao pode ler PII sem `process.pii.viewFull` — e
+ * tambem por isso que ela NAO pode variar por perfil: prontidao e fato sobre o
+ * processo, nao sobre quem esta olhando.
  */
 export function snapshotFromRow(
   row: AutomationReadinessRow,
@@ -66,8 +69,10 @@ export function snapshotFromRow(
     rejectionReason: null,
   }));
 
-  const reviewDocuments: ReviewDocument[] = row.documents.map((doc, index) => ({
-    id: `doc-${index}`,
+  const reviewDocuments: ReviewDocument[] = row.documents.map((doc) => ({
+    // Id REAL: e o que faz o mapa de extracao casar. Antes do #47C-2 era um
+    // placeholder (`doc-0`), porque o select da fila nao trazia a chave.
+    id: doc.id,
     originalFileName: "",
     type: doc.type,
     status: doc.status,

@@ -79,15 +79,67 @@ export function parseExtractionFields(raw: unknown): readonly MockExtractionFiel
 }
 
 /**
- * Decisao unica: esta tentativa entrega campos utilizaveis?
+ * Motivos FECHADOS de descarte.
+ *
+ * Codigo curto, nunca texto livre e nunca trecho do documento — mesma regra de
+ * `EXTRACTION_FAILURE_REASONS`. Existe para a observabilidade poder dizer POR QUE
+ * uma extracao foi ignorada sem carregar nada do conteudo: o motivo e sobre a
+ * FORMA do dado, jamais sobre o dado.
+ */
+export const EXTRACTION_REJECT_REASONS = [
+  /** Tentativa em PENDENTE/PROCESSANDO/FALHOU: nao ha campos para ler. */
+  "ESTADO_NAO_UTILIZAVEL",
+  /** `fields` nao e um array — linha corrompida ou de formato antigo. */
+  "JSON_INVALIDO",
+  /** Array vazio: "extraiu zero campos" nao e melhor que a fonte anterior. */
+  "LISTA_VAZIA",
+  /** Algum campo nao bate com o contrato (tudo ou nada). */
+  "CAMPO_INVALIDO",
+] as const;
+
+export type ExtractionRejectReason = (typeof EXTRACTION_REJECT_REASONS)[number];
+
+export type ExtractionFieldsInspection =
+  | { ok: true; fields: readonly MockExtractionField[] }
+  | { ok: false; reason: ExtractionRejectReason };
+
+/**
+ * Decisao unica COM motivo: esta tentativa entrega campos utilizaveis?
  *
  * Junta as duas travas (estado utilizavel + JSON valido) para que nenhum chamador
- * possa lembrar de uma e esquecer da outra.
+ * possa lembrar de uma e esquecer da outra, e classifica o descarte para quem
+ * precisa relatar — a prontidao da fila, que a partir do #47C-2 DECIDE com base
+ * nestes campos e nao pode ignorar em silencio quando eles somem.
+ *
+ * O motivo descreve a forma do dado. Nenhum valor extraido sai daqui.
+ */
+export function inspectExtractionFields(
+  state: string,
+  rawFields: unknown,
+): ExtractionFieldsInspection {
+  if (!isUsableExtractionState(state)) {
+    return { ok: false, reason: "ESTADO_NAO_UTILIZAVEL" };
+  }
+  if (!Array.isArray(rawFields)) return { ok: false, reason: "JSON_INVALIDO" };
+  if (rawFields.length === 0) return { ok: false, reason: "LISTA_VAZIA" };
+
+  const fields = parseExtractionFields(rawFields);
+  if (!fields) return { ok: false, reason: "CAMPO_INVALIDO" };
+
+  return { ok: true, fields };
+}
+
+/**
+ * Mesma decisao, sem o motivo — `null` quando nao ha campos confiaveis.
+ *
+ * Wrapper fino sobre `inspectExtractionFields` de proposito: uma unica regra de
+ * classificacao, para que o caminho do dono e o da fila nunca divirjam sobre o
+ * que e utilizavel.
  */
 export function usableExtractionFields(
   state: string,
   rawFields: unknown,
 ): readonly MockExtractionField[] | null {
-  if (!isUsableExtractionState(state)) return null;
-  return parseExtractionFields(rawFields);
+  const inspection = inspectExtractionFields(state, rawFields);
+  return inspection.ok ? inspection.fields : null;
 }
