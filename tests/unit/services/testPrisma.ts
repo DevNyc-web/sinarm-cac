@@ -50,6 +50,36 @@ function notFound(model: string): Error {
   return new Error(`[fake-prisma] ${model}: registro nao encontrado`);
 }
 
+/**
+ * Projeta a linha conforme o `select` do Prisma.
+ *
+ * Precisa existir de verdade: o repositorio de extracao usa `select` como GATE DE
+ * PII (o select base nao inclui `fields`). Um fake que devolvesse a linha inteira
+ * faria o teste de "PII nao vaza" passar em falso.
+ */
+function project(row: Row, select?: Row): Row {
+  if (!select) return row;
+  const out: Row = {};
+  for (const [key, wanted] of Object.entries(select)) {
+    if (wanted === true) out[key] = row[key] ?? null;
+  }
+  return out;
+}
+
+/** Ordena por UM campo, como `orderBy: { campo: "asc" | "desc" }`. */
+function sortRows(rows: Row[], orderBy?: Row): Row[] {
+  if (!orderBy) return rows;
+  const [key, direction] = Object.entries(orderBy)[0] ?? [];
+  if (!key) return rows;
+  const factor = direction === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const left = a[key] as number | Date;
+    const right = b[key] as number | Date;
+    if (left === right) return 0;
+    return (left < right ? -1 : 1) * factor;
+  });
+}
+
 class FakeTable {
   readonly rows: Row[] = [];
 
@@ -66,34 +96,51 @@ class FakeTable {
     return full;
   }
 
-  async create({ data }: { data: Row }): Promise<Row> {
-    return this.seed(data);
+  async create({ data, select }: { data: Row; select?: Row }): Promise<Row> {
+    return project(this.seed(data), select);
   }
 
-  async findFirst(args: { where: Where; include?: Row }): Promise<Row | null> {
-    const row = this.rows.find((candidate) => matches(candidate, args.where)) ?? null;
-    return row && args.include ? this.resolveInclude(row, args.include) : row;
+  async findFirst(args: {
+    where: Where;
+    include?: Row;
+    select?: Row;
+    orderBy?: Row;
+  }): Promise<Row | null> {
+    const candidatos = sortRows(
+      this.rows.filter((row) => matches(row, args.where)),
+      args.orderBy,
+    );
+    const row = candidatos[0] ?? null;
+    if (!row) return null;
+    if (args.include) return this.resolveInclude(row, args.include);
+    return project(row, args.select);
   }
 
-  async findUnique(args: { where: Where; include?: Row }): Promise<Row | null> {
+  async findUnique(args: {
+    where: Where;
+    include?: Row;
+    select?: Row;
+  }): Promise<Row | null> {
     return this.findFirst(args);
   }
 
-  async findMany(args: { where?: Where } = {}): Promise<Row[]> {
-    return args.where ? this.rows.filter((row) => matches(row, args.where!)) : [...this.rows];
+  async findMany(args: { where?: Where; select?: Row; orderBy?: Row } = {}): Promise<Row[]> {
+    const filtradas = args.where ? this.rows.filter((row) => matches(row, args.where!)) : this.rows;
+    return sortRows(filtradas, args.orderBy).map((row) => project(row, args.select));
   }
 
-  async update({ where, data }: { where: Where; data: Row }): Promise<Row> {
+  async update({ where, data, select }: { where: Where; data: Row; select?: Row }): Promise<Row> {
     const row = this.rows.find((candidate) => matches(candidate, where));
     if (!row) throw notFound(this.model);
     Object.assign(row, data, { updatedAt: new Date() });
-    return row;
+    return project(row, select);
   }
 }
 
 export class FakePrisma {
   readonly process: FakeTable;
   readonly processDocument: FakeTable;
+  readonly documentExtraction: FakeTable;
   readonly payment: FakeTable;
   readonly processStatusEvent: FakeTable;
 
@@ -125,6 +172,21 @@ export class FakePrisma {
       }),
       linkProcess,
     );
+
+    this.documentExtraction = new FakeTable("documentExtraction", () => ({
+      id: randomUUID(),
+      // Espelha o default do schema.
+      state: "PENDENTE",
+      fields: null,
+      confidence: null,
+      failureReason: null,
+      extractedAt: null,
+      reviewedAt: null,
+      reviewedBy: null,
+      reviewedByRole: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
 
     this.payment = new FakeTable(
       "payment",

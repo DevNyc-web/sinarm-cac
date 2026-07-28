@@ -7,14 +7,19 @@ import {
   EXTRACTABLE_FIELDS,
   EXTRACTION_STATES,
   EXTRACTION_STATE_LABELS,
+  NO_EXTRACTION_STATE,
   demoExtractionExample,
   emptyExtraction,
+  extractionStateLabel,
 } from "../../../src/server/documents/documentExtractionTypes";
 
 test("estados de extração cobrem o ciclo pedido", () => {
+  // A partir do PR #47A os estados sao PERSISTIDOS (paridade com o enum Prisma).
+  // "Sem tentativa" deixou de ser estado e virou AUSENCIA DE LINHA — por isso
+  // NAO_INICIADA saiu daqui e virou marcador de dominio (`NO_EXTRACTION_STATE`).
   for (const s of [
-    "NAO_INICIADA",
     "PENDENTE",
+    "PROCESSANDO",
     "EXTRAIDA",
     "PRECISA_REVISAO",
     "CONFIRMADA",
@@ -23,6 +28,11 @@ test("estados de extração cobrem o ciclo pedido", () => {
     assert.ok(EXTRACTION_STATES.includes(s), `falta estado ${s}`);
     assert.equal(typeof EXTRACTION_STATE_LABELS[s], "string");
   }
+});
+
+test("NAO_INICIADA não é estado persistido", () => {
+  assert.ok(!(EXTRACTION_STATES as readonly string[]).includes(NO_EXTRACTION_STATE));
+  assert.equal(extractionStateLabel(NO_EXTRACTION_STATE), "Não iniciada");
 });
 
 test("campos extraíveis futuros incluem os previstos", () => {
