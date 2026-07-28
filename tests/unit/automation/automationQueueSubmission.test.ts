@@ -20,6 +20,7 @@ import {
   type AutomationReadinessRow,
 } from "../../../src/server/automation/automationReadinessInput";
 import { GUIA_TRAFEGO_PROCESS_CODE } from "../../../src/server/documents/documentRequirements";
+import { NO_EXTRACTION_FIELDS } from "../../../src/server/documents/documentExtractionReview";
 import type { DocumentStatus, DocumentType } from "@prisma/client";
 
 function readiness(status: AutomationReadiness["status"]): AutomationReadiness {
@@ -93,13 +94,13 @@ function readyRow(overrides: Partial<AutomationReadinessRow> = {}): AutomationRe
 }
 
 test("snapshotFromRow + deriveAutomationReadiness: linha completa fica PRONTA e elegivel", () => {
-  const result = deriveAutomationReadiness(snapshotFromRow(readyRow()));
+  const result = deriveAutomationReadiness(snapshotFromRow(readyRow(), NO_EXTRACTION_FIELDS));
   assert.equal(result.status, "PRONTO_PARA_AUTOMACAO");
   assert.equal(checkAutomationQueueEligibility(result, true, false).ok, true);
 });
 
 test("snapshotFromRow: sem pagamento PAGO nao fica pronta e nao e elegivel", () => {
-  const result = deriveAutomationReadiness(snapshotFromRow(readyRow({ payments: [] })));
+  const result = deriveAutomationReadiness(snapshotFromRow(readyRow({ payments: [] }), NO_EXTRACTION_FIELDS));
   assert.equal(result.status, "NAO_PRONTO_PARA_AUTOMACAO");
   const eligibility = checkAutomationQueueEligibility(result, true, false);
   assert.equal(eligibility.ok, false);
@@ -107,7 +108,7 @@ test("snapshotFromRow: sem pagamento PAGO nao fica pronta e nao e elegivel", () 
 });
 
 test("snapshotFromRow: sem arma/PCE nao fica pronta", () => {
-  const result = deriveAutomationReadiness(snapshotFromRow(readyRow({ firearm: null })));
+  const result = deriveAutomationReadiness(snapshotFromRow(readyRow({ firearm: null }), NO_EXTRACTION_FIELDS));
   assert.equal(result.status, "NAO_PRONTO_PARA_AUTOMACAO");
 });
 

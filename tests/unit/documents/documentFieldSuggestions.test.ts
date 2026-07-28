@@ -14,6 +14,7 @@ import {
   type ProcessCurrentValues,
 } from "../../../src/server/documents/documentFieldSuggestions";
 import {
+  NO_EXTRACTION_FIELDS,
   buildExtractionReview,
   type ReviewDocument,
 } from "../../../src/server/documents/documentExtractionReview";
@@ -45,7 +46,7 @@ function suggestionsFor(
   status: ReviewDocument["status"] = "APROVADO",
   current: ProcessCurrentValues = {},
 ) {
-  return buildFieldSuggestions(buildExtractionReview([doc({ type, status })]), current);
+  return buildFieldSuggestions(buildExtractionReview([doc({ type, status })], NO_EXTRACTION_FIELDS), current);
 }
 
 test("sem documentos, não há sugestão alguma", () => {
@@ -169,7 +170,7 @@ test("agrupamento por área é estável e omite área vazia", () => {
     buildExtractionReview([
       doc({ id: "a", type: "DECLARACAO_DESTINO_EVENTO" }),
       doc({ id: "b", type: "IDENTIFICACAO_PESSOAL" }),
-    ]),
+    ], NO_EXTRACTION_FIELDS),
   );
   const groups = groupSuggestionsByArea(suggestions);
   assert.deepEqual(groups.map((g) => g.area), ["PESSOAIS", "DESTINO"]);
@@ -183,14 +184,14 @@ test("ids de sugestão são únicos e estáveis", () => {
   const input = buildExtractionReview([
     doc({ id: "doc-a", type: "DECLARACAO_DESTINO_EVENTO" }),
     doc({ id: "doc-b", type: "COMPROVANTE_ORIGEM_ENDERECO" }),
-  ]);
+  ], NO_EXTRACTION_FIELDS);
   const ids = buildFieldSuggestions(input).map((s) => s.id);
   assert.equal(new Set(ids).size, ids.length, "ids não podem colidir");
   assert.deepEqual(buildFieldSuggestions(input).map((s) => s.id), ids, "ids são estáveis");
 });
 
 test("a função é pura: não muta a entrada nem o processo atual", () => {
-  const reviews = buildExtractionReview([doc({ type: "DECLARACAO_DESTINO_EVENTO" })]);
+  const reviews = buildExtractionReview([doc({ type: "DECLARACAO_DESTINO_EVENTO" })], NO_EXTRACTION_FIELDS);
   const snapshotReviews = JSON.stringify(reviews);
   const current: ProcessCurrentValues = JSON.parse(JSON.stringify(DESTINO_ATUAL));
   const snapshotCurrent = JSON.stringify(current);

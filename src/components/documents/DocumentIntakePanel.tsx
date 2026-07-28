@@ -12,6 +12,7 @@ import {
   resolveRequirementState,
   type DocumentKind,
   type DocumentState,
+  type ExtractionFieldsByDocument,
   type ProcessCurrentValues,
   type ReviewDocument,
 } from "@/server/documents";
@@ -35,6 +36,7 @@ const STATE_TONE: Record<DocumentState, string> = {
 export function DocumentIntakePanel({
   processId,
   documents,
+  extractionFields,
   uploadAction,
   sentKind,
   error,
@@ -44,6 +46,11 @@ export function DocumentIntakePanel({
 }: {
   processId: string;
   documents: readonly ReviewDocument[];
+  /**
+   * Campos extraidos JA LIDOS pela pagina. Prop, e nao leitura propria, porque
+   * componente nao faz I/O: buscar aqui duplicaria a query que a pagina ja fez.
+   */
+  extractionFields: ExtractionFieldsByDocument;
   uploadAction: (formData: FormData) => void | Promise<void>;
   /** Tipo confirmado no ultimo envio (querystring `?ok=`), para feedback no card. */
   sentKind?: DocumentKind;
@@ -57,7 +64,7 @@ export function DocumentIntakePanel({
 }) {
   const requirements = guiaTrafegoRequirements();
   // Calculada uma vez e compartilhada: conferencia e sugestoes veem o mesmo estado.
-  const reviews = buildExtractionReview(documents);
+  const reviews = buildExtractionReview(documents, extractionFields);
 
   return (
     <>

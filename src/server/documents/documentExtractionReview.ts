@@ -1,10 +1,23 @@
 /**
- * Modulo de documentos — CONFERENCIA (mock/dev) dos dados de um documento.
+ * Modulo de documentos — CONFERENCIA dos dados de um documento.
  *
- * Funcoes PURAS: recebem os documentos ja persistidos e devolvem a visao de
- * conferencia. NAO leem arquivo, NAO fazem OCR, NAO chamam IA, NAO acessam rede
- * e NAO gravam nada. O status vem DERIVADO do `DocumentStatus` que ja existe no
- * banco — nao ha tabela de conferencia (decisao: sem mudanca de schema).
+ * Funcoes PURAS: recebem os documentos ja persistidos MAIS os campos extraidos
+ * ja lidos, e devolvem a visao de conferencia. NAO leem arquivo, NAO fazem OCR,
+ * NAO chamam IA, NAO acessam rede e NAO gravam nada. O status vem DERIVADO do
+ * `DocumentStatus` que ja existe no banco — nao ha tabela de conferencia
+ * (decisao: sem mudanca de schema).
+ *
+ * FONTE DOS CAMPOS (PR #47C): os campos vem INJETADOS pelo chamador, nunca lidos
+ * aqui. Quem tem I/O (a pagina do processo, o service de aplicacao) carrega o
+ * mapa com `loadOwnerExtractionFields` e o passa adiante; quem e puro (o
+ * adaptador da fila) passa um mapa vazio. Manter a leitura fora daqui e o que
+ * permite este modulo continuar SINCRONO — se ele virasse async, os quatro
+ * consumidores e a fila do admin teriam de virar tambem, e o adaptador de
+ * prontidao perderia a pureza que o mantem livre de N+1.
+ *
+ * Documento AUSENTE do mapa cai em `mockFieldsFor`. Isso e o que torna a troca do
+ * #47C neutra: hoje nada cria linha de extracao em producao, entao o mapa chega
+ * sempre vazio e a saida e identica a de antes, campo a campo.
  */
 import type { IntakeDocument } from "./documentIntake";
 import {
@@ -36,6 +49,22 @@ export interface DocumentReview {
   hasLowConfidence: boolean;
 }
 
+/**
+ * Campos extraidos ja lidos, por `documentId`.
+ *
+ * Documento AUSENTE significa "sem extracao confiavel" — e nao "extraiu zero
+ * campos". O loader so poe no mapa tentativas em estado utilizavel com JSON
+ * valido, entao PENDENTE/PROCESSANDO/FALHOU e linha corrompida chegam aqui como
+ * ausencia, e caem no mock.
+ */
+export type ExtractionFieldsByDocument = ReadonlyMap<
+  string,
+  readonly MockExtractionField[]
+>;
+
+/** Mapa vazio para quem nao le extracao persistida (adaptador da fila). */
+export const NO_EXTRACTION_FIELDS: ExtractionFieldsByDocument = new Map();
+
 /** Status da conferencia derivado do status do documento + confianca mock. */
 function statusFor(document: ReviewDocument, hasLowConfidence: boolean): ReviewStatus {
   switch (document.status) {
@@ -52,13 +81,20 @@ function statusFor(document: ReviewDocument, hasLowConfidence: boolean): ReviewS
 }
 
 /**
- * Conferencia de UM documento. Os valores sao de DEMONSTRACAO (mock) e nao
- * saem do arquivo enviado — ver `documentExtractionMock.ts`.
+ * Conferencia de UM documento.
+ *
+ * `extractedFields` sao os campos JA LIDOS da extracao persistida; `null` (ou
+ * ausencia) cai nos valores de DEMONSTRACAO, que nao saem do arquivo enviado —
+ * ver `documentExtractionMock.ts`.
  */
-export function reviewForDocument(document: ReviewDocument): DocumentReview {
+export function reviewForDocument(
+  document: ReviewDocument,
+  extractedFields: readonly MockExtractionField[] | null,
+): DocumentReview {
   const kind = fromPrismaDocumentType(document.type);
-  const mockFields = mockFieldsFor(kind);
-  const hasLowConfidence = mockFields.some((field) => needsReview(field.confidence));
+  // Sem extracao confiavel => mock, exatamente como antes do #47C.
+  const fields = extractedFields ?? mockFieldsFor(kind);
+  const hasLowConfidence = fields.some((field) => needsReview(field.confidence));
 
   return {
     documentId: document.id,
@@ -66,7 +102,7 @@ export function reviewForDocument(document: ReviewDocument): DocumentReview {
     originalFileName: document.originalFileName,
     status: statusFor(document, hasLowConfidence),
     // Nenhum campo nasce confirmado: a conferencia humana ainda nao e gravada.
-    fields: mockFields.map((field) => ({ ...field, confirmed: false })),
+    fields: fields.map((field) => ({ ...field, confirmed: false })),
     hasLowConfidence,
   };
 }
@@ -74,13 +110,19 @@ export function reviewForDocument(document: ReviewDocument): DocumentReview {
 /**
  * Conferencia de todos os documentos enviados, mais recentes primeiro.
  * Lista VAZIA quando nao ha documento — a tela nao inventa dados sem arquivo.
+ *
+ * `extractionFields` e OBRIGATORIO de proposito. Um parametro opcional deixaria
+ * a troca do #47C acontecer pela metade em silencio; obrigatorio, o compilador
+ * recusa o build ate os quatro consumidores migrarem no MESMO commit. Quem nao
+ * le extracao persistida passa `NO_EXTRACTION_FIELDS`.
  */
 export function buildExtractionReview(
   documents: readonly ReviewDocument[],
+  extractionFields: ExtractionFieldsByDocument,
 ): readonly DocumentReview[] {
   return [...documents]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .map(reviewForDocument);
+    .map((document) => reviewForDocument(document, extractionFields.get(document.id) ?? null));
 }
 
 /** Onde um dado conferido poderia, no futuro, ajudar a preencher o processo. */

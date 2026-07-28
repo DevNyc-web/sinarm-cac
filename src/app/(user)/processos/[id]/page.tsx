@@ -13,6 +13,7 @@ import {
   buildFieldSuggestions,
   isDocumentKind,
 } from "@/server/documents";
+import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { deriveAutomationReadiness } from "@/server/automation/automationReadiness";
 import {
   DOCUMENT_STATUS_LABELS,
@@ -84,10 +85,17 @@ export default async function ProcessoRevisaoPage({
     !paidPayment &&
     (process.internalStatus === "RASCUNHO" || process.internalStatus === "AGUARDANDO_PAGAMENTO");
 
+  // Campos extraidos ja persistidos, lidos UMA vez e compartilhados com o painel
+  // — evita N+1 e garante que conferencia e sugestoes vejam o mesmo estado. O
+  // dono le os proprios campos por POSSE: `documents` so existe porque
+  // `findProcessByIdForUser` acima confirmou que o processo e dele.
+  // Sem linha persistida (o caso de hoje), o mapa vem vazio e tudo cai no mock.
+  const extractionFields = await loadOwnerExtractionFields(documents);
+
   // Checklist pre-execucao (prontidao para automacao) — avaliacao DERIVADA e
   // pura: nao executa acao, nao muda status, nao acessa Gov.br/SINARM. As
   // sugestoes sao regeradas no servidor a partir das conferencias (destino.*).
-  const reviews = buildExtractionReview(documents);
+  const reviews = buildExtractionReview(documents, extractionFields);
   const suggestions = buildFieldSuggestions(reviews, { destination: process.destination });
   const readiness = deriveAutomationReadiness({
     processTypeCode: process.processType.code,
@@ -185,6 +193,8 @@ export default async function ProcessoRevisaoPage({
         <DocumentIntakePanel
           processId={process.id}
           documents={documents}
+          // Mapa ja carregado acima: o painel NAO le banco (componente nao faz I/O).
+          extractionFields={extractionFields}
           uploadAction={uploadDocumentAction}
           sentKind={sentKind}
           error={erro}

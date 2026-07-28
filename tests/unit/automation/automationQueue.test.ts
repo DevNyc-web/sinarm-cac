@@ -20,6 +20,7 @@ import {
 } from "../../../src/server/automation/automationReadiness";
 import { GUIA_TRAFEGO_PROCESS_CODE } from "../../../src/server/documents/documentRequirements";
 import {
+  NO_EXTRACTION_FIELDS,
   buildExtractionReview,
   type ReviewDocument,
 } from "../../../src/server/documents/documentExtractionReview";
@@ -75,7 +76,7 @@ function pendingSuggestions() {
     rejectionReason: null,
   };
   const current: ProcessCurrentValues = { destination: DESTINO_COMPLETO };
-  return buildFieldSuggestions(buildExtractionReview([review]), current);
+  return buildFieldSuggestions(buildExtractionReview([review], NO_EXTRACTION_FIELDS), current);
 }
 
 test("processo pronto entra em PRONTO_PARA_AUTOMACAO", () => {

@@ -19,6 +19,7 @@ import {
   type ProcessCurrentValues,
 } from "../../../src/server/documents/documentFieldSuggestions";
 import {
+  NO_EXTRACTION_FIELDS,
   buildExtractionReview,
   type ReviewDocument,
 } from "../../../src/server/documents/documentExtractionReview";
@@ -49,7 +50,7 @@ function suggestionsFor(
   current: ProcessCurrentValues = DESTINO_ATUAL,
   status: ReviewDocument["status"] = "APROVADO",
 ) {
-  return buildFieldSuggestions(buildExtractionReview([doc({ type, status })]), current);
+  return buildFieldSuggestions(buildExtractionReview([doc({ type, status })], NO_EXTRACTION_FIELDS), current);
 }
 
 function find(

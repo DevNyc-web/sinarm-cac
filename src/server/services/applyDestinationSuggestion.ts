@@ -15,6 +15,7 @@ import {
   buildFieldSuggestions,
   checkSuggestionApplication,
 } from "@/server/documents";
+import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
 import { recordOperationalEvent } from "@/server/repositories/processEventRepository";
 import {
@@ -50,7 +51,11 @@ export async function applyDestinationSuggestion(
 
     // Fonte da verdade: documentos conferidos + destino atual, lidos agora.
     const documents = await listDocumentsForOwner(process.id);
-    const reviews = buildExtractionReview(documents);
+    // Campos extraidos persistidos do PROPRIO dono — `findProcessByIdForUser`
+    // acima ja confirmou a posse. Sem linha utilizavel, o mapa vem vazio e o
+    // valor aplicado continua sendo o de demonstracao, como antes do #47C.
+    const extractionFields = await loadOwnerExtractionFields(documents);
+    const reviews = buildExtractionReview(documents, extractionFields);
     const suggestions = buildFieldSuggestions(reviews, { destination: process.destination });
 
     const suggestion = suggestions.find((candidate) => candidate.id === suggestionId);

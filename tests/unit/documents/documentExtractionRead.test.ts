@@ -1,10 +1,14 @@
 /**
- * Infraestrutura de LEITURA da extracao persistida (PR #47C-0).
+ * Leitura da extracao persistida (PR #47C-0) e TROCA DE FONTE (PR #47C).
  *
- * Este PR e INERTE: cria a leitura em lote, o guard do JSON e o loader do dono,
- * e NAO troca nenhum consumidor. `buildExtractionReview` continua derivando do
- * mock — a troca e o #47C, e tem de ser atomica. Ha testes aqui provando
- * justamente que a troca NAO aconteceu ainda.
+ * O #47C-0 criou a leitura em lote, o guard do JSON e o loader do dono. O #47C
+ * trocou os quatro consumidores para receberem os campos INJETADOS, com o mock
+ * como fallback quando nao ha extracao confiavel.
+ *
+ * A prova central da troca esta em "NEUTRALIDADE": mapa vazio produz exatamente
+ * a mesma conferencia de antes, campo a campo. Como nada cria linha de extracao
+ * em producao hoje, esse e o caminho real de todo documento — a troca e neutra
+ * por construcao, e passa a valer sozinha quando o #47D comecar a gravar linhas.
  *
  * Banco: fake via `globalThis.prisma` (ver `tests/unit/services/testPrisma.ts`).
  * Sem Postgres, sem OCR, sem worker, sem rede.
@@ -33,6 +37,14 @@ import {
 import { loadOwnerExtractionFields } from "../../../src/server/services/loadOwnerExtractionFields";
 import { EXTRACTION_STATES } from "../../../src/server/documents/documentExtractionTypes";
 import { CONFIDENCE_LEVELS } from "../../../src/server/documents/documentExtractionStatus";
+import {
+  NO_EXTRACTION_FIELDS,
+  buildExtractionReview,
+  type ReviewDocument,
+} from "../../../src/server/documents/documentExtractionReview";
+import { mockFieldsFor } from "../../../src/server/documents/documentExtractionMock";
+import { DOCUMENT_KINDS, type DocumentKind } from "../../../src/server/documents/documentTypes";
+import { mockExtractionEngine } from "../../../src/server/extraction/mockEngine";
 
 let db: FakePrisma = installFakePrisma();
 
@@ -415,6 +427,128 @@ test("o fake continua entendendo escalar, null, Date, gt e OR", async () => {
   );
 });
 
+/* ------------------------------------------- #47C: NEUTRALIDADE da troca --- */
+
+/** Documento de conferencia, com o `id` que chaveia o mapa. */
+function reviewDoc(over: Partial<ReviewDocument> & { id: string }): ReviewDocument {
+  return {
+    originalFileName: "fake.pdf",
+    type: "IDENTIFICACAO_PESSOAL",
+    status: "ENVIADO",
+    createdAt: new Date("2026-01-01T10:00:00Z"),
+    rejectionReason: null,
+    ...over,
+  };
+}
+
+/** `DocumentKind` -> `DocumentType` do Prisma (COMPLEMENTAR grava como OUTRO). */
+function typeOf(kind: DocumentKind): ReviewDocument["type"] {
+  return kind === "COMPLEMENTAR" ? "OUTRO" : kind;
+}
+
+test("NEUTRALIDADE: mapa vazio reproduz a conferencia de antes do #47C", () => {
+  // Para TODO tipo e TODO status, a saida com mapa vazio tem de ser exatamente a
+  // que o mock produzia. Este e o teste que sustenta "sem mudanca de
+  // comportamento" — hoje nao ha linha persistida, entao e o caminho de todos.
+  for (const kind of DOCUMENT_KINDS) {
+    for (const status of ["PENDENTE", "ENVIADO", "EM_ANALISE", "APROVADO", "REJEITADO"] as const) {
+      const doc = reviewDoc({ id: "d1", type: typeOf(kind), status });
+      const [review] = buildExtractionReview([doc], NO_EXTRACTION_FIELDS);
+
+      assert.deepEqual(
+        review.fields,
+        mockFieldsFor(kind).map((f) => ({ ...f, confirmed: false })),
+        `${kind}/${status}: campos divergiram do mock`,
+      );
+    }
+  }
+});
+
+test("NEUTRALIDADE: a engine mock persistida produz a MESMA conferencia do mock", async () => {
+  // O espelhamento provado no #47B vira, aqui, garantia de que a troca de fonte
+  // nao muda nada: linha EXTRAIDA gravada pela engine === ausencia de linha.
+  for (const kind of DOCUMENT_KINDS) {
+    const doc = reviewDoc({ id: "d1", type: typeOf(kind), status: "ENVIADO" });
+
+    const resultado = await mockExtractionEngine.extract({
+      documentId: "d1",
+      kind,
+      mimeType: "application/pdf",
+    });
+    assert.ok(resultado.ok);
+
+    const comPersistido = buildExtractionReview([doc], new Map([["d1", resultado.fields]]));
+    const semPersistido = buildExtractionReview([doc], NO_EXTRACTION_FIELDS);
+
+    assert.deepEqual(comPersistido, semPersistido, `${kind}: a troca de fonte mudou a saida`);
+  }
+});
+
+test("persistido SUBSTITUI o mock quando presente", () => {
+  const doc = reviewDoc({ id: "d1", type: "IDENTIFICACAO_PESSOAL" });
+  const persistido = [
+    { key: "nome", label: "Nome", value: "VALOR PERSISTIDO", confidence: "ALTA" as const },
+  ];
+
+  const [review] = buildExtractionReview([doc], new Map([["d1", persistido]]));
+
+  assert.deepEqual(review.fields, [{ ...persistido[0], confirmed: false }]);
+  assert.equal(review.hasLowConfidence, false, "confianca deriva dos campos EFETIVOS");
+});
+
+test("o mapa e por documento — um persistido nao contamina o vizinho", () => {
+  const docs = [
+    reviewDoc({ id: "com", createdAt: new Date("2026-01-02T10:00:00Z") }),
+    reviewDoc({ id: "sem", createdAt: new Date("2026-01-01T10:00:00Z") }),
+  ];
+  const persistido = [
+    { key: "nome", label: "Nome", value: "SO DESTE", confidence: "ALTA" as const },
+  ];
+
+  const reviews = buildExtractionReview(docs, new Map([["com", persistido]]));
+
+  assert.equal(reviews[0].documentId, "com", "ordenacao por createdAt desc nao mudou");
+  assert.equal(reviews[0].fields[0].value, "SO DESTE");
+  assert.deepEqual(
+    reviews[1].fields,
+    mockFieldsFor("IDENTIFICACAO_PESSOAL").map((f) => ({ ...f, confirmed: false })),
+    "o documento sem extracao continua no mock",
+  );
+});
+
+test("estado nao utilizavel nunca chega ao review — cai no mock via loader", async () => {
+  // A regra vive no loader/guard: estados nao utilizaveis ficam FORA do mapa, e
+  // ausencia no mapa e mock. Aqui provamos a ponta a ponta, do banco ao review.
+  for (const state of ["PENDENTE", "PROCESSANDO", "FALHOU"]) {
+    db = installFakePrisma();
+    db.processDocument.seed({ id: DOC_A, processId: "proc-1" });
+    seedExtraction(DOC_A, { state });
+
+    const mapa = await loadOwnerExtractionFields([{ id: DOC_A }]);
+    const doc = reviewDoc({ id: DOC_A });
+    const [review] = buildExtractionReview([doc], mapa);
+
+    assert.deepEqual(
+      review.fields,
+      mockFieldsFor("IDENTIFICACAO_PESSOAL").map((f) => ({ ...f, confirmed: false })),
+      `${state}: deveria cair no mock`,
+    );
+  }
+});
+
+test("estado utilizavel chega ao review — do banco ate a conferencia", async () => {
+  for (const state of USABLE_EXTRACTION_STATES) {
+    db = installFakePrisma();
+    db.processDocument.seed({ id: DOC_A, processId: "proc-1" });
+    seedExtraction(DOC_A, { state });
+
+    const mapa = await loadOwnerExtractionFields([{ id: DOC_A }]);
+    const [review] = buildExtractionReview([reviewDoc({ id: DOC_A })], mapa);
+
+    assert.deepEqual(review.fields, CAMPOS_VALIDOS.map((f) => ({ ...f, confirmed: false })), state);
+  }
+});
+
 /* ------------------------------------------------ escopo: PR INERTE (#47C-0) --- */
 
 function codeOnly(source: string): string {
@@ -431,47 +565,73 @@ function arquivosDe(dir: string): string[] {
 
 const LOADER = "src/server/services/loadOwnerExtractionFields.ts";
 
-test("NENHUM consumidor foi trocado — o loader ainda nao tem chamador", () => {
+/**
+ * Quem PODE chamar o loader (PR #47C).
+ *
+ * Lista FECHADA: o loader le PII por posse, entao cada chamador novo e uma
+ * decisao de exposicao, nao um detalhe. Um arquivo que passe a importa-lo sem
+ * entrar aqui derruba o teste de proposito.
+ */
+const CHAMADORES_AUTORIZADOS = [
+  "src/app/(user)/processos/[id]/page.tsx",
+  "src/server/services/applyDestinationSuggestion.ts",
+];
+
+test("so os chamadores autorizados usam o loader do dono", () => {
+  // `codeOnly`: interessa IMPORTAR o loader, nao cita-lo. `documentExtractionReview.ts`
+  // explica em prosa quem carrega o mapa — mencao nao e uso.
   const importadores = [...arquivosDe("src"), ...arquivosDe("prisma")]
     .filter((file) => file !== LOADER)
-    .filter((file) => /loadOwnerExtractionFields/.test(readFileSync(file, "utf8")));
+    .filter((file) => /loadOwnerExtractionFields/.test(codeOnly(readFileSync(file, "utf8"))));
 
   assert.deepEqual(
-    importadores,
-    [],
-    `o #47C-0 e inerte: a troca e o #47C, e tem de ser atomica. Achei: ${importadores.join(", ")}`,
+    importadores.sort(),
+    [...CHAMADORES_AUTORIZADOS].sort(),
+    "chamador novo do loader e decisao de PII — precisa entrar na lista de propósito",
   );
 });
 
-test("os 4 consumidores de buildExtractionReview continuam na fonte antiga", () => {
-  const CONSUMIDORES = [
-    "src/app/(user)/processos/[id]/page.tsx",
-    "src/components/documents/DocumentIntakePanel.tsx",
-    "src/server/automation/automationReadinessInput.ts",
-    "src/server/services/applyDestinationSuggestion.ts",
-  ];
+test("os 4 consumidores receberam a fonte injetada", () => {
+  // Cada consumidor tem a sua forma legitima de obter o mapa. O que NENHUM pode
+  // fazer e ler a fonte por conta propria (repositorio) ou acionar a engine.
+  const CONSUMIDORES: Record<string, RegExp> = {
+    // Faz I/O: carrega o mapa uma vez e repassa ao painel.
+    "src/app/(user)/processos/[id]/page.tsx": /loadOwnerExtractionFields\(documents\)/,
+    // Componente NAO faz I/O: recebe por prop.
+    "src/components/documents/DocumentIntakePanel.tsx": /extractionFields/,
+    // Puro: recebe por parametro, nunca busca.
+    "src/server/automation/automationReadinessInput.ts": /extractionFields/,
+    // Service async: carrega antes de derivar.
+    "src/server/services/applyDestinationSuggestion.ts": /loadOwnerExtractionFields\(documents\)/,
+  };
 
-  for (const arquivo of CONSUMIDORES) {
+  for (const [arquivo, esperado] of Object.entries(CONSUMIDORES)) {
     const source = readFileSync(arquivo, "utf8");
-    assert.ok(source.includes("buildExtractionReview"), `${arquivo}: ainda e consumidor`);
+    assert.ok(source.includes("buildExtractionReview"), `${arquivo}: continua consumidor`);
+    assert.match(source, esperado, `${arquivo}: nao recebeu a fonte injetada`);
     assert.ok(
-      !source.includes("loadOwnerExtractionFields") &&
-        !source.includes("documentExtractionRepository"),
-      `${arquivo} nao pode ler a nova fonte neste PR`,
+      !source.includes("documentExtractionRepository"),
+      `${arquivo}: le a fonte pelo loader, nunca pelo repositorio`,
     );
   }
 });
 
-test("buildExtractionReview NAO foi alterado", async () => {
-  const source = readFileSync("src/server/documents/documentExtractionReview.ts", "utf8");
-  assert.match(source, /mockFieldsFor/, "a fonte continua sendo a funcao pura");
-  assert.doesNotMatch(source, /await|Promise|async/, "continua sincrona");
-  assert.doesNotMatch(source, /documentExtractionFields|Repository/, "nao le a fonte nova");
+test("buildExtractionReview trocou de fonte SEM perder pureza", async () => {
+  // `codeOnly`: o cabecalho do modulo explica POR QUE nao pode virar async e
+  // quem carrega o mapa — a trava e sobre codigo, nao sobre a prosa que o documenta.
+  const code = codeOnly(readFileSync("src/server/documents/documentExtractionReview.ts", "utf8"));
+  assert.match(code, /mockFieldsFor/, "o mock continua como FALLBACK");
+  assert.doesNotMatch(code, /\b(await|async)\b/, "continua sincrona");
+  assert.doesNotMatch(code, /Repository|loadOwner|getPrisma/, "nao le banco: recebe injetado");
 
   const { buildExtractionReview } = await import(
     "../../../src/server/documents/documentExtractionReview"
   );
-  assert.equal(buildExtractionReview.length, 1, "assinatura intacta: so `documents`");
+  assert.equal(
+    buildExtractionReview.length,
+    2,
+    "parametro obrigatorio: e o que impede troca pela metade",
+  );
 });
 
 test("nenhum caminho de ADMIN usa o loader do dono", () => {
@@ -502,6 +662,44 @@ test("o loader se declara owner-scoped no nome e no comentario", () => {
   assert.match(source, /listDocumentsForOwner/, "aponta de onde vem a checagem de dono");
 });
 
+test("o painel de intake NAO faz I/O — recebe o mapa por prop", () => {
+  const source = readFileSync("src/components/documents/DocumentIntakePanel.tsx", "utf8");
+
+  assert.match(source, /extractionFields: ExtractionFieldsByDocument/, "recebe por prop");
+  assert.doesNotMatch(codeOnly(source), /\bawait\b|loadOwnerExtractionFields|getPrisma/, "sem I/O");
+});
+
+test("a pagina do processo carrega o mapa UMA vez e repassa ao painel", () => {
+  const code = codeOnly(readFileSync("src/app/(user)/processos/[id]/page.tsx", "utf8"));
+  const chamadas = code.match(/loadOwnerExtractionFields\(/g) ?? [];
+
+  assert.equal(chamadas.length, 1, "mais de uma chamada seria N+1 no render");
+  assert.match(code, /extractionFields=\{extractionFields\}/, "o mesmo mapa vai para o painel");
+});
+
+test("snapshotFromRow continua PURO — sem Prisma, sem loader, sem I/O", () => {
+  const code = codeOnly(readFileSync("src/server/automation/automationReadinessInput.ts", "utf8"));
+
+  assert.doesNotMatch(code, /getPrisma|Repository|loadOwnerExtractionFields/, "nao busca nada");
+  assert.doesNotMatch(code, /\b(async|await)\b/, "continua sincrono");
+  assert.match(code, /extractionFields/, "recebe a fonte por parametro");
+});
+
+test("fila e gate passam mapa VAZIO — sem PII de terceiro no admin", () => {
+  for (const arquivo of [
+    "src/server/services/getAutomationQueue.ts",
+    "src/server/services/submitToAutomationQueue.ts",
+  ]) {
+    const code = codeOnly(readFileSync(arquivo, "utf8"));
+    assert.match(code, /snapshotFromRow\([^)]*NO_EXTRACTION_FIELDS\)/, `${arquivo}: mapa vazio`);
+    assert.doesNotMatch(
+      code,
+      /loadOwnerExtractionFields/,
+      `${arquivo}: loader do DONO nunca em caminho de equipe`,
+    );
+  }
+});
+
 test("a leitura nova nao faz rede, OCR real, nuvem, Gov.br/SINARM nem Fase 9", () => {
   for (const arquivo of [
     LOADER,
@@ -526,4 +724,25 @@ test("o loader nao cria, nao executa e nao grava extracao", () => {
   assert.doesNotMatch(code, /requestDocumentExtraction|runDocumentExtraction/, "nao executa");
   assert.doesNotMatch(code, /getExtractionEngine|mockExtractionEngine/, "nao chama engine");
   assert.doesNotMatch(code, /createPendingExtraction|updateExtractionState/, "nao grava");
+});
+
+test("NENHUM consumidor aciona engine, request ou run", () => {
+  // A troca e de FONTE DE LEITURA. Criar ou executar extracao a partir de um
+  // render ou de uma acao do usuario e o #47D, e depende de worker.
+  for (const arquivo of [
+    "src/app/(user)/processos/[id]/page.tsx",
+    "src/components/documents/DocumentIntakePanel.tsx",
+    "src/server/automation/automationReadinessInput.ts",
+    "src/server/services/applyDestinationSuggestion.ts",
+    "src/server/services/getAutomationQueue.ts",
+    "src/server/services/submitToAutomationQueue.ts",
+    "src/server/documents/documentExtractionReview.ts",
+  ]) {
+    const code = codeOnly(readFileSync(arquivo, "utf8"));
+    assert.doesNotMatch(
+      code,
+      /getExtractionEngine|requestDocumentExtraction|runDocumentExtraction|mockExtractionEngine/,
+      `${arquivo}: extracao nao pode ser acionada por consumidor`,
+    );
+  }
 });
