@@ -16,6 +16,7 @@ import {
   type AutomationReadiness,
 } from "@/server/automation/automationReadiness";
 import { snapshotFromRow } from "@/server/automation/automationReadinessInput";
+import { NO_EXTRACTION_FIELDS } from "@/server/documents";
 import {
   AUTOMATION_QUEUE_SUBMISSION_MARKER,
   AUTOMATION_QUEUE_SUBMISSION_NOTE,
@@ -40,7 +41,8 @@ export async function getProcessReadinessState(
   const row = await findProcessForAutomationReadiness(processId);
   if (!row) return { found: false };
 
-  const readiness = deriveAutomationReadiness(snapshotFromRow(row));
+  // Mapa vazio pelo mesmo motivo da fila — ver `snapshotFromRow`.
+  const readiness = deriveAutomationReadiness(snapshotFromRow(row, NO_EXTRACTION_FIELDS));
   const alreadySubmitted = wasSubmittedToAutomationQueue(row.statusEvents);
   return { found: true, readiness, alreadySubmitted };
 }

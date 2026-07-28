@@ -20,6 +20,7 @@ import {
   type AutomationQueueCategory,
 } from "@/server/automation/automationQueue";
 import { snapshotFromRow } from "@/server/automation/automationReadinessInput";
+import { NO_EXTRACTION_FIELDS } from "@/server/documents";
 import { wasSubmittedToAutomationQueue } from "@/server/automation/automationQueueSubmission";
 import { listAutomationQueue } from "@/server/repositories/processRepository";
 
@@ -43,7 +44,10 @@ export async function getAutomationQueue(): Promise<AutomationQueueRow[]> {
   return rows.map((row) => {
     // Snapshot montado pelo mesmo adaptador do gate — regras so em
     // deriveAutomationReadiness (nada de checklist reimplementado aqui).
-    const readiness = deriveAutomationReadiness(snapshotFromRow(row));
+    // Sem extracao persistida: por `fields` (PII) no select desta LISTA exigiria
+    // decidir a regra de `process.pii.viewFull` no admin — PR proprio. Ver
+    // `snapshotFromRow`.
+    const readiness = deriveAutomationReadiness(snapshotFromRow(row, NO_EXTRACTION_FIELDS));
 
     const classification = classifyReadiness(readiness);
     const owner = findMockUser(row.userId);

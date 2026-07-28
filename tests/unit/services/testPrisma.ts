@@ -173,12 +173,26 @@ class FakeTable {
     Object.assign(row, data, { updatedAt: new Date() });
     return project(row, select);
   }
+
+  /**
+   * Atualiza TODAS as linhas que casam e devolve `{ count }`.
+   *
+   * O `count` importa de verdade: `updateProcessDestination` usa "0 linhas
+   * afetadas" para detectar processo SEM destino e abortar antes de gravar
+   * trilha — um fake que devolvesse sempre 1 esconderia essa guarda.
+   */
+  async updateMany({ where, data }: { where: Where; data: Row }): Promise<{ count: number }> {
+    const alvos = this.rows.filter((row) => matches(row, where));
+    for (const row of alvos) Object.assign(row, data, { updatedAt: new Date() });
+    return { count: alvos.length };
+  }
 }
 
 export class FakePrisma {
   readonly process: FakeTable;
   readonly processDocument: FakeTable;
   readonly documentExtraction: FakeTable;
+  readonly destination: FakeTable;
   readonly payment: FakeTable;
   readonly processStatusEvent: FakeTable;
 
@@ -186,14 +200,46 @@ export class FakePrisma {
     const linkProcess = (row: Row, include: Row): Row =>
       include.process ? { ...row, process: this.findProcess(row.processId as string) } : row;
 
-    this.process = new FakeTable("process", () => ({
+    // `findProcessByIdForUser` pede destination/firearm/processType. Sem resolver
+    // aqui, o service receberia `destination: undefined` e os testes de aplicacao
+    // de sugestao passariam por um caminho que nao existe em producao.
+    //
+    // RESOLVE, NAO INVENTA: cada relacao sai do que o teste SEMEOU — `destination`
+    // da sua tabela, `firearm`/`processType` da propria linha do processo. Devolver
+    // um `processType` fixo pareceria conveniente e seria a pior especie de verde
+    // falso: tipo de processo governa preco e requisitos, entao um teste de outro
+    // tipo passaria afirmando algo que nunca foi exercitado. Quem precisa do dado,
+    // semeia; quem nao semeou, recebe `null` e descobre na hora.
+    const linkProcessRelations = (row: Row, include: Row): Row => ({
+      ...row,
+      ...(include.destination
+        ? { destination: this.destination.rows.find((d) => d.processId === row.id) ?? null }
+        : {}),
+      ...(include.firearm ? { firearm: row.firearm ?? null } : {}),
+      ...(include.processType ? { processType: row.processType ?? null } : {}),
+    });
+
+    this.process = new FakeTable(
+      "process",
+      () => ({
+        id: randomUUID(),
+        userId: "user-dono",
+        code: "GT-0001",
+        operationalStatus: "RASCUNHO",
+        internalStatus: "RASCUNHO",
+        userFacingStatus: "RECEBIDO",
+        createdAt: new Date(),
+      }),
+      linkProcessRelations,
+    );
+
+    this.destination = new FakeTable("destination", () => ({
       id: randomUUID(),
-      userId: "user-dono",
-      code: "GT-0001",
-      operationalStatus: "RASCUNHO",
-      internalStatus: "RASCUNHO",
-      userFacingStatus: "RECEBIDO",
-      createdAt: new Date(),
+      eventName: "",
+      uf: "",
+      city: "",
+      street: "",
+      number: "",
     }));
 
     this.processDocument = new FakeTable(

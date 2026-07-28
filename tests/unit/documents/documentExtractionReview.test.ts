@@ -9,6 +9,7 @@ import {
   buildExtractionReview,
   reviewForDocument,
   toProcessFieldSuggestions,
+  type ExtractionFieldsByDocument,
   type ReviewDocument,
 } from "../../../src/server/documents/documentExtractionReview";
 import {
@@ -22,6 +23,15 @@ import {
   needsReview,
 } from "../../../src/server/documents/documentExtractionStatus";
 import { DOCUMENT_KINDS } from "../../../src/server/documents/documentTypes";
+
+/**
+ * SEM extracao persistida — a fonte de antes do #47C.
+ *
+ * Os testes abaixo descrevem o comportamento historico e as expectativas NAO
+ * mudaram na troca de fonte: e isso que prova que o #47C foi neutro. Se alguma
+ * assercao aqui precisar mudar, houve mudanca de comportamento.
+ */
+const SEM_EXTRACAO: ExtractionFieldsByDocument = new Map();
 
 function doc(partial: Partial<ReviewDocument> & Pick<ReviewDocument, "type">): ReviewDocument {
   return {
@@ -95,30 +105,30 @@ test("todo valor de demonstração se identifica como exemplo/fictício", () => 
 });
 
 test("sem documento enviado, não há conferência alguma", () => {
-  assert.deepEqual(buildExtractionReview([]), []);
+  assert.deepEqual(buildExtractionReview([], SEM_EXTRACAO), []);
 });
 
 test("conferência só aparece para documento enviado", () => {
-  const reviews = buildExtractionReview([doc({ type: "CR_REGISTRO_CAC" })]);
+  const reviews = buildExtractionReview([doc({ type: "CR_REGISTRO_CAC" })], SEM_EXTRACAO);
   assert.equal(reviews.length, 1);
   assert.equal(reviews[0].kind, "CR_REGISTRO_CAC");
   assert.ok(reviews[0].fields.length > 0);
 });
 
 test("status da conferência é derivado do status do documento", () => {
-  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "REJEITADO" })).status, "REJEITADA");
-  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "APROVADO" })).status, "CONFIRMADA");
-  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "PENDENTE" })).status, "NAO_INICIADA");
+  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "REJEITADO" }), null).status, "REJEITADA");
+  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "APROVADO" }), null).status, "CONFIRMADA");
+  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "PENDENTE" }), null).status, "NAO_INICIADA");
   // Identificacao tem um campo de confianca baixa => precisa de revisao.
-  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "ENVIADO" })).status, "PRECISA_REVISAO");
+  assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "ENVIADO" }), null).status, "PRECISA_REVISAO");
   // Origem/endereco nao tem campo baixo => fica so como demonstracao a conferir.
-  assert.equal(reviewForDocument(doc({ type: "COMPROVANTE_ORIGEM_ENDERECO", status: "ENVIADO" })).status, "EXTRAIDA_MOCK");
+  assert.equal(reviewForDocument(doc({ type: "COMPROVANTE_ORIGEM_ENDERECO", status: "ENVIADO" }), null).status, "EXTRAIDA_MOCK");
 });
 
 test("nenhum campo nasce confirmado (não há persistência de conferência)", () => {
   for (const kind of DOCUMENT_KINDS) {
     const type = kind === "COMPLEMENTAR" ? "OUTRO" : kind;
-    const review = reviewForDocument(doc({ type, status: "APROVADO" }));
+    const review = reviewForDocument(doc({ type, status: "APROVADO" }), null);
     for (const field of review.fields) {
       assert.equal(field.confirmed, false, `${kind}.${field.key} não pode nascer confirmado`);
     }
@@ -129,7 +139,7 @@ test("conferência lista o documento mais recente primeiro", () => {
   const reviews = buildExtractionReview([
     doc({ id: "antigo", type: "IDENTIFICACAO_PESSOAL", createdAt: new Date("2026-01-01T10:00:00Z") }),
     doc({ id: "novo", type: "CR_REGISTRO_CAC", createdAt: new Date("2026-01-02T10:00:00Z") }),
-  ]);
+  ], SEM_EXTRACAO);
   assert.equal(reviews[0].documentId, "novo");
   assert.equal(reviews[1].documentId, "antigo");
 });
@@ -137,12 +147,12 @@ test("conferência lista o documento mais recente primeiro", () => {
 test("sugestões futuras só saem de documento confirmado pela equipe", () => {
   const naoConfirmado = buildExtractionReview([
     doc({ type: "DECLARACAO_DESTINO_EVENTO", status: "ENVIADO" }),
-  ]);
+  ], SEM_EXTRACAO);
   assert.deepEqual(toProcessFieldSuggestions(naoConfirmado), []);
 
   const confirmado = buildExtractionReview([
     doc({ type: "DECLARACAO_DESTINO_EVENTO", status: "APROVADO" }),
-  ]);
+  ], SEM_EXTRACAO);
   const suggestions = toProcessFieldSuggestions(confirmado);
   assert.ok(suggestions.length > 0);
   for (const s of suggestions) {
@@ -154,7 +164,7 @@ test("sugestões futuras só saem de documento confirmado pela equipe", () => {
 });
 
 test("documento complementar nunca vira sugestão de campo do processo", () => {
-  const reviews = buildExtractionReview([doc({ type: "OUTRO", status: "APROVADO" })]);
+  const reviews = buildExtractionReview([doc({ type: "OUTRO", status: "APROVADO" })], SEM_EXTRACAO);
   assert.equal(reviews[0].kind, "COMPLEMENTAR");
   assert.deepEqual(toProcessFieldSuggestions(reviews), []);
 });
@@ -192,12 +202,12 @@ test("nenhum módulo de conferência chama rede, OCR ou IA", () => {
 
 test("as funções são puras: mesma entrada, mesma saída, sem I/O", () => {
   const input = [doc({ type: "IDENTIFICACAO_PESSOAL", status: "APROVADO" })];
-  assert.deepEqual(buildExtractionReview(input), buildExtractionReview(input));
+  assert.deepEqual(buildExtractionReview(input, SEM_EXTRACAO), buildExtractionReview(input, SEM_EXTRACAO));
   // Entrada nao e mutada (a ordenacao nao pode reordenar o array do chamador).
   const original = [
     doc({ id: "a", type: "IDENTIFICACAO_PESSOAL", createdAt: new Date("2026-01-01T10:00:00Z") }),
     doc({ id: "b", type: "CR_REGISTRO_CAC", createdAt: new Date("2026-01-02T10:00:00Z") }),
   ];
-  buildExtractionReview(original);
+  buildExtractionReview(original, SEM_EXTRACAO);
   assert.deepEqual(original.map((d) => d.id), ["a", "b"]);
 });

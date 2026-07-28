@@ -12,6 +12,7 @@ import {
 } from "../../../src/server/automation/automationReadiness";
 import { GUIA_TRAFEGO_PROCESS_CODE } from "../../../src/server/documents/documentRequirements";
 import {
+  NO_EXTRACTION_FIELDS,
   buildExtractionReview,
   type ReviewDocument,
 } from "../../../src/server/documents/documentExtractionReview";
@@ -133,7 +134,7 @@ test("sugestao aplicavel pendente de destino bloqueia", () => {
     rejectionReason: null,
   };
   const current: ProcessCurrentValues = { destination: DESTINO_COMPLETO };
-  const suggestions = buildFieldSuggestions(buildExtractionReview([review]), current);
+  const suggestions = buildFieldSuggestions(buildExtractionReview([review], NO_EXTRACTION_FIELDS), current);
   assert.ok(suggestions.length > 0, "a fixture precisa gerar sugestoes");
 
   const result = deriveAutomationReadiness(readySnapshot({ suggestions }));
