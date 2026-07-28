@@ -33,6 +33,7 @@ import {
 import { AutomationSubmitPanel } from "@/components/automation/AutomationSubmitPanel";
 import { ProcessRequirementsSummary } from "@/components/processes/ProcessRequirementsSummary";
 import { DOCUMENT_FILE_PERMISSION, documentFileHref } from "@/server/documents/documentAccess";
+import { formatBRL } from "@/server/processes/pricing";
 import { assignableMockUsers } from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
@@ -76,10 +77,6 @@ function formatDateTime(date: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   })}`;
-}
-
-function formatBRL(amountCents: number): string {
-  return `R$ ${(amountCents / 100).toFixed(2).replace(".", ",")}`;
 }
 
 /**

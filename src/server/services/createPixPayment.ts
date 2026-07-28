@@ -2,7 +2,7 @@
  * Caso de uso: gerar cobranca Pix SANDBOX/DEV do processo — Fase 5.
  *
  * Fluxo (docs/10 §9, adaptado ao modo sandbox):
- * - Valor FICTICIO do servico: R$ 100,00 (docs/00/10 — preco provavel).
+ * - Valor lido de `processes/pricing` (FONTE UNICA) — nunca do cliente.
  * - Uma cobranca ativa por processo (reaproveita se ja existir).
  * - Provider via adapter (fake por padrao; Mercado Pago sandbox opcional).
  * - NUNCA cobranca real: aviso na UI + provider fake nao-pagavel + trava de
@@ -17,9 +17,7 @@ import {
   markFailed,
 } from "@/server/repositories/paymentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
-
-/** Valor FICTICIO do servico no MVP (R$ 100,00). */
-export const SERVICE_PRICE_CENTS = 10_000;
+import { SERVICE_TOTAL_CENTS } from "@/server/processes/pricing";
 
 export type CreatePixPaymentResult = { ok: true } | { ok: false; error: string };
 
@@ -40,12 +38,12 @@ export async function createPixPayment(
     if (active) return { ok: true };
 
     const provider = getPaymentProvider();
-    const payment = await createPendingPayment(process.id, provider.name, SERVICE_PRICE_CENTS);
+    const payment = await createPendingPayment(process.id, provider.name, SERVICE_TOTAL_CENTS);
 
     try {
       const charge = await provider.createPixCharge({
         paymentId: payment.id,
-        amountCents: SERVICE_PRICE_CENTS,
+        amountCents: SERVICE_TOTAL_CENTS,
         description: `Servico Guia de Trafego (sandbox/dev) — ${process.code}`,
       });
       await attachCharge(payment.id, charge);
