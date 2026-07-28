@@ -414,6 +414,16 @@ enum ExtractionState {
 ///
 /// NAO ha OCR nesta fase: a tabela existe para receber o resultado quando o motor
 /// entrar. Nada aqui toca Gov.br/SINARM/PF, storage ou rede.
+///
+/// ATENCAO — ESTA TABELA TEM UM INDICE QUE O SCHEMA NAO DECLARA:
+/// `document_extractions_one_active_per_document` e um UNIQUE PARCIAL
+/// (`WHERE state IN ('PENDENTE','PROCESSANDO')`) criado em SQL cru na migration
+/// `20260729000000_extraction_single_active`. O Prisma nao expressa `WHERE` em
+/// @@index/@@unique, entao ele vive so la.
+///
+/// Consequencia: use `npm run db:migrate` / `db:deploy`. `npm run db:push`
+/// sincroniza o banco COM ESTE SCHEMA e pode remover aquele indice em silencio —
+/// e sem ele o banco volta a aceitar duas tentativas ativas no mesmo documento.
 model DocumentExtraction {
   id         String          @id @default(uuid())
   documentId String          @map("document_id")
@@ -445,7 +455,10 @@ model DocumentExtraction {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([documentId, createdAt])
+  /// Ordem declarada: "a mais recente deste documento" e sempre
+  /// (created_at DESC, id DESC) — sem isso, empate de milissegundo desempatava
+  /// pelo que o Postgres devolvesse, e podia alternar entre execucoes.
+  @@index([documentId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("document_extractions")
 }
 

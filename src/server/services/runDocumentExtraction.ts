@@ -14,14 +14,24 @@
 import { fromPrismaDocumentType } from "@/server/documents/documentTypes";
 import { getExtractionEngine } from "@/server/extraction/getExtractionEngine";
 import {
+  claimPendingExtraction,
   findLatestExtractionForDocument,
   updateExtractionState,
   type ExtractionRow,
 } from "@/server/repositories/documentExtractionRepository";
 import { findDocumentById } from "@/server/repositories/processDocumentRepository";
 
+/**
+ * Resultado da execucao.
+ *
+ * `claimed: false` NAO e erro: com dois workers, o perdedor perde o tempo todo,
+ * por desenho. Se isso voltasse como `ok: false`, o worker do #47D nao teria como
+ * distinguir "esta tentativa nao era minha" de "o banco caiu" — e ou alertaria em
+ * falso, ou silenciaria falha de verdade. O discriminante separa as duas.
+ */
 export type RunExtractionResult =
-  | { ok: true; extraction: ExtractionRow }
+  | { ok: true; claimed: true; extraction: ExtractionRow }
+  | { ok: true; claimed: false }
   | { ok: false; error: string };
 
 /**
@@ -38,13 +48,15 @@ export async function runDocumentExtraction(documentId: string): Promise<RunExtr
 
     const latest = await findLatestExtractionForDocument(documentId);
     if (!latest) return { ok: false, error: "Nenhuma extracao aberta para este documento." };
-    if (latest.state !== "PENDENTE") {
-      return { ok: false, error: `Extracao em estado ${latest.state} nao pode ser executada.` };
-    }
 
+    // CLAIM ATOMICO antes de qualquer trabalho. Tambem cobre o caso de a
+    // tentativa nao estar PENDENTE (ja processando, ou terminal): o `where` do
+    // claim nao a encontra e devolvemos `claimed: false` sem tocar na engine.
+    //
     // PROCESSANDO antes de chamar a engine: se o processo morrer no meio, a
     // linha denuncia que houve tentativa, em vez de parecer que nunca comecou.
-    await updateExtractionState(latest.id, { state: "PROCESSANDO" });
+    const claimed = await claimPendingExtraction(latest.id);
+    if (!claimed) return { ok: true, claimed: false };
 
     const engine = getExtractionEngine();
     const result = await engine.extract({
@@ -60,7 +72,7 @@ export async function runDocumentExtraction(documentId: string): Promise<RunExtr
         // Codigo fechado — o tipo garante que nao entra texto livre aqui.
         failureReason: result.failureReason,
       });
-      return { ok: true, extraction };
+      return { ok: true, claimed: true, extraction };
     }
 
     const extraction = await updateExtractionState(latest.id, {
@@ -70,11 +82,14 @@ export async function runDocumentExtraction(documentId: string): Promise<RunExtr
       extractedAt: new Date(),
     });
 
-    return { ok: true, extraction };
+    return { ok: true, claimed: true, extraction };
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel executar a extracao. Verifique o Postgres local (npm run db:push).",
+      // `db:migrate`, NAO `db:push` — mesmo motivo do `requestDocumentExtraction`:
+      // `db push` pode remover o indice unico parcial que garante uma unica
+      // tentativa ativa, e e justamente ele que sustenta o claim deste service.
+      error: "Nao foi possivel executar a extracao. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }
