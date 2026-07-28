@@ -7,10 +7,16 @@
  * pessoa antes de qualquer uso, e nada e enviado automaticamente.
  */
 
-/** Estados do ciclo de extracao (dominio). */
+/**
+ * Estados PERSISTIDOS de uma tentativa de extracao.
+ *
+ * Paridade 1:1 com o enum Prisma `ExtractionState` — travada por teste, pelo
+ * mesmo motivo de `Role`: o banco recusar estado invalido so vale se os dois
+ * lados nao divergirem.
+ */
 export const EXTRACTION_STATES = [
-  "NAO_INICIADA",
   "PENDENTE",
+  "PROCESSANDO",
   "EXTRAIDA",
   "PRECISA_REVISAO",
   "CONFIRMADA",
@@ -20,13 +26,37 @@ export const EXTRACTION_STATES = [
 export type ExtractionState = (typeof EXTRACTION_STATES)[number];
 
 export const EXTRACTION_STATE_LABELS: Record<ExtractionState, string> = {
-  NAO_INICIADA: "Não iniciada",
   PENDENTE: "Pendente",
+  PROCESSANDO: "Processando",
   EXTRAIDA: "Extraída (a conferir)",
   PRECISA_REVISAO: "Precisa de revisão",
   CONFIRMADA: "Confirmada",
   FALHOU: "Falhou",
 };
+
+/**
+ * Marcador de DOMINIO para "nenhuma tentativa existe" — NAO persistido.
+ *
+ * Com a tabela `document_extractions`, a ausencia de tentativa e representada
+ * pela AUSENCIA DE LINHA, nao por um estado gravado. Este valor existe apenas
+ * para a camada em memoria (`emptyExtraction`) ter o que devolver quando nao ha
+ * nada a relatar, sem inventar um estado que o banco aceitaria.
+ */
+export const NO_EXTRACTION_STATE = "NAO_INICIADA" as const;
+
+export type NoExtractionState = typeof NO_EXTRACTION_STATE;
+
+export const NO_EXTRACTION_STATE_LABEL = "Não iniciada";
+
+/** Estado persistido OU a ausencia de tentativa. */
+export type ExtractionStateOrAbsent = ExtractionState | NoExtractionState;
+
+/** Rotulo de qualquer um dos dois. */
+export function extractionStateLabel(state: ExtractionStateOrAbsent): string {
+  return state === NO_EXTRACTION_STATE
+    ? NO_EXTRACTION_STATE_LABEL
+    : EXTRACTION_STATE_LABELS[state];
+}
 
 /** Campos que poderao ser extraidos no futuro (contrato). */
 export const EXTRACTABLE_FIELDS = [
@@ -66,9 +96,28 @@ export interface ExtractedField {
 }
 
 export interface DocumentExtractionResult {
-  status: ExtractionState;
+  /** Pode ser a ausencia de tentativa — ver `NO_EXTRACTION_STATE`. */
+  status: ExtractionStateOrAbsent;
   fields: ExtractedField[];
   note: string;
+}
+
+/**
+ * Codigos de falha. Curtos e fechados de proposito: `failure_reason` NUNCA pode
+ * carregar texto bruto de OCR, trecho do documento, senha, token, cookie ou OTP.
+ */
+export const EXTRACTION_FAILURE_REASONS = [
+  "ARQUIVO_ILEGIVEL",
+  "FORMATO_NAO_SUPORTADO",
+  "TIMEOUT",
+  "ENGINE_INDISPONIVEL",
+  "ERRO_INTERNO",
+] as const;
+
+export type ExtractionFailureReason = (typeof EXTRACTION_FAILURE_REASONS)[number];
+
+export function isExtractionFailureReason(value: string): value is ExtractionFailureReason {
+  return (EXTRACTION_FAILURE_REASONS as readonly string[]).includes(value);
 }
 
 export const EXTRACTION_DISABLED_NOTE =
@@ -79,7 +128,7 @@ export const EXTRACTION_DISABLED_NOTE =
  * Nao depende de OCR, arquivo, IA ou rede.
  */
 export function emptyExtraction(): DocumentExtractionResult {
-  return { status: "NAO_INICIADA", fields: [], note: EXTRACTION_DISABLED_NOTE };
+  return { status: NO_EXTRACTION_STATE, fields: [], note: EXTRACTION_DISABLED_NOTE };
 }
 
 /**

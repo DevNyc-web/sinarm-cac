@@ -1,0 +1,154 @@
+import { type ExtractionState, type Prisma } from "@prisma/client";
+import { getPrisma } from "@/server/db/prisma";
+
+/**
+ * Repositorio de tentativas de extracao (PR #47A).
+ *
+ * 1:N por documento: uma linha POR TENTATIVA, historico preservado. "A extracao
+ * atual" e sempre a MAIS RECENTE — nunca um update destrutivo, porque a decisao
+ * automatica precisa saber em qual tentativa se baseou.
+ *
+ * NEED-TO-KNOW (mesmo criterio de `processDocumentRepository`): `fields` guarda o
+ * que foi lido do documento do cliente, ou seja, PII. O select BASE nao o inclui —
+ * so a funcao explicitamente marcada como "full" o busca, e ela exige que o
+ * chamador ja tenha checado `process.pii.viewFull`. Esconder na UI nao bastaria:
+ * o dado buscado ainda trafega no payload RSC e em log.
+ *
+ * Este modulo NAO conhece storage: nao ha `storageKey` aqui, nem caminho local.
+ * Tambem nao faz OCR, nao chama rede e nao toca Gov.br/SINARM/PF.
+ */
+
+/** Campos NAO sensiveis — seguros para fila, contagem e decisao automatica. */
+const EXTRACTION_BASE_SELECT = {
+  id: true,
+  documentId: true,
+  state: true,
+  confidence: true,
+  engine: true,
+  engineVersion: true,
+  failureReason: true,
+  extractedAt: true,
+  reviewedAt: true,
+  reviewedBy: true,
+  reviewedByRole: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** PII — so para quem tem `process.pii.viewFull`. */
+const EXTRACTION_FIELDS_SELECT = { fields: true } as const;
+
+/** Tentativa SEM os campos extraidos. */
+export type ExtractionRow = {
+  id: string;
+  documentId: string;
+  state: ExtractionState;
+  confidence: string | null;
+  engine: string;
+  engineVersion: string;
+  failureReason: string | null;
+  extractedAt: Date | null;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  reviewedByRole: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Tentativa COM os campos extraidos (PII). */
+export type ExtractionRowWithFields = ExtractionRow & { fields: Prisma.JsonValue | null };
+
+export type CreateExtractionData = {
+  documentId: string;
+  engine: string;
+  engineVersion: string;
+};
+
+/**
+ * Abre uma tentativa PENDENTE para o documento.
+ *
+ * Sempre INSERE: reprocessar cria uma linha nova, nunca sobrescreve a anterior.
+ * `state` usa o default PENDENTE do schema, e nenhum campo extraido nasce
+ * preenchido — nao ha OCR nesta fase.
+ */
+export function createPendingExtractionForDocument(
+  data: CreateExtractionData,
+): Promise<ExtractionRow> {
+  return getPrisma().documentExtraction.create({
+    data,
+    select: EXTRACTION_BASE_SELECT,
+  });
+}
+
+/**
+ * Tentativa mais recente do documento, SEM os campos extraidos.
+ *
+ * E a leitura padrao: fila, decisao automatica e painel de excecao precisam do
+ * estado, nao do conteudo do documento.
+ */
+export function findLatestExtractionForDocument(
+  documentId: string,
+): Promise<ExtractionRow | null> {
+  return getPrisma().documentExtraction.findFirst({
+    where: { documentId },
+    orderBy: { createdAt: "desc" },
+    select: EXTRACTION_BASE_SELECT,
+  });
+}
+
+/**
+ * Tentativa mais recente COM os campos extraidos (PII).
+ *
+ * O NOME e longo de proposito: quem chama tem de assumir que esta pedindo PII e
+ * ja ter verificado `process.pii.viewFull`. Nao ha checagem de permissao aqui —
+ * repositorio nao conhece sessao; o guard fica na action/rota, como no resto do
+ * projeto.
+ */
+export function findLatestExtractionWithFieldsForDocument(
+  documentId: string,
+): Promise<ExtractionRowWithFields | null> {
+  return getPrisma().documentExtraction.findFirst({
+    where: { documentId },
+    orderBy: { createdAt: "desc" },
+    select: { ...EXTRACTION_BASE_SELECT, ...EXTRACTION_FIELDS_SELECT },
+  });
+}
+
+/** Historico completo do documento, mais recentes primeiro, SEM PII. */
+export function listExtractionsForDocument(documentId: string): Promise<ExtractionRow[]> {
+  return getPrisma().documentExtraction.findMany({
+    where: { documentId },
+    orderBy: { createdAt: "desc" },
+    select: EXTRACTION_BASE_SELECT,
+  });
+}
+
+export type UpdateExtractionStateData = {
+  state: ExtractionState;
+  /** Campos lidos (PII). Omitido => nao mexe no que ja estava gravado. */
+  fields?: Prisma.InputJsonValue;
+  /** Agregado do PIOR campo. */
+  confidence?: string | null;
+  /** CODIGO de `EXTRACTION_FAILURE_REASONS` — nunca texto bruto de OCR. */
+  failureReason?: string | null;
+  extractedAt?: Date | null;
+  reviewedAt?: Date | null;
+  reviewedBy?: string | null;
+  reviewedByRole?: string | null;
+};
+
+/**
+ * Move o estado de UMA tentativa.
+ *
+ * Devolve a linha SEM `fields`: quem atualiza nao precisa receber PII de volta.
+ */
+export function updateExtractionState(
+  id: string,
+  data: UpdateExtractionStateData,
+): Promise<ExtractionRow> {
+  return getPrisma().documentExtraction.update({
+    where: { id },
+    data,
+    select: EXTRACTION_BASE_SELECT,
+  });
+}

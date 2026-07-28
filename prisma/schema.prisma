@@ -386,8 +386,67 @@ model ProcessDocument {
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")
 
+  extractions DocumentExtraction[]
+
   @@index([processId])
   @@map("process_documents")
+}
+
+/// Estado de UMA tentativa de extracao (docs/25). Espelha `EXTRACTION_STATES` em
+/// `src/server/documents/documentExtractionTypes.ts` — a paridade e travada por
+/// teste, pelo mesmo motivo de `Role`: o banco recusar estado invalido.
+enum ExtractionState {
+  PENDENTE
+  PROCESSANDO
+  EXTRAIDA
+  PRECISA_REVISAO
+  CONFIRMADA
+  FALHOU
+
+  @@map("extraction_state")
+}
+
+/// Tentativa de extracao de um documento.
+///
+/// 1:N de proposito (uma linha POR TENTATIVA, historico preservado): decisao
+/// automatica precisa saber em qual extracao se baseou, reprocessamento nao pode
+/// apagar a evidencia anterior, e trocar `engineVersion` exige comparar motores.
+///
+/// NAO ha OCR nesta fase: a tabela existe para receber o resultado quando o motor
+/// entrar. Nada aqui toca Gov.br/SINARM/PF, storage ou rede.
+model DocumentExtraction {
+  id         String          @id @default(uuid())
+  documentId String          @map("document_id")
+  document   ProcessDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  state ExtractionState @default(PENDENTE)
+
+  /// PII — campos extraidos + confianca POR CAMPO. So pode ser lido por quem tem
+  /// `process.pii.viewFull`; o repositorio nao o inclui no select base.
+  fields Json?
+
+  /// Agregado derivado do PIOR campo (ALTA/MEDIA/BAIXA). Atalho de consulta —
+  /// a fonte de verdade continua sendo a confianca por campo dentro de `fields`.
+  confidence String?
+
+  engine        String
+  engineVersion String @map("engine_version")
+
+  /// Codigo curto e sanitizado (ver `EXTRACTION_FAILURE_REASONS` no dominio).
+  /// NUNCA texto bruto de OCR nem qualquer credencial — a regra permanente de
+  /// docs/00 §8 vale aqui como no resto do schema.
+  failureReason String? @map("failure_reason")
+
+  extractedAt          DateTime? @map("extracted_at")
+  reviewedAt           DateTime? @map("reviewed_at")
+  reviewedBy           String?   @map("reviewed_by_mock_user_id")
+  reviewedByRole       String?   @map("reviewed_by_role")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([documentId, createdAt])
+  @@map("document_extractions")
 }
 
 /// Pagamento Pix do cliente (docs/12 §3.9) — Fase 5 em modo SANDBOX/DEV.
