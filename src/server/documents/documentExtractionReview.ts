@@ -23,6 +23,7 @@ import type { IntakeDocument } from "./documentIntake";
 import {
   needsReview,
   type ConfidenceLevel,
+  type ReviewSource,
   type ReviewStatus,
 } from "./documentExtractionStatus";
 import { mockFieldsFor, type MockExtractionField } from "./documentExtractionMock";
@@ -44,23 +45,35 @@ export interface DocumentReview {
   kind: DocumentKind;
   originalFileName: string;
   status: ReviewStatus;
+  /** ORIGEM dos valores — o que autoriza (ou proibe) a tela dizer "lemos". */
+  source: ReviewSource;
   fields: readonly ReviewField[];
   /** `true` quando algum campo esta com confianca baixa. */
   hasLowConfidence: boolean;
 }
 
 /**
- * Campos extraidos ja lidos, por `documentId`.
+ * Uma extracao persistida ja lida: os campos MAIS de onde vieram.
+ *
+ * A origem viaja junto com os campos de proposito. Se a UI tivesse de descobrir
+ * a fonte por outro caminho, os dois poderiam divergir — e a divergencia
+ * apareceria como uma frase errada na tela do cliente sobre o documento dele.
+ */
+export type PersistedExtraction = {
+  fields: readonly MockExtractionField[];
+  /** Sempre um `PERSISTED_*`: quem esta no mapa veio do banco. */
+  source: Extract<ReviewSource, `PERSISTED_${string}`>;
+};
+
+/**
+ * Extracoes persistidas por `documentId`.
  *
  * Documento AUSENTE significa "sem extracao confiavel" — e nao "extraiu zero
  * campos". O loader so poe no mapa tentativas em estado utilizavel com JSON
  * valido, entao PENDENTE/PROCESSANDO/FALHOU e linha corrompida chegam aqui como
- * ausencia, e caem no mock.
+ * ausencia, e caem em `MOCK_FALLBACK`.
  */
-export type ExtractionFieldsByDocument = ReadonlyMap<
-  string,
-  readonly MockExtractionField[]
->;
+export type ExtractionFieldsByDocument = ReadonlyMap<string, PersistedExtraction>;
 
 /** Mapa vazio para quem nao le extracao persistida (adaptador da fila). */
 export const NO_EXTRACTION_FIELDS: ExtractionFieldsByDocument = new Map();
@@ -76,24 +89,24 @@ function statusFor(document: ReviewDocument, hasLowConfidence: boolean): ReviewS
       return "NAO_INICIADA";
     default:
       // ENVIADO / EM_ANALISE: ha arquivo, mas ninguem conferiu ainda.
-      return hasLowConfidence ? "PRECISA_REVISAO" : "EXTRAIDA_MOCK";
+      return hasLowConfidence ? "PRECISA_REVISAO" : "EXTRAIDA";
   }
 }
 
 /**
  * Conferencia de UM documento.
  *
- * `extractedFields` sao os campos JA LIDOS da extracao persistida; `null` (ou
- * ausencia) cai nos valores de DEMONSTRACAO, que nao saem do arquivo enviado —
- * ver `documentExtractionMock.ts`.
+ * `extraction` e a extracao persistida ja lida; `null` (ou ausencia) cai nos
+ * valores de DEMONSTRACAO, que nao saem do arquivo enviado — ver
+ * `documentExtractionMock.ts` — e a origem vira `MOCK_FALLBACK`.
  */
 export function reviewForDocument(
   document: ReviewDocument,
-  extractedFields: readonly MockExtractionField[] | null,
+  extraction: PersistedExtraction | null,
 ): DocumentReview {
   const kind = fromPrismaDocumentType(document.type);
   // Sem extracao confiavel => mock, exatamente como antes do #47C.
-  const fields = extractedFields ?? mockFieldsFor(kind);
+  const fields = extraction?.fields ?? mockFieldsFor(kind);
   const hasLowConfidence = fields.some((field) => needsReview(field.confidence));
 
   return {
@@ -101,6 +114,7 @@ export function reviewForDocument(
     kind,
     originalFileName: document.originalFileName,
     status: statusFor(document, hasLowConfidence),
+    source: extraction?.source ?? "MOCK_FALLBACK",
     // Nenhum campo nasce confirmado: a conferencia humana ainda nao e gravada.
     fields: fields.map((field) => ({ ...field, confirmed: false })),
     hasLowConfidence,
@@ -123,6 +137,26 @@ export function buildExtractionReview(
   return [...documents]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .map((document) => reviewForDocument(document, extractionFields.get(document.id) ?? null));
+}
+
+/** Origem comum a TODOS os documentos, ou `"MISTA"`, ou `null` se nao ha nenhum. */
+export type AggregateSource = ReviewSource | "MISTA" | null;
+
+/**
+ * Origem do conjunto, para o texto de PAINEL.
+ *
+ * A origem e por documento, mas o painel tem avisos que falam do conjunto. Sem
+ * este agregado, o unico jeito de escrever esse aviso seria escolher uma fonte
+ * e torcer — que e como o texto fixo "Nenhum arquivo foi lido" existia. Com
+ * fontes MISTAS o painel nao pode afirmar nada global: tem de mandar olhar o
+ * rotulo de cada documento.
+ */
+export function aggregateReviewSource(
+  reviews: readonly DocumentReview[],
+): AggregateSource {
+  const [first, ...rest] = reviews;
+  if (!first) return null;
+  return rest.every((review) => review.source === first.source) ? first.source : "MISTA";
 }
 
 /** Onde um dado conferido poderia, no futuro, ajudar a preencher o processo. */

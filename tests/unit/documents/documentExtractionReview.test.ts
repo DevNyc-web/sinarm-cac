@@ -47,7 +47,7 @@ function doc(partial: Partial<ReviewDocument> & Pick<ReviewDocument, "type">): R
 test("status de conferência cobre os estados pedidos", () => {
   for (const s of [
     "NAO_INICIADA",
-    "EXTRAIDA_MOCK",
+    "EXTRAIDA",
     "PRECISA_REVISAO",
     "CONFIRMADA",
     "REJEITADA",
@@ -122,7 +122,7 @@ test("status da conferência é derivado do status do documento", () => {
   // Identificacao tem um campo de confianca baixa => precisa de revisao.
   assert.equal(reviewForDocument(doc({ type: "IDENTIFICACAO_PESSOAL", status: "ENVIADO" }), null).status, "PRECISA_REVISAO");
   // Origem/endereco nao tem campo baixo => fica so como demonstracao a conferir.
-  assert.equal(reviewForDocument(doc({ type: "COMPROVANTE_ORIGEM_ENDERECO", status: "ENVIADO" }), null).status, "EXTRAIDA_MOCK");
+  assert.equal(reviewForDocument(doc({ type: "COMPROVANTE_ORIGEM_ENDERECO", status: "ENVIADO" }), null).status, "EXTRAIDA");
 });
 
 test("nenhum campo nasce confirmado (não há persistência de conferência)", () => {
