@@ -15,11 +15,12 @@ import {
   buildDocumentFileHeaders,
   decideDocumentAccess,
   documentFileHref,
+  encodeExtValue,
   safeContentType,
   safeDownloadFileName,
 } from "../../../src/server/documents/documentAccess";
 import { roleHasPermission } from "../../../src/server/auth/permissions";
-import { INTERNAL_ROLES } from "../../../src/server/auth/roles";
+import { INTERNAL_ROLES, ROLES } from "../../../src/server/auth/roles";
 
 const DONO = "user-dono";
 const OUTRO = "user-outro";
@@ -70,6 +71,29 @@ test("perfil interno SEM a permissao de revisao nao acessa", () => {
 test("a permissao do arquivo e a MESMA de revisar o documento", () => {
   // Se divergirem, aparece botao que responde 404 (ou acesso sem direito a decidir).
   assert.equal(DOCUMENT_FILE_PERMISSION, "document.review");
+});
+
+test("CONTRATO RBAC: quem baixa o arquivo tambem pode ver PII completa", () => {
+  // A rota entrega o CONTEUDO do documento, que carrega mais PII que o nome do
+  // arquivo — e o nome ja e escondido de quem nao tem `process.pii.viewFull`
+  // (ver `documentsRestricted` em getAdminProcessDetail). Hoje os dois conjuntos
+  // coincidem, mas nada na matriz obriga isso: este teste falha se alguem criar
+  // um perfil que baixa o arquivo sem poder ver PII completa.
+  const violacoes = ROLES.filter(
+    (role) =>
+      roleHasPermission(role, DOCUMENT_FILE_PERMISSION) &&
+      !roleHasPermission(role, "process.pii.viewFull"),
+  );
+  assert.deepEqual(
+    violacoes,
+    [],
+    `perfil com ${DOCUMENT_FILE_PERMISSION} sem process.pii.viewFull: ${violacoes.join(", ")}`,
+  );
+});
+
+test("o contrato RBAC nao passa por vacuidade (ha perfil que baixa o arquivo)", () => {
+  const podem = ROLES.filter((role) => roleHasPermission(role, DOCUMENT_FILE_PERMISSION));
+  assert.ok(podem.length > 0, "algum perfil precisa poder baixar, senao o contrato acima e vazio");
 });
 
 /* ------------------------------------------------------------ Content-Type --- */
@@ -154,6 +178,27 @@ test("nenhum header contem CR/LF, mesmo com nome hostil", () => {
   for (const [nome, valor] of Object.entries(h)) {
     assert.ok(!/[\r\n]/.test(valor), `header ${nome} com quebra de linha`);
   }
+});
+
+test("apostrofo e percent-encodado no filename* (RFC 8187)", () => {
+  const disposition = headers({ originalFileName: "Joao's doc.pdf" })["Content-Disposition"];
+  assert.ok(
+    disposition.includes("filename*=UTF-8''Joao%27s%20doc.pdf"),
+    `apostrofo cru quebraria a ext-value: ${disposition}`,
+  );
+  // Depois do delimitador `UTF-8''` nao pode sobrar nenhuma aspa simples.
+  const extValue = disposition.split("filename*=UTF-8''")[1] ?? "";
+  assert.ok(!extValue.includes("'"), "a ext-value nao pode conter apostrofo cru");
+});
+
+test("os demais caracteres fora do attr-char tambem sao encodados", () => {
+  // encodeURIComponent deixa passar ( ) * alem do apostrofo — todos fora da RFC.
+  assert.equal(encodeExtValue("a(b)c*d'e"), "a%28b%29c%2Ad%27e");
+});
+
+test("o encoding da ext-value preserva o caso comum sem escapar demais", () => {
+  assert.equal(encodeExtValue("identificacao.pdf"), "identificacao.pdf");
+  assert.equal(encodeExtValue("nota fiscal.pdf"), "nota%20fiscal.pdf");
 });
 
 test("nome com acento vai no filename* e o ASCII no filename legado", () => {

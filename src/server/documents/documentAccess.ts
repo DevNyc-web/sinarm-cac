@@ -93,6 +93,21 @@ export function asciiDownloadFileName(fileName: string): string {
   return ascii.trim() || "documento";
 }
 
+/**
+ * Percent-encoding para a `ext-value` do `filename*` (RFC 8187 §3.2).
+ *
+ * `encodeURIComponent` NAO codifica `'`, `(`, `)` e `*`, que estao fora do
+ * `attr-char` da RFC. O apostrofo e o pior deles: e o proprio delimitador de
+ * `UTF-8''<valor>`, entao um nome como "Joao's doc.pdf" produziria um header
+ * fora da gramatica. Os quatro sao codificados na mao.
+ */
+export function encodeExtValue(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
 export type DocumentHeadersInput = {
   mimeType: string;
   originalFileName: string;
@@ -113,7 +128,7 @@ export function buildDocumentFileHeaders(input: DocumentHeadersInput): Record<st
 
   return {
     "Content-Type": safeContentType(input.mimeType),
-    "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeExtValue(fileName)}`,
     "Content-Length": String(input.byteLength),
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'none'; sandbox",
