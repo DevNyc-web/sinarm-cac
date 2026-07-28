@@ -111,10 +111,32 @@ export default async function CadastroPage({
                 outro lugar.
               </p>
             </div>
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm text-neutral-600">
+                Repita a senha
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={128}
+                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-neutral-500">
+                Só para conferir que não houve erro de digitação.
+              </p>
+            </div>
             <Button type="submit" className="w-full py-2.5 text-base">
               Criar minha conta
             </Button>
           </form>
+          <p className="mt-3 text-xs text-neutral-500">
+            Ao criar, você já entra no painel. Sua conta fica salva para acompanhar seus pedidos
+            quando quiser.
+          </p>
         </Card>
 
         <p className="mt-4 text-sm text-neutral-600">

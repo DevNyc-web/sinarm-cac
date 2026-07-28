@@ -17,6 +17,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { registerClient } from "@/server/auth/authService";
+import { checkPasswordConfirmation } from "@/server/auth/signupForm";
 import { startRealSession } from "@/server/auth/session";
 
 /**
@@ -33,6 +34,19 @@ export async function signUpAction(formData: FormData) {
   const name = String(formData.get("name") ?? "");
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  // Antes de `registerClient`: e erro de digitacao, nao decisao de seguranca.
+  // Nao consulta banco, entao nao revela nada sobre o e-mail — a protecao de
+  // timing de `register()` (hash antes da consulta) segue intacta.
+  const confirmation = checkPasswordConfirmation(password, confirmPassword);
+  if (!confirmation.ok) {
+    // A senha NUNCA volta na URL; so nome e e-mail, para o usuario nao redigitar.
+    redirect(
+      `/cadastro?erro=${encodeURIComponent(confirmation.message)}` +
+        `&nome=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`,
+    );
+  }
 
   const result = await registerClient({ name, email, password }, await rateLimitKey());
 
