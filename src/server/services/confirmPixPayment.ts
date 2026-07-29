@@ -13,8 +13,7 @@ import {
   findPaymentByWebhookEventId,
   markPaid,
 } from "@/server/repositories/paymentRepository";
-import { recordStatusEvent } from "@/server/repositories/processEventRepository";
-import { getPrisma } from "@/server/db/prisma";
+import { transitionInternalStatus } from "./transitionInternalStatus";
 
 export type ConfirmPixPaymentResult =
   | { ok: true; alreadyProcessed: boolean }
@@ -47,23 +46,23 @@ export async function confirmPixPayment(
     // Processo: RASCUNHO/AGUARDANDO_PAGAMENTO -> PAGO_EM_FILA (docs/11 §8).
     // Move as tres visoes juntas: interna (docs/12 §6), operacional (fila) e a
     // visivel ao usuario — para nao divergirem.
-    const fromStatus = payment.process.internalStatus;
-    await getPrisma().process.update({
-      where: { id: payment.processId },
-      data: {
-        internalStatus: "PAGO_EM_FILA",
+    //
+    // Via `transitionInternalStatus` (docs/44, Fase 3a): o `internalStatus` e o
+    // evento tipado saem da porta canonica; `operationalStatus`/
+    // `userFacingStatus` continuam sendo DECISAO DESTE FLUXO, passada em
+    // `alsoSet` para preservar a `update` unica. O helper nao os deriva.
+    const transition = await transitionInternalStatus({
+      processId: payment.processId,
+      toStatus: "PAGO_EM_FILA",
+      alsoSet: {
         operationalStatus: "PAGO_EM_FILA",
         userFacingStatus: "PAGAMENTO_CONFIRMADO",
       },
-    });
-    await recordStatusEvent({
-      processId: payment.processId,
-      fromStatus,
-      toStatus: "PAGO_EM_FILA",
       actorMockUserId: "webhook",
       actorRole: "SYSTEM",
       note: `Pix confirmado (sandbox/dev) — evento ${eventId.slice(0, 24)}`,
     });
+    if (!transition.ok) return { ok: false, error: transition.error };
 
     return { ok: true, alreadyProcessed: false };
   } catch {
