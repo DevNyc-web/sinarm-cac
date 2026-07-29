@@ -286,6 +286,41 @@ export async function failStaleProcessingExtractions(
   return count;
 }
 
+/**
+ * Encerra tentativas PROCESSANDO paradas ha tempo demais em TODOS os documentos.
+ *
+ * IRMA da funcao acima, NAO substituta. As duas resolvem coisas diferentes e
+ * precisam das duas: a por `documentId` DESTRAVA o documento do cliente no
+ * instante em que ele pede de novo — e e ela que garante que ninguem fica preso,
+ * mesmo sem nada varrendo a tabela. Esta aqui e REDE DE SEGURANCA, para a orfa de
+ * um documento que ninguem foi pedir: sem ela, a linha fica PROCESSANDO para
+ * sempre, aparecendo em relatorio como trabalho em andamento que nao existe.
+ *
+ * NAO recebe `documentId`, e a versao por documento NAO ganhou um parametro
+ * opcional para virar global. O `where` escopado dela e protegido por teste
+ * justamente porque afroxa-lo era o atalho previsivel para chegar aqui — e um
+ * escopo variavel erraria em silencio, matando tentativa viva de outro documento.
+ * Duas funcoes com `where` fixo sao mais dificeis de usar errado que uma com
+ * escopo configuravel.
+ *
+ * RELOGIO E `updatedAt`, mesmo criterio da versao por documento: o claim
+ * PENDENTE -> PROCESSANDO renova `@updatedAt`, entao numa linha PROCESSANDO ele
+ * marca quando o processamento COMECOU. `createdAt` mediria a espera na fila
+ * junto com o trabalho e mataria tentativa recem-iniciada.
+ *
+ * Um unico UPDATE condicional — atomico e idempotente como o claim: dois
+ * chamadores concorrentes nao se atrapalham, o segundo encontra 0 linhas. Devolve
+ * a CONTAGEM, nunca as linhas: quem limpa nao precisa receber PII de volta.
+ */
+export async function failStaleProcessingExtractionsEverywhere(cutoff: Date): Promise<number> {
+  const { count } = await getPrisma().documentExtraction.updateMany({
+    where: { state: "PROCESSANDO", updatedAt: { lt: cutoff } },
+    // `TIMEOUT` ja existe em `EXTRACTION_FAILURE_REASONS` — codigo fechado, sem PII.
+    data: { state: "FALHOU", failureReason: "TIMEOUT" },
+  });
+  return count;
+}
+
 export type UpdateExtractionStateData = {
   state: ExtractionState;
   /** Campos lidos (PII). Omitido => nao mexe no que ja estava gravado. */
