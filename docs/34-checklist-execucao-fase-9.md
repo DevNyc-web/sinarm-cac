@@ -239,16 +239,113 @@ Falhas **aceitáveis** (o sistema parou com segurança):
 
 > **A execução só começa com este bloco preenchido e assinado.** Sem ele, o
 > checklist **não** autoriza nada.
+>
+> **Aprovação operacional ≠ liberação técnica.** Este bloco registra a
+> autorização do responsável pelo produto/operação. Ele **não** fecha gate
+> técnico, **não** altera `PHASE9_REAL_EXECUTION_ENABLED` e **não** liga
+> execução real — ver §16.6 (condição de ativação).
 
-```
-Aprovado por: ______________________________
-Data: _______________________________________
-Escopo aprovado: ____________________________
-Conta autorizada: ___________________________
-Ponto de parada: "Dados da GRU" (sem gerar GRU/protocolo)
-Observações: ________________________________
-Assinatura/registro interno: ________________
-```
+### §16 — Aprovação explícita para execução controlada
+
+**Status:** APROVADO PARA EXECUÇÃO CONTROLADA, SUPERVISIONADA E LIMITADA.
+
+#### 16.1 Autorizador
+
+| Campo | Valor |
+|-------|-------|
+| Nome | Nyc / DevNyc-web |
+| Papel | Responsável pelo produto e pela operação |
+| Base da autorização | Aceite jurídico já obtido |
+| Data/hora da autorização | 2026-07-29 14:21 BRT |
+| Conta autorizada | Própria/autorizada (§3) — **sem cliente real** |
+| Ponto de parada | "Dados da GRU" (sem gerar GRU/protocolo) |
+| Assinatura / registro interno | Nyc / DevNyc-web — 2026-07-29 14:21 BRT |
+
+#### 16.2 Declaração
+
+Eu, na qualidade de responsável pelo produto e pela operação, autorizo a
+preparação e posterior execução controlada, supervisionada e limitada,
+exclusivamente dentro do escopo descrito neste documento.
+
+Esta autorização **não** libera execução autônoma, execução irrestrita,
+schedule, armazenamento de credenciais, bypass de validações, nem envio final
+sem confirmação humana quando aplicável.
+
+#### 16.3 Escopo autorizado
+
+- Execução controlada em ambiente real **somente quando os gates técnicos
+  também estiverem concluídos**.
+- Execução supervisionada por operador humano.
+- Usuário presente durante a autenticação Gov.br.
+- Autenticação feita **diretamente na tela oficial Gov.br**.
+- Sessão efêmera.
+- Sem armazenamento de senha Gov.br.
+- Sem armazenamento de OTP.
+- Sem armazenamento de cookies.
+- Sem armazenamento de tokens.
+- Sem bypass de captcha ou de validações.
+- Sem ocultar a execução do usuário.
+- Sem execução autônoma.
+- Sem schedule.
+- Sem execução em massa.
+- Sem envio final sem confirmação humana, quando o fluxo exigir confirmação.
+- Com possibilidade de **interrupção manual**.
+- Com **logs seguros**, sem senha, OTP, cookies, tokens ou PII desnecessária.
+
+#### 16.4 Fluxo autorizado
+
+- Somente o fluxo previamente documentado e aprovado.
+- Somente execução controlada.
+- Somente após conclusão dos gates técnicos pendentes.
+- Somente após **PR técnico separado** de liberação controlada.
+- Somente com revisão antes do primeiro uso real.
+
+#### 16.5 Limites explícitos
+
+Esta autorização **NÃO** permite:
+
+- Armazenar senha Gov.br.
+- Armazenar OTP.
+- Armazenar cookies.
+- Armazenar tokens.
+- Capturar credenciais.
+- Reutilizar sessão fora do escopo aprovado.
+- Burlar captcha.
+- Burlar validações.
+- Executar sem usuário presente.
+- Executar em background.
+- Executar por schedule.
+- Executar em massa.
+- Acessar fluxos não aprovados.
+- Alterar `PHASE9_REAL_EXECUTION_ENABLED` neste PR.
+- Ativar execução real neste PR.
+
+#### 16.6 Condição de ativação
+
+Mesmo com este §16 aprovado, a **execução real continua bloqueada** até que:
+
+1. Os **gates técnicos pendentes** sejam concluídos.
+2. `docs/26 §19` seja atualizado, se aplicável.
+3. Exista **PR técnico separado** para liberação controlada.
+4. `PHASE9_REAL_EXECUTION_ENABLED` seja tratado **somente nesse PR técnico
+   futuro**.
+5. O **primeiro teste real** seja aprovado explicitamente antes da execução.
+
+#### 16.7 Decisão
+
+Autorizo formalmente a execução controlada, supervisionada e limitada nos
+termos acima, **condicionada** à conclusão dos gates técnicos e a PR técnico
+separado de liberação.
+
+**Assinatura:**
+Nyc / DevNyc-web
+Responsável pelo produto e pela operação
+2026-07-29 14:21 BRT
+
+> **Observações.** Os campos ainda vazios de **§3** (região/superintendência,
+> responsável técnico, responsável operacional, data/hora planejada) **não**
+> são preenchidos por esta autorização e seguem pendentes antes de qualquer
+> execução (`docs/42 §3`).
 
 ---
 
