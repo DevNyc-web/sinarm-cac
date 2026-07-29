@@ -9,7 +9,8 @@
 > Merge de infraestrutura **não é** autorização de execução real.
 >
 > **Data:** 2026-07-26
-> **Base:** `docs/26 §19` (gates), `docs/34 §16` (checklist não assinado),
+> **Base:** `docs/26 §19` (gates), `docs/34 §16` (autorização operacional
+> assinada em 2026-07-29 — **não** é liberação técnica),
 > `docs/35`/`docs/36` (config/infra Fase 9), `docs/37` (Fase 8D).
 
 ---
@@ -67,7 +68,11 @@ automação real foi liberada por esses merges.
 ## 5. Gates — o que continua fechado
 
 - **Gates 1, 2, 3 e 5** de `docs/26 §19` continuam **abertos** (não vencidos).
-- **`docs/34 §16`** continua **não assinado / em branco**.
+- **`docs/34 §16`** agora contém **autorização operacional explícita assinada**
+  (2026-07-29), mas isso **não** equivale à liberação técnica. A execução real
+  continua **bloqueada** até a conclusão dos gates técnicos aplicáveis, PR
+  técnico separado e manutenção das proteções de credenciais, sessão e ponto de
+  parada.
 - **Merge de infraestrutura ≠ autorização de execução real.** Nenhum texto deste
   documento fecha gate, libera Gov.br/SINARM ou liga a flag. Qualquer execução
   real depende de aprovação escrita e dos gates cumpridos — fora do escopo aqui.
