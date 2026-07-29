@@ -29,6 +29,7 @@ import { logger } from "@/lib/logger";
 import { requirePermission } from "@/server/auth/guards";
 import { type Role } from "@/server/auth/roles";
 import { type ExtractionFailureReason } from "@/server/documents/documentExtractionTypes";
+import { enqueueDocumentExtractions } from "@/server/services/enqueueDocumentExtractions";
 import { runExtractionReaperOnce } from "@/server/workers/documentExtractionReaper";
 import { runExtractionWorkerOnce } from "@/server/workers/documentExtractionWorker";
 
@@ -39,7 +40,9 @@ type OpsLogEvent =
   | "extraction_worker_manual_triggered"
   | "extraction_worker_manual_failed"
   | "extraction_reaper_manual_triggered"
-  | "extraction_reaper_manual_failed";
+  | "extraction_reaper_manual_failed"
+  | "extraction_enqueue_manual_triggered"
+  | "extraction_enqueue_manual_failed";
 
 /**
  * Payload de log — o TIPO E a allowlist.
@@ -58,6 +61,9 @@ type OpsLogPayload = {
   event: OpsLogEvent;
   actorId: string;
   actorRole: Role;
+  candidates?: number;
+  requested?: number;
+  reused?: number;
   scanned?: number;
   processed?: number;
   skipped?: number;
@@ -75,7 +81,10 @@ type OpsLogPayload = {
  * pela URL aparecendo na tela. A pagina ainda coage tudo com `Number()`, mas a
  * primeira barreira e nao produzir texto arbitrario.
  */
-function urlDoResultado(acao: "lote" | "limpeza", numeros: Record<string, number>): string {
+function urlDoResultado(
+  acao: "lote" | "limpeza" | "fila",
+  numeros: Record<string, number>,
+): string {
   const params = new URLSearchParams({ acao });
   for (const [chave, valor] of Object.entries(numeros)) {
     params.set(chave, String(Math.trunc(valor)));
@@ -144,6 +153,65 @@ export async function runExtractionBatchAction(_formData: FormData): Promise<voi
   // FORA DO `try`, sempre. `redirect()` funciona LANCANDO `NEXT_REDIRECT`: dentro
   // do bloco protegido, o `catch` acima o engoliria e a acao terminaria sem
   // navegar — em silencio, com a tela parecendo travada.
+  revalidatePath(PAINEL);
+  redirect(destino);
+}
+
+/**
+ * Abre tentativas para os documentos elegiveis — CRIA fila, nao processa.
+ *
+ * Nao encadeia com o lote de proposito: um clique que enfileira E processa
+ * esconderia qual dos dois passos falhou e dobraria a duracao de uma acao manual.
+ * Depois desta, quem opera aciona "Processar fila de extracoes".
+ *
+ * O LIMITE NAO VEM DAQUI: `enqueueDocumentExtractions()` e chamada sem argumento,
+ * usando a constante de servidor. Aceitar um limite do formulario seria entrada
+ * nao validada num caminho que cria linhas.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- mesmo motivo das acoes acima
+export async function enqueueExtractionsAction(_formData: FormData): Promise<void> {
+  const actor = await requirePermission("extraction.run");
+  const iniciadoEm = Date.now();
+
+  let destino: string;
+  try {
+    const resumo = await enqueueDocumentExtractions();
+
+    logger.info(
+      {
+        event: "extraction_enqueue_manual_triggered",
+        actorId: actor.id,
+        actorRole: actor.role,
+        candidates: resumo.candidates,
+        requested: resumo.requested,
+        reused: resumo.reused,
+        failed: resumo.failed,
+        durationMs: resumo.durationMs,
+      } satisfies OpsLogPayload,
+      "criacao de tentativas de extracao acionada manualmente",
+    );
+
+    destino = urlDoResultado("fila", {
+      candidates: resumo.candidates,
+      requested: resumo.requested,
+      reused: resumo.reused,
+      failed: resumo.failed,
+      ms: resumo.durationMs,
+    });
+  } catch {
+    logger.warn(
+      {
+        event: "extraction_enqueue_manual_failed",
+        actorId: actor.id,
+        actorRole: actor.role,
+        reasonCode: "ERRO_INTERNO",
+        durationMs: Date.now() - iniciadoEm,
+      } satisfies OpsLogPayload,
+      "acionamento manual da criacao de tentativas falhou",
+    );
+    destino = `${PAINEL}?acao=fila&erro=1`;
+  }
+
   revalidatePath(PAINEL);
   redirect(destino);
 }

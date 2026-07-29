@@ -1,4 +1,4 @@
-import { type DocumentStatus, type DocumentType } from "@prisma/client";
+import { type DocumentStatus, type DocumentType, type Prisma } from "@prisma/client";
 import { getPrisma } from "@/server/db/prisma";
 
 /**
@@ -101,6 +101,54 @@ export function listDocumentsForOwner(processId: string): Promise<OwnerDocumentR
     where: { processId },
     select: { ...DOCUMENT_BASE_SELECT, ...DOCUMENT_SENSITIVE_SELECT },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+/**
+ * Ordem da FILA de enfileiramento: mais antigos primeiro.
+ *
+ * ASC porque e FIFO — o documento que espera ha mais tempo nao pode ser preterido
+ * por trabalho novo. O desempate por `id` existe pelo mesmo motivo do repositorio
+ * de extracoes: `created_at` e TIMESTAMP(3), duas linhas no mesmo milissegundo
+ * empatam, e sem criterio declarado a mesma fila sairia em ordens diferentes.
+ */
+const OLDEST_FIRST: Prisma.ProcessDocumentOrderByWithRelationInput[] = [
+  { createdAt: "asc" },
+  { id: "asc" },
+];
+
+/**
+ * Documentos que JA TEM ARQUIVO e ainda nao foram conferidos, excluindo os que
+ * ja possuem tentativa de extracao ativa.
+ *
+ * `ENVIADO`/`EM_ANALISE` NAO e criterio novo: e a mesma leitura que
+ * `automationReadiness` e `documentExtractionReview` ja fazem — "ha arquivo, mas
+ * ninguem aprovou/conferiu". `APROVADO` ja passou por pessoa e extrair depois nao
+ * muda decisao; `REJEITADO` esta fora; e `PENDENTE` e estado de DOMINIO para
+ * "exigido mas nao enviado" — nao ha arquivo, nao ha o que extrair.
+ *
+ * A exclusao vem por lista, nao por filtro de relacao: o conjunto de ativos e
+ * pequeno (uma por documento, pelo indice parcial) e a consulta fica expressavel
+ * sem relacao — mais simples de ler e de cobrir por teste.
+ *
+ * `select: { id: true }` E O GATE: `originalFileName`, `sha256`, `storageKey` e
+ * ate `processId` nem chegam a sair da tabela. Quem enfileira nao precisa saber
+ * de quem e o documento — precisa saber que ele existe e esta esperando.
+ */
+export function listDocumentsAwaitingExtraction(
+  limit: number,
+  excludeDocumentIds: readonly string[],
+): Promise<{ id: string }[]> {
+  if (limit <= 0) return Promise.resolve([]);
+
+  return getPrisma().processDocument.findMany({
+    where: {
+      status: { in: ["ENVIADO", "EM_ANALISE"] },
+      id: { notIn: [...excludeDocumentIds] },
+    },
+    orderBy: OLDEST_FIRST,
+    take: limit,
+    select: { id: true },
   });
 }
 

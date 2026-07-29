@@ -32,7 +32,7 @@ type Where = Record<string, unknown>;
  * a pior falha possivel num fake — o teste fica verde afirmando que o
  * repositorio nao achou nada, quando na verdade o fake e que nao sabe procurar.
  */
-const SUPPORTED_OPERATORS = ["gt", "lt", "in"] as const;
+const SUPPORTED_OPERATORS = ["gt", "lt", "in", "notIn"] as const;
 
 /** `true` quando o valor e um operador (`{ gt }`), nao um escalar comparavel. */
 function isOperator(expected: unknown): expected is Row {
@@ -68,6 +68,21 @@ function matchesValue(rowValue: unknown, expected: unknown): boolean {
       const limit = (expected as { lt: unknown }).lt;
       if (rowValue == null) return false;
       return (rowValue as Date) < (limit as Date);
+    }
+
+    // `notIn`: complemento de `in`. Precisa de ramo PROPRIO — sem ele, cairia no
+    // fallback abaixo, leria `.in` como `undefined` e lancaria "filtro `in` exige
+    // um array": falha ruidosa, mas pela razao errada, e quem lesse o erro
+    // procuraria o defeito no lugar errado.
+    if ("notIn" in expected) {
+      const excluidos = (expected as { notIn: unknown }).notIn;
+      if (!Array.isArray(excluidos)) {
+        throw new Error("[fake-prisma] filtro `notIn` exige um array.");
+      }
+      // Lista VAZIA nao exclui nada — mesma semantica do Prisma. Tratar `[]` como
+      // "exclui tudo" faria a fila de enfileiramento sumir em silencio justamente
+      // na primeira execucao, quando ainda nao ha nenhuma tentativa ativa.
+      return !excluidos.includes(rowValue);
     }
 
     // `in`: pertinencia por igualdade, como o Prisma faz para escalares.
