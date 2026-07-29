@@ -6,10 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ClientStartPanel } from "@/components/client/ClientStartPanel";
 import { requireUser } from "@/server/auth/guards";
-import {
-  OPERATIONAL_STATUS_USER_LABELS,
-  PAYMENT_STATUS_LABELS,
-} from "@/server/processes/statusLabels";
+import { clientVisibleStatusLabel, PAYMENT_STATUS_LABELS } from "@/server/processes/statusLabels";
 import { listProcessesByUser } from "@/server/repositories/processRepository";
 
 type ProcessRow = Awaited<ReturnType<typeof listProcessesByUser>>[number];
@@ -113,7 +110,14 @@ export default async function DashboardPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-mono text-sm font-medium">{process.code}</p>
-                        <Badge>{OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]}</Badge>
+                        {/*
+                          MESMA funcao do detalhe (`clientVisibleStatusLabel`).
+                          Antes esta lista lia so `operationalStatus`, entao um
+                          processo com execucao manual em andamento aparecia como
+                          "Pagamento confirmado — em fila" aqui e "Em execucao" no
+                          detalhe — duas respostas para a mesma pergunta.
+                        */}
+                        <Badge>{clientVisibleStatusLabel(process)}</Badge>
                       </div>
                       <p className="mt-1 text-sm text-neutral-600">
                         {process.processType.name}
