@@ -11,7 +11,7 @@
  * Sem OCR, sem rede, sem agendamento, sem Fase 9.
  */
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { beforeEach, test } from "node:test";
 import { installFakePrisma, prismaIsFake, type FakePrisma, type Row } from "../services/testPrisma";
 import { runExtractionReaperOnce } from "../../../src/server/workers/documentExtractionReaper";
@@ -442,12 +442,38 @@ function arquivosDe(dir: string): string[] {
   });
 }
 
-test("nenhum arquivo de src/app ou src/components importa a varredura", () => {
-  const proibidos = [...arquivosDe("src/app"), ...arquivosDe("src/components")].filter((file) =>
-    /documentExtractionReaper|runExtractionReaperOnce/.test(readFileSync(file, "utf8")),
+/**
+ * UNICO acionador manual/admin aprovado (#47D-3A).
+ *
+ * Mesma politica da trava do lote: a varredura protege o caminho de RENDER, e
+ * uma server action nao e render. Isencao por NOME, nunca por pasta ou extensao
+ * — o `page.tsx` vizinho continua bloqueado.
+ */
+const ACIONADOR_MANUAL = "src/app/(admin)/admin/extracao/actions.ts";
+
+test("o arquivo isentado existe — isencao orfa vira buraco silencioso", () => {
+  assert.ok(
+    existsSync(ACIONADOR_MANUAL),
+    `${ACIONADOR_MANUAL} nao existe — remova a isencao ou corrija o caminho`,
   );
+});
+
+test("so o acionador manual importa a varredura; o resto de src/app segue bloqueado", () => {
+  const proibidos = [...arquivosDe("src/app"), ...arquivosDe("src/components")]
+    .filter((file) => file !== ACIONADOR_MANUAL)
+    .filter((file) => /documentExtractionReaper|runExtractionReaperOnce/.test(readFileSync(file, "utf8")));
 
   assert.deepEqual(proibidos, [], `manutencao nao entra no render: ${proibidos.join(", ")}`);
+});
+
+test("a isencao vale para UM caminho exato, nao para a pasta", () => {
+  const vizinho = "src/app/(admin)/admin/extracao/page.tsx";
+  assert.ok(existsSync(vizinho), "a pagina do painel precisa existir");
+  assert.doesNotMatch(
+    readFileSync(vizinho, "utf8"),
+    /documentExtractionReaper|runExtractionReaperOnce/,
+    "a pagina chama a action, nunca a varredura",
+  );
 });
 
 /* ------------------------------------------------------------ migration --- */

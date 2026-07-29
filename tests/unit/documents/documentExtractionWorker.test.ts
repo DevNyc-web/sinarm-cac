@@ -11,7 +11,7 @@
  * Sem OCR, sem rede, sem agendamento, sem Fase 9.
  */
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { beforeEach, test } from "node:test";
 import { installFakePrisma, prismaIsFake, type FakePrisma, type Row } from "../services/testPrisma";
 import {
@@ -671,12 +671,46 @@ function arquivosDe(dir: string): string[] {
   });
 }
 
-test("nenhum arquivo de src/app ou src/components importa o lote", () => {
-  const proibidos = [...arquivosDe("src/app"), ...arquivosDe("src/components")].filter((file) =>
-    /documentExtractionWorker|runExtractionWorkerOnce/.test(readFileSync(file, "utf8")),
+/**
+ * UNICO acionador manual/admin aprovado (#47D-3A).
+ *
+ * A varredura abaixo existe para impedir que extracao entre no caminho de
+ * RENDER. Uma server action nao e render: e handler de POST, protegido por
+ * `requirePermission("extraction.run")`. Por isso a isencao e por NOME, e nao um
+ * afrouxamento de categoria — nao vale "todo .ts de src/app", nao vale a pasta.
+ * Qualquer outro arquivo, inclusive o `page.tsx` vizinho, continua bloqueado.
+ */
+const ACIONADOR_MANUAL = "src/app/(admin)/admin/extracao/actions.ts";
+
+test("o arquivo isentado existe — isencao orfa vira buraco silencioso", () => {
+  // Se o acionador for renomeado ou removido, a isencao passaria a nao proteger
+  // nada e ninguem perceberia: a varredura seguiria verde por acidente.
+  assert.ok(
+    existsSync(ACIONADOR_MANUAL),
+    `${ACIONADOR_MANUAL} nao existe — remova a isencao ou corrija o caminho`,
   );
+});
+
+test("so o acionador manual importa o lote; o resto de src/app segue bloqueado", () => {
+  const proibidos = [...arquivosDe("src/app"), ...arquivosDe("src/components")]
+    .filter((file) => file !== ACIONADOR_MANUAL)
+    .filter((file) => /documentExtractionWorker|runExtractionWorkerOnce/.test(readFileSync(file, "utf8")));
 
   assert.deepEqual(proibidos, [], `extracao em lote nao entra no render: ${proibidos.join(", ")}`);
+});
+
+test("a isencao vale para UM caminho exato, nao para a pasta", () => {
+  // Trava contra a evolucao previsivel: transformar a isencao em prefixo
+  // (`startsWith`) liberaria o `page.tsx` vizinho junto, que e justamente o
+  // arquivo de render que a varredura precisa continuar pegando.
+  const vizinho = "src/app/(admin)/admin/extracao/page.tsx";
+  assert.ok(existsSync(vizinho), "a pagina do painel precisa existir");
+  assert.notEqual(vizinho, ACIONADOR_MANUAL);
+  assert.doesNotMatch(
+    readFileSync(vizinho, "utf8"),
+    /documentExtractionWorker|runExtractionWorkerOnce/,
+    "a pagina chama a action, nunca o lote",
+  );
 });
 
 test("package.json roda este arquivo em test:documents:unit", () => {
