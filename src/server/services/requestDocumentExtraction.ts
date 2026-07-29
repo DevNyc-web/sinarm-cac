@@ -15,10 +15,12 @@ import {
 } from "@/server/extraction/mockEngine";
 import {
   createPendingExtractionForDocument,
+  failStaleProcessingExtractions,
   findLatestExtractionForDocument,
   type ExtractionRow,
 } from "@/server/repositories/documentExtractionRepository";
 import { findDocumentById } from "@/server/repositories/processDocumentRepository";
+import { logger } from "@/lib/logger";
 
 /**
  * Estados em que uma tentativa ainda esta VIVA.
@@ -28,6 +30,23 @@ import { findDocumentById } from "@/server/repositories/processDocumentRepositor
  * tentativas simultaneas do mesmo documento.
  */
 export const ACTIVE_EXTRACTION_STATES: readonly ExtractionState[] = ["PENDENTE", "PROCESSANDO"];
+
+/**
+ * Quanto tempo uma tentativa pode ficar PROCESSANDO antes de ser dada por morta.
+ *
+ * 15 minutos e FOLGADO de proposito: a engine desta fase e mock e sincrona,
+ * retorna em milissegundos, e mesmo um OCR real razoavel fica em segundos a
+ * poucos minutos. O valor esta uma ordem de grandeza acima do pior caso
+ * plausivel — nao mata trabalho legitimo, e nao deixa o documento do cliente
+ * travado por horas.
+ *
+ * Constante, nao env: hoje nao ha operacao real com SLA para justificar o botao.
+ * REVISAR quando um motor real entrar, medindo a duracao verdadeira.
+ *
+ * O relogio e `updatedAt`, renovado no claim PENDENTE -> PROCESSANDO — ver
+ * `failStaleProcessingExtractions`.
+ */
+export const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
  * Estados TERMINAIS. Depois de qualquer um deles, pedir de novo e reprocessar:
@@ -75,6 +94,34 @@ export async function requestDocumentExtraction(
   try {
     const document = await findDocumentById(documentId);
     if (!document) return { ok: false, error: "Documento nao encontrado." };
+
+    // ANTES de olhar a ativa: encerra PROCESSANDO parada ha tempo demais.
+    //
+    // A ordem importa. Sem isto, o passo seguinte encontraria a orfa, a trataria
+    // como viva e devolveria `reused` para sempre — e o indice unico parcial
+    // impediria criar a substituta. O documento ficaria sem saida pela aplicacao.
+    //
+    // Reap por DOCUMENTO, aqui, e nao um job global: enquanto nao existe worker,
+    // ninguem varre a tabela, e o proprio pedido do usuario e a unica coisa que
+    // acontece. O reaper periodico entra no #47D.
+    const expiradas = await failStaleProcessingExtractions(
+      documentId,
+      new Date(Date.now() - PROCESSING_TIMEOUT_MS),
+    );
+    if (expiradas > 0) {
+      // Sem PII: so o codigo do motivo, o documento e a contagem. Expiracao
+      // silenciosa esconderia queda de worker — que e justamente o sintoma que
+      // o #47D vai precisar enxergar.
+      logger.warn(
+        {
+          event: "extraction_processing_timeout",
+          documentId,
+          count: expiradas,
+          reasonCode: "TIMEOUT",
+        },
+        "extracao PROCESSANDO expirou e foi encerrada; documento liberado",
+      );
+    }
 
     // Idempotencia: tentativa viva vence: devolve a mesma, sem criar outra.
     const latest = await findLatestExtractionForDocument(documentId);

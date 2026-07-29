@@ -194,6 +194,41 @@ export async function claimPendingExtraction(id: string): Promise<boolean> {
   return count === 1;
 }
 
+/**
+ * Encerra tentativas PROCESSANDO paradas ha tempo demais NESTE documento.
+ *
+ * Existe por causa de um efeito colateral da propria protecao do #47C-4: o
+ * indice unico parcial impede uma segunda tentativa ativa, entao uma linha que
+ * ficou PROCESSANDO por queda da app nao so persiste — ela BLOQUEIA o documento.
+ * `requestDocumentExtraction` a reusaria para sempre e `runDocumentExtraction` a
+ * recusaria; sem isto, nao ha saida pela aplicacao.
+ *
+ * RELOGIO E `updatedAt`, NAO `createdAt`. Verificado contra o Postgres: o
+ * `updateMany` do claim RENOVA `@updatedAt`, entao numa linha PROCESSANDO ele
+ * marca o instante em que o processamento COMECOU. `createdAt` marca o pedido,
+ * que pode ser muito anterior — mediria a espera na fila junto com o trabalho e
+ * mataria tentativa recem-iniciada.
+ *
+ * Consequencia a nao esquecer: qualquer update numa linha PROCESSANDO adia o
+ * timeout. Um heartbeat de worker (#47D) usaria isso de proposito; um update
+ * acidental quebraria a garantia sem aviso.
+ *
+ * Um unico UPDATE condicional — atomico como o claim. Dois reapers concorrentes
+ * nao se atrapalham: o segundo encontra 0 linhas. Devolve a CONTAGEM, nunca as
+ * linhas: quem limpa nao precisa receber PII de volta.
+ */
+export async function failStaleProcessingExtractions(
+  documentId: string,
+  cutoff: Date,
+): Promise<number> {
+  const { count } = await getPrisma().documentExtraction.updateMany({
+    where: { documentId, state: "PROCESSANDO", updatedAt: { lt: cutoff } },
+    // `TIMEOUT` ja existe em `EXTRACTION_FAILURE_REASONS` — codigo fechado, sem PII.
+    data: { state: "FALHOU", failureReason: "TIMEOUT" },
+  });
+  return count;
+}
+
 export type UpdateExtractionStateData = {
   state: ExtractionState;
   /** Campos lidos (PII). Omitido => nao mexe no que ja estava gravado. */

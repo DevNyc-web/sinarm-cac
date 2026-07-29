@@ -32,7 +32,7 @@ type Where = Record<string, unknown>;
  * a pior falha possivel num fake — o teste fica verde afirmando que o
  * repositorio nao achou nada, quando na verdade o fake e que nao sabe procurar.
  */
-const SUPPORTED_OPERATORS = ["gt", "in"] as const;
+const SUPPORTED_OPERATORS = ["gt", "lt", "in"] as const;
 
 /** `true` quando o valor e um operador (`{ gt }`), nao um escalar comparavel. */
 function isOperator(expected: unknown): expected is Row {
@@ -59,6 +59,15 @@ function matchesValue(rowValue: unknown, expected: unknown): boolean {
       const limit = (expected as { gt: unknown }).gt;
       if (rowValue == null) return false;
       return (rowValue as Date) > (limit as Date);
+    }
+
+    // `lt`: usado pelo reaper de PROCESSANDO (`updatedAt: { lt: cutoff }`).
+    // `null` NAO e "menor que": ausencia de valor nao pode ser lida como antiga,
+    // ou o reaper varreria linhas que nunca comecaram a processar.
+    if ("lt" in expected) {
+      const limit = (expected as { lt: unknown }).lt;
+      if (rowValue == null) return false;
+      return (rowValue as Date) < (limit as Date);
     }
 
     // `in`: pertinencia por igualdade, como o Prisma faz para escalares.
