@@ -78,7 +78,7 @@ export async function uploadProcessDocument(
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel salvar o documento. Verifique o Postgres local (npm run db:push).",
+      error: "Nao foi possivel salvar o documento. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }

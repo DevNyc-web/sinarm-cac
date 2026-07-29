@@ -16,7 +16,8 @@
  * Sem OCR, sem rede, sem worker.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { installFakePrisma, prismaIsFake, type FakePrisma } from "../services/testPrisma";
 import { requestDocumentExtraction } from "../../../src/server/services/requestDocumentExtraction";
@@ -39,6 +40,16 @@ import { logger } from "../../../src/lib/logger";
 let db: FakePrisma = installFakePrisma();
 
 const DOC = "doc-1";
+
+/** Todos os `.ts`/`.tsx` sob `dir`, recursivo. Usado na varredura de `db:push`. */
+function arquivosTs(dir: string, acc: string[] = []): string[] {
+  for (const entrada of readdirSync(dir)) {
+    const caminho = join(dir, entrada);
+    if (statSync(caminho).isDirectory()) arquivosTs(caminho, acc);
+    else if (/\.tsx?$/.test(entrada)) acc.push(caminho);
+  }
+  return acc;
+}
 
 beforeEach(() => {
   db = installFakePrisma();
@@ -571,21 +582,33 @@ test("o schema avisa sobre o indice que ele nao declara", () => {
   assert.match(schema, /db push|db:push/, "avisa o risco");
 });
 
-test("os services de extracao mandam rodar db:migrate, nunca db:push", () => {
+test("nenhum service/repositorio manda rodar db:push", () => {
   // `db push` sincroniza o banco COM O SCHEMA, que nao declara o indice unico
   // parcial — rodar aquilo apaga a garantia de "uma tentativa ativa por
   // documento". Uma mensagem de erro que instrui o usuario a executar o comando
   // que enfraquece a propria protecao do service e pior que nao ter mensagem.
   //
-  // Escopo: SO estes dois. As outras ocorrencias de `db:push` no projeto sao
-  // anteriores a este PR e ficam como divida — la a orientacao ainda cabe.
+  // ESCOPO AMPLIADO: antes este teste cobria so os dois services de extracao e
+  // registrava as demais ocorrencias como divida, com o argumento de que "la a
+  // orientacao ainda cabe". O argumento estava errado — `db push` derruba o
+  // indice do BANCO INTEIRO, nao do service que imprimiu a mensagem. Quem le
+  // "rode db:push" no erro de pagamento e obedece apaga a protecao da extracao.
+  // A divida foi paga; a regra agora vale para todo `src/server`.
+  const alvos = arquivosTs("src/server");
+  assert.ok(alvos.length > 0, "varredura nao encontrou arquivo — caminho errado");
+
+  for (const arquivo of alvos) {
+    const source = readFileSync(arquivo, "utf8");
+    assert.ok(!source.includes("npm run db:push"), `${arquivo}: nao pode mandar rodar db:push`);
+  }
+
+  // Os dois services de extracao seguem obrigados a apontar o caminho correto:
+  // sao os que dependem diretamente do indice parcial.
   for (const arquivo of [
     "src/server/services/requestDocumentExtraction.ts",
     "src/server/services/runDocumentExtraction.ts",
   ]) {
     const source = readFileSync(arquivo, "utf8");
-
-    assert.ok(!source.includes("npm run db:push"), `${arquivo}: nao pode mandar rodar db:push`);
     assert.match(source, /npm run db:migrate/, `${arquivo}: aponta o fluxo correto`);
   }
 });

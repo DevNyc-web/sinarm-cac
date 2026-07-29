@@ -69,9 +69,9 @@ cp .env.example .env   # e ajuste DATABASE_URL para seu Postgres local
 # 3. Criar o schema local e dados fictícios
 #    (necessário para salvar rascunhos de Guia de Tráfego — Fase 3;
 #     sem banco, o app navega mas não salva)
-npm run db:push        # aplica o schema no Postgres LOCAL (sem migrations)
+npm run db:migrate     # aplica as migrations versionadas no Postgres LOCAL
 npm run seed           # dados fictícios (ProcessType + processo de demo)
-#    Após alterar prisma/schema.prisma, rode npm run db:push de novo.
+#    Após alterar prisma/schema.prisma, gere a migration com npm run db:migrate.
 
 # 4. Rodar em desenvolvimento
 npm run dev            # http://localhost:3000
@@ -81,6 +81,15 @@ npm run typecheck
 npm run lint
 npm run build
 ```
+
+> **Banco: use migrations, não `db:push`.** Use `npm run db:migrate` para aplicar
+> migrations no ambiente local. Em ambientes de deploy, use `npm run db:deploy`.
+> **Não use `db:push` neste projeto**, porque ele pode não preservar estruturas
+> criadas por SQL cru — como o índice único **parcial**
+> `document_extractions_one_active_per_document`, que garante uma única extração
+> ativa por documento e **não** é declarável no `schema.prisma`. Rodar `db push`
+> pode removê-lo em silêncio, e uma proteção que desaparece sozinha é pior que
+> não ter proteção.
 
 Páginas placeholder: `/` (landing), `/login`, `/dashboard`, `/processos/novo`,
 `/admin`. Healthcheck: `/api/health`.
@@ -153,7 +162,7 @@ marcam o checklist de revisão (cada marcação grava quem/perfil/quando —
 `process_checklist_items`); FINANCEIRO e SUPORTE só visualizam. O histórico
 mostra a criação do rascunho, eventos de status (`process_status_events`,
 append-only) e as marcações de checklist. Após atualizar o schema, rode
-`npm run db:push` de novo.
+`npm run db:migrate` de novo.
 
 ## Upload fictício de documento (Fase 4 — modo dev)
 
@@ -172,7 +181,7 @@ append-only) e as marcações de checklist. Após atualizar o schema, rode
 - Revisão: ADMIN/OPERADOR aprovam/rejeitam no detalhe admin (rejeição exige
   motivo, sem reproduzir dados do documento); FINANCEIRO/SUPORTE não revisam
   (SUPORTE vê só o status). Envio e revisão aparecem no histórico.
-- Schema mudou: rode `npm run db:push` antes de usar.
+- Schema mudou: rode `npm run db:migrate` antes de usar.
 - Código: adapter em `src/server/storage/` (interface + implementação
   local/dev; provedor real de produção entra como nova implementação),
   services `uploadProcessDocument.ts` / `reviewProcessDocument.ts`.
@@ -187,7 +196,7 @@ append-only) e as marcações de checklist. Após atualizar o schema, rode
 
 **Modo fake/dev (padrão — sem credencial nenhuma):**
 1. `.env`: `PAYMENT_PROVIDER=fake` (ou omita — é o default). Rode
-   `npm run db:push` (schema ganhou a tabela `payments`).
+   `npm run db:migrate` (schema ganhou a tabela `payments`).
 2. Logado como **Usuario Exemplo**, abra a revisão do processo
    (`/processos/[id]`) → **"Gerar cobrança Pix (sandbox/dev)"** — valor
    fictício R$ 100,00; o "copia e cola" gerado é deliberadamente **não
@@ -244,7 +253,7 @@ conferência **fictícia**, sem acessar SINARM e sem gerar GRU.
 
 O usuário vê, no próprio processo, um **status amigável** e apenas as
 **mensagens marcadas como visíveis** — nunca notas internas. Não escreva PII nas
-notas (docs/11 §19). Schema mudou: rode `npm run db:push`.
+notas (docs/11 §19). Schema mudou: rode `npm run db:migrate`.
 
 ### Indicadores operacionais (Fase 6.5)
 
@@ -314,8 +323,8 @@ registrada · Aguardando pagamento da GRU · Em acompanhamento*) e a frase de qu
 **a execução é feita por uma pessoa da equipe, não pelo aplicativo**. Ele não vê
 número de protocolo, dados da GRU nem qualquer bloco interno.
 
-Schema mudou: rode `npm run db:push`.
-Requer Postgres local com `npm run db:push && npm run seed` (o seed cria o
+Schema mudou: rode `npm run db:migrate`.
+Requer Postgres local com `npm run db:migrate && npm run seed` (o seed cria o
 `ProcessType` da Guia de Tráfego que o formulário usa).
 
 Código: validação em `src/server/processes/guiaTrafegoSchema.ts` (Zod),

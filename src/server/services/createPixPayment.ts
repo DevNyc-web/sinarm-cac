@@ -57,7 +57,7 @@ export async function createPixPayment(
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel gerar a cobranca. Verifique o Postgres local (npm run db:push).",
+      error: "Nao foi possivel gerar a cobranca. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }

@@ -57,7 +57,7 @@ export async function reviewProcessDocument(
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel revisar. Verifique o Postgres local (npm run db:push).",
+      error: "Nao foi possivel revisar. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }

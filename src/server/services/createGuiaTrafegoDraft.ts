@@ -64,7 +64,7 @@ export async function createGuiaTrafegoDraft(
     const message =
       error instanceof Error && error.message.includes("nao encontrado")
         ? error.message
-        : "Nao foi possivel salvar o rascunho. Verifique se o Postgres local esta ativo (npm run db:push && npm run seed).";
+        : "Nao foi possivel salvar o rascunho. Verifique se o Postgres local esta ativo (npm run db:migrate && npm run seed).";
     return { ok: false, error: message };
   }
 }

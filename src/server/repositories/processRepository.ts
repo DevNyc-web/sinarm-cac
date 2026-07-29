@@ -38,7 +38,7 @@ export async function createDraftProcess(data: CreateDraftData) {
   });
   if (!processType) {
     throw new Error(
-      `ProcessType "${data.processTypeCode}" nao encontrado. Rode: npm run db:push && npm run seed`,
+      `ProcessType "${data.processTypeCode}" nao encontrado. Rode: npm run db:migrate && npm run seed`,
     );
   }
 

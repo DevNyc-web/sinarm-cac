@@ -42,7 +42,7 @@ export async function toggleChecklistItem(
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel salvar. Verifique o Postgres local (npm run db:push).",
+      error: "Nao foi possivel salvar. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }
