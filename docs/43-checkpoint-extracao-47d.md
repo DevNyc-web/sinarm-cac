@@ -188,6 +188,9 @@ da unificação a cada PR.
 
 > **Esta decisão não é tomada aqui.** Ela deve ser um **PR documental próprio e
 > posterior**. Este documento apenas **registra o achado**.
+>
+> A decisão arquitetural foi registrada em
+> [`docs/44-decisao-maquina-de-estados.md`](44-decisao-maquina-de-estados.md).
 
 ---
 
