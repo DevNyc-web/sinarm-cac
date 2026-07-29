@@ -1,10 +1,19 @@
-import { type InternalStatus, type ProcessEventKind } from "@prisma/client";
+import { type InternalStatus, type Prisma, type ProcessEventKind } from "@prisma/client";
 import { getPrisma } from "@/server/db/prisma";
 
 /**
  * Repositorio de eventos de status do processo (docs/12 §3.5).
  * APPEND-ONLY: so cria e lista — nunca edita/apaga.
  */
+
+/**
+ * Client que grava o evento: o global ou o TRANSACIONAL de um `$transaction`.
+ *
+ * `Prisma.TransactionClient` e o tipo mais estreito (`PrismaClient` sem os
+ * metodos que nao existem dentro de transacao), e `PrismaClient` e atribuivel a
+ * ele — entao um parametro deste tipo aceita os dois sem union.
+ */
+export type EventWriteClient = Prisma.TransactionClient;
 
 export type RecordStatusEventData = {
   processId: string;
@@ -16,8 +25,23 @@ export type RecordStatusEventData = {
   note?: string;
 };
 
-export function recordStatusEvent(data: RecordStatusEventData) {
-  return getPrisma().processStatusEvent.create({
+/**
+ * Grava a transicao TIPADA na trilha.
+ *
+ * `client` existe para que quem estiver dentro de um `$transaction` grave o
+ * evento no MESMO escopo do `update` que mudou o status — sem isso, status e
+ * trilha podem divergir se a segunda operacao falhar. Omitir usa o client
+ * global, que e o comportamento de sempre.
+ *
+ * `recordOperationalEvent` NAO recebeu o mesmo parametro de proposito: tem 11
+ * chamadores, nenhum dentro de transacao, e adicionar seria capacidade sem
+ * consumidor. A assimetria e deliberada, nao esquecimento.
+ */
+export function recordStatusEvent(
+  data: RecordStatusEventData,
+  client: EventWriteClient = getPrisma(),
+) {
+  return client.processStatusEvent.create({
     data: {
       processId: data.processId,
       fromStatus: data.fromStatus,

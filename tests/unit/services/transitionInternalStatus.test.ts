@@ -194,6 +194,98 @@ test("o modulo nao usa os estados da Fase 2 nem cria mapa operacional", () => {
     assert.ok(!code.includes(proibido), `${proibido}: sem mapa implicito`);
   }
 
-  // E nao abre transacao — a atomicidade e o PR 3b.
-  assert.ok(!code.includes("$transaction"), "sem $transaction neste PR");
+  // Fase 3b INVERTEU esta guarda: antes exigia AUSENCIA de `$transaction`
+  // (atomicidade era trabalho de outro PR); agora exige a presenca, senao a
+  // promessa de atomicidade do modulo vira comentario sem lastro.
+  assert.match(code, /\$transaction\(async \(tx\)/, "a transicao roda em $transaction");
+  // O evento tem de receber o MESMO `tx`. Sem isto, a trilha sairia do escopo
+  // transacional e a janela status-sem-evento voltaria em silencio.
+  assert.match(code, /recordStatusEvent\([\s\S]*?tx,?\s*\)/, "evento gravado com o tx");
+});
+
+test("a transicao e ATOMICA: falha no evento reverte o internalStatus", async () => {
+  semearProcesso();
+  const original = db.processStatusEvent.create.bind(db.processStatusEvent);
+  db.processStatusEvent.create = async () => {
+    throw new Error("falha simulada ao gravar evento");
+  };
+
+  await assert.rejects(
+    () => transitionInternalStatus({ processId: PROCESS_ID, toStatus: "PAGO_EM_FILA", ...ATOR }),
+    /falha simulada/,
+    "o erro tem de propagar, nao ser engolido",
+  );
+
+  db.processStatusEvent.create = original;
+  assert.equal(processo().internalStatus, "RASCUNHO", "status deveria ter voltado");
+  assert.equal(db.processStatusEvent.rows.length, 0, "nenhum evento gravado");
+});
+
+test("falha no evento reverte TAMBEM as colunas de alsoSet", async () => {
+  semearProcesso();
+  db.processStatusEvent.create = async () => {
+    throw new Error("falha simulada ao gravar evento");
+  };
+
+  await assert.rejects(() =>
+    transitionInternalStatus({
+      processId: PROCESS_ID,
+      toStatus: "PAGO_EM_FILA",
+      alsoSet: { operationalStatus: "PAGO_EM_FILA", userFacingStatus: "PAGAMENTO_CONFIRMADO" },
+      ...ATOR,
+    }),
+  );
+
+  const p = processo();
+  assert.equal(p.internalStatus, "RASCUNHO");
+  // A parte que mais importa: `alsoSet` entrou na MESMA `update`, entao tem de
+  // voltar junto. Reverter so o canonico deixaria o processo incoerente.
+  assert.equal(p.operationalStatus, "RASCUNHO");
+  assert.equal(p.userFacingStatus, "RECEBIDO");
+});
+
+test("FakePrisma.$transaction: sucesso NAO restaura o snapshot", async () => {
+  semearProcesso();
+
+  const r = await db.$transaction(async (tx) => {
+    await tx.process.update({ where: { id: PROCESS_ID }, data: { internalStatus: "PAGO_EM_FILA" } });
+    return "pronto";
+  });
+
+  assert.equal(r, "pronto", "o retorno do callback tem de chegar a quem chamou");
+  assert.equal(processo().internalStatus, "PAGO_EM_FILA", "commit deve persistir");
+});
+
+test("FakePrisma.$transaction: rollback restaura TODAS as tabelas", async () => {
+  semearProcesso();
+  db.payment.seed({ id: "pay-1", processId: PROCESS_ID, status: "PENDENTE", amountCents: 10_000 });
+
+  await assert.rejects(() =>
+    db.$transaction(async (tx) => {
+      await tx.process.update({
+        where: { id: PROCESS_ID },
+        data: { internalStatus: "PAGO_EM_FILA" },
+      });
+      await tx.payment.update({ where: { id: "pay-1" }, data: { status: "PAGO" } });
+      await tx.processStatusEvent.create({
+        data: { processId: PROCESS_ID, toStatus: "PAGO_EM_FILA", actorMockUserId: "x", actorRole: "Y" },
+      });
+      throw new Error("aborta depois de mexer em tres tabelas");
+    }),
+  );
+
+  // Snapshot por tabela, nao so a que o codigo em teste alterou: um rollback
+  // parcial passaria no teste anterior e deixaria lixo em outra tabela.
+  assert.equal(processo().internalStatus, "RASCUNHO");
+  assert.equal(db.payment.rows[0].status, "PENDENTE");
+  assert.equal(db.processStatusEvent.rows.length, 0, "linha criada dentro da tx deve sumir");
+});
+
+test("FakePrisma.$transaction recusa a forma com array de promises", async () => {
+  // A forma em array executa fora do escopo que este fake entende; aceitar as
+  // duas daria falsa confianca.
+  await assert.rejects(
+    () => (db.$transaction as unknown as (a: unknown) => Promise<unknown>)([Promise.resolve(1)]),
+    /somente a forma com callback/,
+  );
 });
