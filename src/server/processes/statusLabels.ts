@@ -117,6 +117,32 @@ export const MANUAL_EXECUTION_USER_LABELS: Record<ManualExecutionStatus, string>
   BLOQUEADO_OPERACIONALMENTE: "Bloqueado — precisa de ajuste",
 };
 
+/**
+ * O rotulo que o CLIENTE realmente ve no status do processo.
+ *
+ * FONTE UNICA desta regra. Antes ela existia inline no JSX da tela do cliente, e
+ * o admin exibia OUTRA coisa — `userFacingStatus` — sob o rotulo "Status visivel
+ * ao usuario". As duas divergiam em 4 dos 9 estados operacionais (ex.: com
+ * `DOCUMENTO_ENVIADO` o cliente le "Documento em analise" e o admin dizia "Em
+ * andamento"), entao um operador que confiasse na tela admin informava o cliente
+ * errado.
+ *
+ * NAO usa `userFacingStatus`: aquela coluna nao alimenta nenhuma tela do
+ * cliente. O que decidir sobre ela — promover ou deprecar — e decisao propria
+ * (docs/44 §5.1), fora desta correcao.
+ *
+ * Regra: depois que a execucao manual comeca, ela e a visao mais atual do
+ * processo e sobrepoe o status operacional (docs/21 §11).
+ */
+export function clientVisibleStatusLabel(process: {
+  operationalStatus: OperationalStatus;
+  manualExecutionStatus: ManualExecutionStatus;
+}): string {
+  return process.manualExecutionStatus === "EXECUCAO_MANUAL_NAO_INICIADA"
+    ? OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]
+    : MANUAL_EXECUTION_USER_LABELS[process.manualExecutionStatus];
+}
+
 export const PRIORITY_LABELS: Record<ProcessPriority, string> = {
   BAIXA: "Baixa",
   NORMAL: "Normal",
