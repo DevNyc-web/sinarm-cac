@@ -94,7 +94,7 @@ export async function applyDestinationSuggestion(
   } catch {
     return {
       ok: false,
-      error: "Nao foi possivel aplicar a sugestao. Verifique o Postgres local (npm run db:push).",
+      error: "Nao foi possivel aplicar a sugestao. Verifique o Postgres local (npm run db:migrate).",
     };
   }
 }
