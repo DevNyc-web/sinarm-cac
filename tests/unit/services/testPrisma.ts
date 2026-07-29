@@ -92,6 +92,39 @@ function matches(row: Row, where: Where): boolean {
   return true;
 }
 
+/**
+ * Argumentos de topo que `findMany` entende.
+ *
+ * `include` e ACEITO mas NAO resolvido — mesmo comportamento de sempre. Nenhum
+ * teste exercita hoje um `findMany` com relacao (so `findFirst` o faz), entao
+ * resolve-lo aqui seria escrever comportamento sem cobertura. Esta anotado para
+ * que ninguem assuma o contrario ao ver a chave na lista.
+ */
+const FIND_MANY_ARGS = ["where", "select", "orderBy", "take", "include"] as const;
+
+/**
+ * LANCA se o chamador passou um argumento que o fake nao implementa.
+ *
+ * Existe por um defeito real encontrado no #47D-1: `take` era ignorado em
+ * silencio, e um teste de "o lote respeita o batch size" passava sem que o corte
+ * jamais tivesse acontecido — o pior tipo de verde, o que afirma exatamente a
+ * garantia que nao existe. Operador desconhecido ja lancava (ver
+ * `SUPPORTED_OPERATORS`); argumento desconhecido nao. Agora lanca tambem.
+ *
+ * Ao adicionar uma chave aqui, IMPLEMENTE-A junto e cubra com teste. Incluir o
+ * nome so para calar o erro recria exatamente o defeito que isto veio impedir.
+ */
+function assertKnownArgs(method: string, args: Row, permitidos: readonly string[]): void {
+  for (const key of Object.keys(args)) {
+    if (!permitidos.includes(key)) {
+      throw new Error(
+        `[fake-prisma] ${method}: argumento nao suportado \`${key}\`. ` +
+          `Implemente-o no fake antes de usa-lo no repositorio.`,
+      );
+    }
+  }
+}
+
 /** Erro no formato que o codigo de producao trata como falha do banco. */
 function notFound(model: string): Error {
   return new Error(`[fake-prisma] ${model}: registro nao encontrado`);
@@ -220,9 +253,25 @@ class FakeTable {
     return this.findFirst(args);
   }
 
-  async findMany(args: { where?: Where; select?: Row; orderBy?: Row } = {}): Promise<Row[]> {
+  async findMany(
+    args: {
+      where?: Where;
+      select?: Row;
+      orderBy?: Row | readonly Row[];
+      take?: number;
+      include?: Row;
+    } = {},
+  ): Promise<Row[]> {
+    assertKnownArgs("findMany", args, FIND_MANY_ARGS);
+
     const filtradas = args.where ? this.rows.filter((row) => matches(row, args.where!)) : this.rows;
-    return sortRows(filtradas, args.orderBy).map((row) => project(row, args.select));
+    const ordenadas = sortRows(filtradas, args.orderBy);
+    // ORDENA ANTES DE CORTAR — nesta sequencia, sempre. Cortar antes de ordenar
+    // devolveria linhas arbitrarias com cara de deliberado: o `take` teria sido
+    // respeitado, e o teste afirmaria o oposto da producao sem quebrar. Mesmo
+    // motivo do `take` aninhado em `project`.
+    const cortadas = typeof args.take === "number" ? ordenadas.slice(0, args.take) : ordenadas;
+    return cortadas.map((row) => project(row, args.select));
   }
 
   async update({ where, data, select }: { where: Where; data: Row; select?: Row }): Promise<Row> {
