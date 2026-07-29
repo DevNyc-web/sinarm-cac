@@ -459,6 +459,14 @@ model DocumentExtraction {
   /// (created_at DESC, id DESC) — sem isso, empate de milissegundo desempatava
   /// pelo que o Postgres devolvesse, e podia alternar entre execucoes.
   @@index([documentId, createdAt(sort: Desc), id(sort: Desc)])
+
+  /// Varredura do reaper global (#47D-2): PROCESSANDO parada ha tempo demais.
+  /// O relogio e `updated_at`, renovado no claim PENDENTE -> PROCESSANDO.
+  @@index([state, updatedAt])
+
+  /// Fila de trabalho (#47D-1): PENDENTE mais antigas primeiro. O indice acima,
+  /// que comeca em `document_id`, NAO serve — a fila nao filtra por documento.
+  @@index([state, createdAt, id])
   @@map("document_extractions")
 }
 
