@@ -553,6 +553,25 @@ enum InternalStatus {
   CONCLUIDO
   CANCELADO_REEMBOLSADO
 
+  /// Pausas assistidas (docs/44 §6) — Fase 2. SEM CONSUMIDOR neste PR: nenhum
+  /// fluxo escreve estes valores ainda; eles existem para que os fluxos da
+  /// Fase 3 nasçam com o ponto de parada ja nomeado.
+  ///
+  /// NO FIM DO ENUM de proposito: `ALTER TYPE ... ADD VALUE` sem `BEFORE`/`AFTER`
+  /// anexa ao fim no Postgres. Inserir no meio aqui faria a ordem do schema
+  /// divergir da ordem real do tipo no banco — e a ordem do enum e o que o
+  /// Postgres usa em `ORDER BY` sobre a coluna.
+  ///
+  /// Pausa antes do ato irreversivel (selecao de arma/PCE, "Gerar GRU e
+  /// Salvar"). So sai por acao humana explicita: nenhum timeout, reaper ou
+  /// retry atravessa este estado (docs/44 §7, invariante 2).
+  AGUARDANDO_CONFIRMACAO_HUMANA
+  /// Validacao humana exigida pelo portal. NAO existe e NAO existira caminho
+  /// automatico para resolve-la: o sistema para e devolve para a pessoa
+  /// (docs/00 §8, permanente). Diferente de `BLOQUEADO_INSTABILIDADE`, que o
+  /// sistema pode retomar sozinho quando o portal voltar.
+  AGUARDANDO_CAPTCHA
+
   @@map("internal_status")
 }
 
