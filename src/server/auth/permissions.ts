@@ -22,6 +22,12 @@ export const PERMISSIONS = [
   "process.priority", // Alterar prioridade operacional (docs/11 §4)
   "process.operationalStatus", // Mover o status operacional da fila
   "automation.queue.submit", // Enviar processo pronto para a fila de automacao futura (docs/25)
+  // Acionar MANUALMENTE o lote de extracao e a limpeza de abandonadas (#47D-3A).
+  // Permissao PROPRIA de proposito: reusar `document.review` ou
+  // `automation.queue.submit` daria execucao de extracao a quem so pediu para
+  // conferir documento ou enfileirar processo — e a matriz deixaria de responder
+  // "quem pode acionar extracao?".
+  "extraction.run",
   "note.internal", // Escrever nota interna (equipe) no processo
   "manual.execution.register", // Registrar execucao MANUAL feita fora do app (docs/21)
   "gru.generate", // Clicar "Gerar GRU e Salvar" (irreversivel)
@@ -52,6 +58,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "process.priority": "Alterar prioridade do processo",
   "process.operationalStatus": "Mover status operacional",
   "automation.queue.submit": "Enviar para a fila de automação (futura)",
+  "extraction.run": "Acionar extração de documentos",
   "note.internal": "Escrever nota interna",
   "manual.execution.register": "Registrar execucao manual (feita fora do app)",
   "gru.generate": 'Clicar "Gerar GRU e Salvar"',
@@ -89,6 +96,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "process.priority",
     "process.operationalStatus",
     "automation.queue.submit",
+    // Mesma familia de `automation.queue.submit`: quem opera a fila e quem
+    // aciona o lote. FINANCEIRO e SUPORTE ficam de fora — segregacao de funcoes.
+    "extraction.run",
     "note.internal",
     // Registra o que FEZ manualmente fora do app — o app nao executa nada.
     "manual.execution.register",

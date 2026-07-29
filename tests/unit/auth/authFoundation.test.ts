@@ -14,7 +14,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { MOCK_USERS, SEEDED_USER_IDS } from "../../../src/server/auth/mockUsers";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../../../src/server/auth/permissions";
+import {
+  PERMISSIONS,
+  PERMISSION_LABELS,
+  ROLE_PERMISSIONS,
+} from "../../../src/server/auth/permissions";
 import { ROLES, USER_ROLE, INTERNAL_ROLES } from "../../../src/server/auth/roles";
 
 // ------------------------------------------------------------------- 1. RBAC
@@ -46,6 +50,24 @@ test("segregacao de funcoes: quem executa nao libera pagamento, e vice-versa", (
   assert.equal(ROLE_PERMISSIONS.OPERADOR.includes("refund.approve"), false);
   assert.equal(ROLE_PERMISSIONS.FINANCEIRO.includes("sinarm.execute"), false);
   assert.equal(ROLE_PERMISSIONS.FINANCEIRO.includes("gru.generate"), false);
+});
+
+test("extraction.run existe na matriz e tem rotulo", () => {
+  assert.ok(
+    (PERMISSIONS as readonly string[]).includes("extraction.run"),
+    "acionar extracao e permissao propria, nao carona de outra",
+  );
+  assert.ok(PERMISSION_LABELS["extraction.run"], "permissao sem rotulo nao aparece no painel");
+});
+
+test("so ADMIN e OPERADOR podem acionar extracao", () => {
+  // Quem opera a fila aciona o lote. FINANCEIRO cuida de dinheiro e SUPORTE le —
+  // dar execucao a eles quebraria a mesma segregacao do teste acima.
+  assert.equal(ROLE_PERMISSIONS.ADMIN.includes("extraction.run"), true);
+  assert.equal(ROLE_PERMISSIONS.OPERADOR.includes("extraction.run"), true);
+  assert.equal(ROLE_PERMISSIONS.FINANCEIRO.includes("extraction.run"), false);
+  assert.equal(ROLE_PERMISSIONS.SUPORTE.includes("extraction.run"), false);
+  assert.equal(ROLE_PERMISSIONS.USER.includes("extraction.run"), false);
 });
 
 // -------------------------------------------------- 2. paridade Prisma x app
