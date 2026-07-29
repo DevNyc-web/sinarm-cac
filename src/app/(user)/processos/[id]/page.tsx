@@ -16,10 +16,9 @@ import {
 import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { deriveAutomationReadiness } from "@/server/automation/automationReadiness";
 import {
+  clientVisibleStatusLabel,
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
-  MANUAL_EXECUTION_USER_LABELS,
-  OPERATIONAL_STATUS_USER_LABELS,
   PAYMENT_STATUS_LABELS,
 } from "@/server/processes/statusLabels";
 import {
@@ -115,10 +114,13 @@ export default async function ProcessoRevisaoPage({
         <Card className="mt-4 space-y-1 text-sm">
           <p className="font-medium">Status</p>
           <p className="text-neutral-800">
-            {/* Depois que a execucao manual comeca, ela e a visao mais atual. */}
-            {process.manualExecutionStatus === "EXECUCAO_MANUAL_NAO_INICIADA"
-              ? OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]
-              : MANUAL_EXECUTION_USER_LABELS[process.manualExecutionStatus]}
+            {/*
+              Depois que a execucao manual comeca, ela e a visao mais atual. A
+              regra saiu daqui para `clientVisibleStatusLabel` — o render e o
+              MESMO, mas agora o admin le da mesma funcao em vez de exibir outra
+              coluna sob o rotulo de "status do cliente".
+            */}
+            {clientVisibleStatusLabel(process)}
           </p>
           <p className="text-neutral-600">{process.processType.name}</p>
           <p className="text-xs text-neutral-500">

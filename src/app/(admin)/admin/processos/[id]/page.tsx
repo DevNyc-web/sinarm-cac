@@ -8,6 +8,7 @@ import { hasPermission, requireAdminRole } from "@/server/auth/guards";
 import { PERMISSION_LABELS, type Permission } from "@/server/auth/permissions";
 import { ROLE_LABELS } from "@/server/auth/roles";
 import {
+  clientVisibleStatusLabel,
   DOCUMENT_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   INTERNAL_STATUS_LABELS,
@@ -152,9 +153,22 @@ export default async function AdminProcessoDetalhePage({
           <p className="text-neutral-600">
             Responsavel: {detail.assignedToLabel ?? "sem responsavel"}
           </p>
+          {/*
+            O que o cliente VE sai da mesma funcao que a tela dele usa. Antes esta
+            linha mostrava `userFacingStatus`, que nenhuma tela do cliente le —
+            divergia em 4 dos 9 estados operacionais e fazia o operador informar
+            status errado.
+
+            `userFacingStatus` continua visivel, mas rotulado pelo que ele e: uma
+            coluna persistida de diagnostico, nao o que o cliente enxerga.
+          */}
           <p className="text-xs text-neutral-500">
-            Status visivel ao usuario: {USER_FACING_STATUS_LABELS[detail.userFacingStatus]} ·
-            interno (docs/12 §6): {INTERNAL_STATUS_LABELS[detail.internalStatus]}
+            Status que o cliente ve: {clientVisibleStatusLabel(detail)} · interno (docs/12 §6):{" "}
+            {INTERNAL_STATUS_LABELS[detail.internalStatus]}
+          </p>
+          <p className="text-xs text-neutral-400">
+            Coluna `userFacingStatus` (persistida, nao exibida ao cliente):{" "}
+            {USER_FACING_STATUS_LABELS[detail.userFacingStatus]}
           </p>
           <p className="text-xs text-neutral-500">
             Criado em {detail.createdAt.toLocaleDateString("pt-BR")}
