@@ -30,6 +30,12 @@ export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   GRU_PAGA_EMPRESA: "GRU paga (empresa)",
   CONCLUIDO: "Concluido",
   CANCELADO_REEMBOLSADO: "Cancelado / reembolsado",
+  AGUARDANDO_CONFIRMACAO_HUMANA: "Aguardando confirmacao humana",
+  // "validacao humana", NAO "resolvendo captcha": o rotulo descreve o que o
+  // sistema esta esperando (uma pessoa), nunca o mecanismo nem uma resolucao
+  // automatica. Burlar captcha e proibido de forma permanente (docs/00 §8), e
+  // rotulo de tela e onde essa promessa vaza primeiro.
+  AGUARDANDO_CAPTCHA: "Aguardando validacao humana",
 };
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {

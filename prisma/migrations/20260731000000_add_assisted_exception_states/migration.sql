@@ -1,0 +1,31 @@
+-- Estados de pausa assistida no enum `internal_status` (docs/44 §6, Fase 2).
+--
+-- MIGRATION ADITIVA: `ALTER TYPE ... ADD VALUE` nao reescreve tabela, nao trava
+-- linha e nao altera dado algum. Nenhuma linha existente muda de estado.
+--
+-- SEM CONSUMIDOR NESTE PR: nenhum fluxo escreve estes valores. Eles existem para
+-- que os fluxos da Fase 3 nascam com o ponto de parada ja nomeado, em vez de
+-- alguem inventar um estado sob pressao no meio de outro PR.
+--
+-- ORDEM: sem `BEFORE`/`AFTER`, o Postgres anexa ao FIM do tipo. O
+-- `schema.prisma` lista os dois no fim tambem — se um dia divergirem, a ordem
+-- do banco e a que vale em `ORDER BY` sobre a coluna.
+--
+-- `IF NOT EXISTS`: o `prisma migrate dev` nao gera esta clausula, ela foi
+-- adicionada a mao. Como o CI nao tem Postgres, esta migration nunca e
+-- exercitada por teste antes de rodar em ambiente real — idempotencia e a unica
+-- defesa contra reaplicacao parcial.
+--
+-- NAO USAR `db:push`: ele sincroniza o banco com o schema e desconhece o
+-- historico de migrations. Use `npm run db:migrate` (dev) ou `npm run db:deploy`
+-- (aplicar) — mesmo criterio do aviso em `20260729000000_extraction_single_active`.
+--
+-- POSTGRESQL < 12: `ALTER TYPE ... ADD VALUE` NAO podia rodar dentro de bloco de
+-- transacao antes do PG 12, e o Prisma executa cada migration em transacao. Do
+-- PG 12 em diante funciona, com a restricao de que o valor novo nao seja USADO
+-- na mesma transacao — o que este arquivo nao faz. CONFIRMAR a versao do
+-- servidor antes do primeiro deploy; se for < 12, esta migration precisa rodar
+-- fora de transacao.
+
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'AGUARDANDO_CONFIRMACAO_HUMANA';
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'AGUARDANDO_CAPTCHA';
