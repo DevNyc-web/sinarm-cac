@@ -14,7 +14,11 @@
 > - ❌ **NÃO preenche `docs/34 §16`.**
 >
 > **Fase 9 continua INERTE.** `PHASE9_REAL_EXECUTION_ENABLED` continua
-> `false as const`. **`docs/34 §16` continua em branco / não assinado.**
+> `false as const`. **`docs/34 §16` agora contém autorização operacional
+> explícita assinada (2026-07-29), mas isso não equivale à liberação técnica:**
+> a execução real continua bloqueada até a conclusão dos gates técnicos
+> aplicáveis, PR técnico separado e manutenção das proteções de credenciais,
+> sessão e ponto de parada.
 > **Gates 1, 2, 3 e 5 (`docs/26 §19`) continuam abertos.** Automação real
 > continua **não autorizada**.
 >
@@ -66,12 +70,14 @@ O que se busca observar — e que o laboratório sintético **não** consegue pr
 
 ## 3. Pré-condições obrigatórias
 
-Nenhuma existe hoje. Todas precisariam estar satisfeitas **antes**:
+Hoje só a autorização operacional do `docs/34 §16` existe; **todas as demais**
+continuam pendentes e precisariam estar satisfeitas **antes**:
 
 **Formais**
 
-- [ ] `docs/34 §16` **preenchido e assinado** — aprovador, escopo, conta
-      autorizada, ponto de parada, data.
+- [x] `docs/34 §16` **preenchido e assinado** — aprovador, escopo, conta
+      autorizada, ponto de parada, data. *(2026-07-29 — autorização
+      **operacional**; não fecha gate técnico nem libera execução real.)*
 - [ ] `docs/34 §3` com os campos hoje vazios: região/superintendência,
       responsável técnico, responsável operacional, data/hora planejada.
 - [ ] Consentimento específico registrado (`docs/40 §9`).
@@ -387,6 +393,7 @@ MFA).
 > código, **não** altera `PHASE9_REAL_EXECUTION_ENABLED`, **não** toca a
 > allowlist, **não** libera rede oficial, **não** executa nada, **não** altera
 > processo real, **não fecha gate** e **não substitui consentimento formal**. A
-> Fase 9 continua **inerte**, `docs/34 §16` continua **em branco / não
-> assinado**, e os **gates 1, 2, 3 e 5 continuam abertos**. Regras permanentes
+> Fase 9 continua **inerte**; o `docs/34 §16` passou a conter **autorização
+> operacional assinada (2026-07-29), que não é liberação técnica**, e os
+> **gates 1, 2, 3 e 5 continuam abertos**. Regras permanentes
 > (`docs/00 §8`) e bloqueios de fase (`docs/15`) seguem íntegros.
