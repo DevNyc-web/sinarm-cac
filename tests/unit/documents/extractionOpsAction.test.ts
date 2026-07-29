@@ -39,6 +39,7 @@ function corpoDaAction(nome: string): string {
 
 const BATCH = corpoDaAction("runExtractionBatchAction");
 const REAP = corpoDaAction("runExtractionReapAction");
+const ENQUEUE = corpoDaAction("enqueueExtractionsAction");
 
 /* ------------------------------------------------------------ existencia --- */
 
@@ -47,6 +48,7 @@ test("os dois arquivos do painel existem", () => {
   assert.ok(existsSync(PAGE));
   assert.ok(BATCH, "runExtractionBatchAction precisa existir");
   assert.ok(REAP, "runExtractionReapAction precisa existir");
+  assert.ok(ENQUEUE, "enqueueExtractionsAction precisa existir");
 });
 
 /* ------------------------------------------------------------------ RBAC --- */
@@ -68,6 +70,7 @@ test("as duas actions exigem extraction.run", () => {
   for (const [nome, corpo] of [
     ["batch", BATCH],
     ["reap", REAP],
+    ["enqueue", ENQUEUE],
   ] as const) {
     assert.match(corpo, /requirePermission\("extraction\.run"\)/, `${nome}: guard ausente`);
   }
@@ -79,6 +82,7 @@ test("a permissao e exigida ANTES de acionar qualquer coisa", () => {
   for (const [nome, corpo, runner] of [
     ["batch", BATCH, "runExtractionWorkerOnce"],
     ["reap", REAP, "runExtractionReaperOnce"],
+    ["enqueue", ENQUEUE, "enqueueDocumentExtractions"],
   ] as const) {
     const guard = corpo.indexOf("requirePermission");
     const trabalho = corpo.indexOf(runner);
@@ -140,6 +144,7 @@ test("redirect fica FORA do try — senao o catch o engoliria", () => {
   for (const [nome, corpo] of [
     ["batch", BATCH],
     ["reap", REAP],
+    ["enqueue", ENQUEUE],
   ] as const) {
     const fimDoCatch = corpo.lastIndexOf("}");
     const redirectPos = corpo.indexOf("redirect(destino)");
@@ -155,7 +160,7 @@ test("redirect fica FORA do try — senao o catch o engoliria", () => {
 
 test("todo catch e SEM binding — erro bruto nao existe como variavel", () => {
   assert.doesNotMatch(actionCode, /catch\s*\(/);
-  assert.equal((actionCode.match(/\} catch \{/g) ?? []).length, 2, "uma por action");
+  assert.equal((actionCode.match(/\} catch \{/g) ?? []).length, 3, "uma por action");
 });
 
 test("a query string carrega apenas contagens, duracao e literais fechados", () => {
@@ -163,7 +168,7 @@ test("a query string carrega apenas contagens, duracao e literais fechados", () 
     .flatMap((m) => [m[1], m[2], m[3]])
     .filter(Boolean);
 
-  const permitidas = ["acao", "lote", "limpeza", "erro"];
+  const permitidas = ["acao", "lote", "limpeza", "fila", "erro"];
   for (const chave of chaves) {
     assert.ok(permitidas.includes(chave!), `literal inesperado na URL: ${chave}`);
   }
@@ -182,12 +187,17 @@ const EVENTOS = [
   "extraction_worker_manual_failed",
   "extraction_reaper_manual_triggered",
   "extraction_reaper_manual_failed",
+  "extraction_enqueue_manual_triggered",
+  "extraction_enqueue_manual_failed",
 ] as const;
 
 const PAYLOAD_PERMITIDO = [
   "event",
   "actorId",
   "actorRole",
+  "candidates",
+  "requested",
+  "reused",
   "scanned",
   "processed",
   "skipped",
@@ -206,7 +216,7 @@ test("todo ponto de log passa por satisfies OpsLogPayload", () => {
   const sitios = (actionCode.match(/logger\.(info|warn)\(/g) ?? []).length;
   const tipados = (actionCode.match(/satisfies OpsLogPayload/g) ?? []).length;
   assert.equal(sitios, tipados, "log sem o tipo escaparia da allowlist do compilador");
-  assert.equal(sitios, 4, "sucesso e falha, para lote e limpeza");
+  assert.equal(sitios, 6, "sucesso e falha, para lote, limpeza e fila");
 });
 
 test("o tipo do payload E a allowlist — nada fora dela", () => {
@@ -222,7 +232,7 @@ test("o tipo do payload E a allowlist — nada fora dela", () => {
 test("todo evento registra autoria", () => {
   // Acionamento manual sem autor e acionamento sem responsavel.
   const blocos = [...actionCode.matchAll(/\{\s*event: "[a-z_]+",[\s\S]*?\} satisfies OpsLogPayload/g)];
-  assert.equal(blocos.length, 4);
+  assert.equal(blocos.length, 6);
   for (const [bloco] of blocos) {
     assert.match(bloco, /actorId: actor\.id/, "actorId ausente");
     assert.match(bloco, /actorRole: actor\.role/, "actorRole ausente");
@@ -264,6 +274,32 @@ test("a pagina coage searchParams para numero — nunca renderiza texto da URL",
   assert.match(pageCode, /Number\(/, "coercao explicita");
   assert.match(pageCode, /Number\.isFinite/, "NaN e descartado");
   assert.match(pageCode, /Math\.trunc/, "so inteiro chega ao render");
+});
+
+test("a pagina tem os TRES formularios e explica que enfileirar nao processa", () => {
+  assert.equal((pageSource.match(/<form action=/g) ?? []).length, 3);
+  assert.match(pageCode, /enqueueExtractionsAction/, "o form de fila aponta para a action");
+  assert.match(pageSource, /N[aã]o processa automaticamente/i, "criar fila nao processa");
+  assert.match(pageSource, /Processar fila de extra/i, "aponta o proximo passo");
+});
+
+test("a action de fila nao recebe limite do cliente", () => {
+  // Limite vindo de formulario ou URL seria entrada nao validada num caminho que
+  // CRIA linhas. A constante e de servidor.
+  assert.match(ENQUEUE, /enqueueDocumentExtractions\(\)/, "chamada sem argumento");
+  assert.doesNotMatch(ENQUEUE, /ENQUEUE_BATCH_SIZE|limit/, "a action nao decide o limite");
+});
+
+test("a action de fila nao alcanca repositorio, lote nem varredura", () => {
+  for (const proibido of [
+    "listDocumentsAwaitingExtraction",
+    "listActiveExtractionDocumentIds",
+    "runExtractionWorkerOnce",
+    "runExtractionReaperOnce",
+    "requestDocumentExtraction",
+  ]) {
+    assert.doesNotMatch(ENQUEUE, new RegExp(proibido), `enqueue nao pode usar ${proibido}`);
+  }
 });
 
 test("a pagina avisa que e manual, mock, sem OCR e sem orgao publico", () => {

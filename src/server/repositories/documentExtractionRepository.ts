@@ -221,6 +221,35 @@ export function listPendingExtractions(limit: number): Promise<PendingExtraction
   });
 }
 
+/**
+ * Estados em que uma tentativa ocupa a vaga ATIVA do documento.
+ *
+ * Duplicado de proposito: `ACTIVE_EXTRACTION_STATES` mora em
+ * `requestDocumentExtraction`, que e um SERVICE — um repositorio importando
+ * service inverteria a camada. A copia e travada por teste de paridade, para que
+ * as duas nao possam divergir em silencio.
+ */
+const ACTIVE_STATES: readonly ExtractionState[] = ["PENDENTE", "PROCESSANDO"];
+
+/**
+ * `documentId` de toda tentativa ATIVA, em todos os documentos.
+ *
+ * Conjunto pequeno POR CONSTRUCAO: o indice unico parcial garante no maximo uma
+ * ativa por documento, entao isto e limitado a "documentos em voo agora", nao ao
+ * historico — que continua sendo 1:N e pode ser grande.
+ *
+ * Devolve so o id. Quem monta fila precisa saber QUAIS documentos ja estao
+ * ocupados; nao precisa da tentativa, do estado nem de nada que venha do
+ * documento do cliente.
+ */
+export async function listActiveExtractionDocumentIds(): Promise<string[]> {
+  const linhas = await getPrisma().documentExtraction.findMany({
+    where: { state: { in: [...ACTIVE_STATES] } },
+    select: { documentId: true },
+  });
+  return linhas.map((linha) => linha.documentId);
+}
+
 /** Historico completo do documento, mais recentes primeiro, SEM PII. */
 export function listExtractionsForDocument(documentId: string): Promise<ExtractionRow[]> {
   return getPrisma().documentExtraction.findMany({

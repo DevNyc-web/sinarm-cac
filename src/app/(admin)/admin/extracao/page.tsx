@@ -5,7 +5,11 @@ import { Container } from "@/components/ui/Container";
 import { Notice } from "@/components/ui/Notice";
 import { requirePermission } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
-import { runExtractionBatchAction, runExtractionReapAction } from "./actions";
+import {
+  enqueueExtractionsAction,
+  runExtractionBatchAction,
+  runExtractionReapAction,
+} from "./actions";
 
 /**
  * Painel de operacao da extracao (PR #47D-3A).
@@ -25,6 +29,13 @@ const RESULTADO_LOTE = [
   ["processed", "processadas"],
   ["skipped", "ignoradas (outra execucao venceu)"],
   ["failed", "sem veredito"],
+] as const;
+
+const RESULTADO_FILA = [
+  ["candidates", "elegíveis"],
+  ["requested", "criadas"],
+  ["reused", "já existia"],
+  ["failed", "falhas"],
 ] as const;
 
 /**
@@ -79,7 +90,25 @@ export default async function AdminExtracaoPage({
         resultado do lote será <strong>0</strong>, e isso é o esperado, não um defeito.
       </Notice>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <Card className="mt-6">
+        <h2 className="text-base font-medium">Criar tentativas pendentes</h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          Cria fila para até 10 documentos elegíveis: os que já foram{" "}
+          <strong>enviados ou estão em análise</strong> e ainda não têm tentativa ativa. Os mais
+          antigos entram primeiro.
+        </p>
+        <p className="mt-2 text-sm text-neutral-600">
+          <strong>Não processa automaticamente.</strong> Depois de criar, use “Processar fila de
+          extrações”, abaixo. Criar a fila não faz leitura óptica real, não lê o arquivo enviado,
+          não consulta Gov.br, SINARM ou Polícia Federal e não envia dados para fora — o
+          processamento continua mock e manual.
+        </p>
+        <form action={enqueueExtractionsAction} className="mt-4">
+          <Button type="submit">Criar tentativas pendentes</Button>
+        </form>
+      </Card>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Card>
           <h2 className="text-base font-medium">Processar fila de extrações</h2>
           <p className="mt-1 text-sm text-neutral-600">
@@ -117,6 +146,18 @@ export default async function AdminExtracaoPage({
           ) : acao === "lote" ? (
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
               {RESULTADO_LOTE.map(([chave, rotulo]) => {
+                const n = numeroDaQuery(valor(chave));
+                return (
+                  <div key={chave}>
+                    <dt className="text-neutral-500">{rotulo}</dt>
+                    <dd className="text-lg font-medium text-neutral-900">{n ?? "—"}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          ) : acao === "fila" ? (
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+              {RESULTADO_FILA.map(([chave, rotulo]) => {
                 const n = numeroDaQuery(valor(chave));
                 return (
                   <div key={chave}>
