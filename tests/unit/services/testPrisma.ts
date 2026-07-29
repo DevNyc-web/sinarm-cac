@@ -421,6 +421,65 @@ export class FakePrisma {
   findProcess(id: string): Row | undefined {
     return this.process.rows.find((row) => row.id === id);
   }
+
+  /** Todas as tabelas do fake — base do snapshot de `$transaction`. */
+  private tabelas(): FakeTable[] {
+    return [
+      this.process,
+      this.processDocument,
+      this.documentExtraction,
+      this.destination,
+      this.payment,
+      this.processStatusEvent,
+    ];
+  }
+
+  /**
+   * `$transaction` interativa — SNAPSHOT/RESTORE, nao transacao de verdade.
+   *
+   * O QUE ELA FAZ: copia as linhas de TODAS as tabelas antes do callback; se ele
+   * lancar, restaura as copias e repropaga o erro. Isso torna o rollback
+   * OBSERVAVEL num teste unitario: da para provar que um `update` bem-sucedido
+   * volta atras quando a operacao seguinte falha.
+   *
+   * O QUE ELA NAO FAZ — E ISTO IMPORTA:
+   *
+   * - **Nao simula isolamento.** Duas `$transaction` concorrentes no mesmo teste
+   *   se atropelariam: a segunda tira snapshot de um estado ja sujo pela
+   *   primeira. Nenhum teste faz isso hoje; se algum passar a fazer, este fake
+   *   dara resposta errada com cara de certa.
+   * - **Nao prova nada sobre Postgres.** Nao ha `BEGIN`/`ROLLBACK`, nao ha
+   *   niveis de isolamento, nao ha deadlock, nao ha constraint diferida. O CI
+   *   roda SEM banco (`.github/workflows/ci.yml`), entao a atomicidade real —
+   *   aquela que depende do Prisma e do servidor — continua NAO exercitada por
+   *   teste nenhum. O que se prova aqui e que o CODIGO agrupa as operacoes.
+   * - **Nao aceita array de promises** (`$transaction([p1, p2])`), so o callback.
+   *   A forma em array executa as promises FORA do escopo transacional que este
+   *   fake entende, e aceitar as duas esconderia essa diferenca.
+   *
+   * `tx` e o proprio fake: as tabelas tem a mesma API, entao `tx.process.update`
+   * e `getPrisma().process.update` sao literalmente o mesmo objeto. Isso e o
+   * bastante para provar que chamador e repositorio usaram o MESMO client.
+   */
+  async $transaction<T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> {
+    if (typeof fn !== "function") {
+      throw new Error("FakePrisma.$transaction aceita somente a forma com callback.");
+    }
+
+    const snapshot = this.tabelas().map((tabela) => structuredClone(tabela.rows));
+
+    try {
+      return await fn(this);
+    } catch (erro) {
+      this.tabelas().forEach((tabela, i) => {
+        // `rows` e `readonly` (nao reatribuivel), mas o CONTEUDO nao e: zerar e
+        // repopular restaura sem tocar a declaracao do campo.
+        tabela.rows.length = 0;
+        tabela.rows.push(...snapshot[i]);
+      });
+      throw erro;
+    }
+  }
 }
 
 /**

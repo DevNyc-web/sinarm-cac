@@ -149,6 +149,46 @@ test("recordStatusEvent segue inalterado: grava a transicao tipada", async () =>
   assert.equal(evento.kind, undefined);
 });
 
+test("recordStatusEvent SEM client usa o global — o default nao regrediu", async () => {
+  // A Fase 3b deu a `recordStatusEvent` um segundo parametro opcional (o client
+  // transacional). Este teste existe para provar que omiti-lo continua gravando
+  // pelo client global: os chamadores fora de transacao nao mudaram de contrato.
+  await recordStatusEvent({
+    processId: PROCESS_ID,
+    fromStatus: null,
+    toStatus: "RASCUNHO",
+    ...ATOR,
+  });
+
+  const evento = eventoUnico();
+  assert.equal(evento.fromStatus, null);
+  assert.equal(evento.toStatus, "RASCUNHO");
+});
+
+test("recordStatusEvent COM client grava no client informado", async () => {
+  // Prova que o parametro e usado de fato, e nao ignorado com o global
+  // atendendo por acidente: o client informado e um espiao que registra a
+  // chamada e delega.
+  const chamadas: Record<string, unknown>[] = [];
+  const espiao = {
+    processStatusEvent: {
+      create: async (args: { data: Record<string, unknown> }) => {
+        chamadas.push(args.data);
+        return db.processStatusEvent.create(args);
+      },
+    },
+  };
+
+  await recordStatusEvent(
+    { processId: PROCESS_ID, fromStatus: "RASCUNHO", toStatus: "PAGO_EM_FILA", ...ATOR },
+    espiao as unknown as Parameters<typeof recordStatusEvent>[1],
+  );
+
+  assert.equal(chamadas.length, 1, "o client informado tem de ser o usado");
+  assert.equal(chamadas[0].toStatus, "PAGO_EM_FILA");
+  assert.equal(eventoUnico().toStatus, "PAGO_EM_FILA");
+});
+
 test("trilha e append-only: eventos se acumulam, nao se sobrescrevem", async () => {
   await recordOperationalEvent({ processId: PROCESS_ID, kind: "NOTA", ...ATOR });
   await recordOperationalEvent({
