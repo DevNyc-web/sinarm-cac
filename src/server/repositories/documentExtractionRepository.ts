@@ -55,6 +55,22 @@ const LATEST_FIRST: Prisma.DocumentExtractionOrderByWithRelationInput[] = [
   { id: "desc" },
 ];
 
+/**
+ * Ordem da FILA de trabalho: a mais ANTIGA primeiro.
+ *
+ * ASC, nao DESC: FIFO. Ordenar pela mais recente faria a tentativa mais antiga
+ * nunca chegar ao topo enquanto entrasse trabalho novo — e a que ja esperou mais
+ * e justamente a que nao pode ser preterida.
+ *
+ * O desempate por `id` existe pelo mesmo motivo de `LATEST_FIRST`: `created_at`
+ * e TIMESTAMP(3), duas linhas no mesmo milissegundo empatam, e sem criterio
+ * declarado a mesma fila podia sair em ordens diferentes entre execucoes.
+ */
+const OLDEST_FIRST: Prisma.DocumentExtractionOrderByWithRelationInput[] = [
+  { createdAt: "asc" },
+  { id: "asc" },
+];
+
 /** Tentativa SEM os campos extraidos. */
 export type ExtractionRow = {
   id: string;
@@ -162,6 +178,47 @@ export async function findLatestExtractionsWithFieldsForDocuments(
     if (!latestByDocument.has(row.documentId)) latestByDocument.set(row.documentId, row);
   }
   return [...latestByDocument.values()];
+}
+
+/**
+ * Referencia MINIMA de uma tentativa aguardando execucao.
+ *
+ * Duas chaves, e so. Quem monta um lote precisa saber o que existe e a qual
+ * documento pertence — nao precisa de `fields`, nem de `confidence`, nem de
+ * `engine`. Um tipo maior aqui viraria, sem esforco, um caminho de PII para
+ * dentro de log e de resumo de execucao.
+ */
+export type PendingExtractionRef = {
+  id: string;
+  documentId: string;
+};
+
+/**
+ * Proximas tentativas PENDENTE, as mais antigas primeiro.
+ *
+ * SO OLHA: nao transiciona estado, nao reserva nada. O claim continua sendo
+ * exclusividade de `claimPendingExtraction`, chamado por quem executa. Reservar
+ * aqui criaria um segundo dono da mesma regra, e dois donos divergem no primeiro
+ * ajuste.
+ *
+ * Consequencia disso, e nao e defeito: entre esta leitura e o claim a linha pode
+ * mudar (outra instancia venceu, ou a tentativa terminou). Quem executa precisa
+ * tratar `claimed: false` como caso normal — e trata.
+ *
+ * `limit <= 0` NAO consulta o banco, mesma economia de `in: []` acima.
+ */
+export function listPendingExtractions(limit: number): Promise<PendingExtractionRef[]> {
+  if (limit <= 0) return Promise.resolve([]);
+
+  return getPrisma().documentExtraction.findMany({
+    where: { state: "PENDENTE" },
+    orderBy: OLDEST_FIRST,
+    take: limit,
+    // O `select` E o gate: `fields` fora daqui significa que a PII nao chega nem
+    // a sair da tabela. Filtrar depois nao seria equivalente — o dado ja teria
+    // trafegado, e log e resumo passariam a poder alcanca-lo por descuido.
+    select: { id: true, documentId: true },
+  });
 }
 
 /** Historico completo do documento, mais recentes primeiro, SEM PII. */
