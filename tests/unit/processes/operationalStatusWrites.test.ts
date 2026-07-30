@@ -23,6 +23,17 @@
  * O QUE ELA NAO FAZ: nao migra fluxo, nao cria mapa, nao cria projecao, nao toca
  * schema/enum/migration e nao altera comportamento de aplicacao. E teste
  * estrutural puro: le arquivos como texto, nao importa nada de `src/`.
+ *
+ * LIMITE conhecido: este teste detecta writes estruturais explicitos em sinks
+ * conhecidos e literais diretos de `operationalStatus` em padroes comuns. Ele NAO
+ * e um parser TypeScript completo e NAO garante detectar todos os fluxos
+ * indiretos por objeto intermediario, spread complexo, factory dinamica ou chave
+ * construida em runtime. O objetivo da Fase 5b e impedir crescimento
+ * ACIDENTAL/PLAUSIVEL dos writes, nao provar ausencia formal.
+ *
+ * O que fica coberto e o que fica de fora esta exercitado em testes proprios no
+ * fim do arquivo (secoes 6 e 7) — de proposito, para que o limite seja VISIVEL e
+ * nao vire surpresa quando alguem confiar demais na trava.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -145,9 +156,19 @@ type DetectedWrite = {
   value: string;
 };
 
-/** Remove comentarios sem quebrar `https://`. Mesmo helper de labRedaction.test.ts. */
+/**
+ * Remove comentarios sem quebrar `https://`. Variante do helper de
+ * labRedaction.test.ts com uma diferenca que importa aqui: o comentario de bloco
+ * vira as MESMAS quebras de linha que ocupava, em vez de um unico espaco.
+ *
+ * Sem isso, todo cabecalho `/** ... *\/` encolhe o arquivo e a linha reportada
+ * na falha sai deslocada — em `transitionInternalStatus.ts` o desvio chegava a
+ * 52 linhas. Uma trava que aponta para a linha errada perde a serventia.
+ */
 function codeOnly(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 /** Avanca o indice para depois de uma string literal, respeitando escapes. */
@@ -184,22 +205,54 @@ function endOfBlock(code: string, openIndex: number): number {
   return code.length;
 }
 
-/** Spans dos contextos de payload do arquivo. */
-function payloadSpans(code: string): { sink: string; start: number; end: number }[] {
-  const sinks: { sink: string; re: RegExp }[] = [
-    { sink: "updateProcessOperations(...)", re: /\bupdateProcessOperations\s*\(/g },
-    { sink: "alsoSet", re: /\balsoSet\s*\??\s*:\s*\{/g },
-    { sink: "prisma data", re: /\bdata\s*\??\s*:\s*\{/g },
-  ];
+function spansOf(code: string, re: RegExp, sink: string, openChar: "(" | "{") {
   const spans: { sink: string; start: number; end: number }[] = [];
-  for (const { sink, re } of sinks) {
-    for (const match of code.matchAll(re)) {
-      const open = code.indexOf(sink === "updateProcessOperations(...)" ? "(" : "{", match.index);
-      spans.push({ sink, start: open, end: endOfBlock(code, open) });
-    }
+  for (const match of code.matchAll(re)) {
+    const open = code.indexOf(openChar, match.index);
+    spans.push({ sink, start: open, end: endOfBlock(code, open) });
   }
   return spans;
 }
+
+/** Spans dos contextos de payload — onde uma chave `operationalStatus` grava. */
+function payloadSpans(code: string) {
+  return [
+    ...spansOf(code, /\bupdateProcessOperations\s*\(/g, "updateProcessOperations(...)", "("),
+    ...spansOf(code, /\balsoSet\s*\??\s*:\s*\{/g, "alsoSet", "{"),
+    ...spansOf(code, /\bdata\s*\??\s*:\s*\{/g, "prisma data", "{"),
+  ];
+}
+
+/**
+ * ANTI-SINKS: contextos onde `operationalStatus` NUNCA grava, nem com valor
+ * literal. `where`/`select` sao clausulas de LEITURA do Prisma — filtrar a fila
+ * por `"PAGO_EM_FILA"` e legitimo e nao pode acender a trava.
+ *
+ * Precisam ser explicitos porque a regra de valor literal (abaixo) dispensa
+ * sink; sem esta lista, um filtro com valor fixo viraria falso positivo.
+ */
+function readOnlySpans(code: string) {
+  return [
+    ...spansOf(code, /\bwhere\s*:\s*\{/g, "where", "{"),
+    ...spansOf(code, /\bselect\s*:\s*\{/g, "select", "{"),
+  ];
+}
+
+/**
+ * Os 9 valores de `OperationalStatus`, lidos do schema — nao copiados. Copiar
+ * criaria uma segunda fonte de verdade que envelheceria calada.
+ */
+function operationalStatusValues(): string[] {
+  const schema = readFileSync("prisma/schema.prisma", "utf8");
+  const block = /enum OperationalStatus \{([\s\S]*?)\}/.exec(schema);
+  if (!block) throw new Error("enum OperationalStatus nao encontrado em prisma/schema.prisma");
+  return block[1]
+    .split("\n")
+    .map((line) => line.replace(/\/\/.*$/, "").trim())
+    .filter((line) => /^[A-Z][A-Z0-9_]*$/.test(line));
+}
+
+const OPERATIONAL_STATUS_VALUES = operationalStatusValues();
 
 /** Texto do valor escrito, normalizado: do `:` ate a virgula/fecho do mesmo nivel. */
 function valueAfter(code: string, colonIndex: number): string {
@@ -231,11 +284,28 @@ function isTypeAnnotation(value: string): boolean {
   return /^(?:OperationalStatus|string)\b/.test(value);
 }
 
+/**
+ * `operationalStatus: "PAGO_EM_FILA"` — valor cravado no arquivo.
+ *
+ * Tolera a assercao final (`as const`, `as OperationalStatus`), que e como o TS
+ * costuma exigir o literal em objeto solto: sem isso, `as const` bastava para
+ * furar a trava.
+ */
+function isLiteralStatus(value: string): boolean {
+  const semAssercao = value.replace(/\s+as\s+[\w.]+$/, "").trim();
+  const literal = /^"([A-Z0-9_]+)"$|^'([A-Z0-9_]+)'$/.exec(semAssercao);
+  const name = literal?.[1] ?? literal?.[2];
+  return name !== undefined && OPERATIONAL_STATUS_VALUES.includes(name);
+}
+
 function scanSource(file: string, source: string): DetectedWrite[] {
   const code = codeOnly(source);
   const spans = payloadSpans(code);
+  const readOnly = readOnlySpans(code);
   const found: DetectedWrite[] = [];
   const lineOf = (index: number) => code.slice(0, index).split("\n").length;
+  const inside = <T extends { start: number; end: number }>(list: T[], index: number) =>
+    list.find((s) => index > s.start && index < s.end);
 
   // (a) chave com valor: `operationalStatus: <valor>`.
   // O lookbehind descarta `.operationalStatus`, `"process.operationalStatus"` e
@@ -246,9 +316,23 @@ function scanSource(file: string, source: string): DetectedWrite[] {
     const value = valueAfter(code, colon);
     // `operationalStatus?:` so existe em declaracao de tipo/prop opcional.
     if (optional || isTypeAnnotation(value)) continue;
-    const span = spans.find((s) => match.index > s.start && match.index < s.end);
-    if (!span) continue; // leitura, DTO, filtro, `select`, rotulo — nao e write
-    found.push({ file, line: lineOf(match.index), sink: span.sink, value });
+    // `where`/`select` sao leitura, mesmo com valor literal.
+    if (inside(readOnly, match.index)) continue;
+
+    const span = inside(spans, match.index);
+    if (span) {
+      found.push({ file, line: lineOf(match.index), sink: span.sink, value });
+      continue;
+    }
+    // Fora de sink conhecido, um VALOR LITERAL do enum ainda e write: e o unico
+    // motivo plausivel para cravar o valor no codigo. Fecha os dois bypasses que
+    // a revisao sondou — objeto intermediario (`const patch = {...}`) e porta
+    // generica nova (`patchProcess(id, {...})`) — sem precisar de parser.
+    // Leitura nao tem literal do lado direito: tem `row.operationalStatus`,
+    // `true`, `filters.x` ou um tipo.
+    if (isLiteralStatus(value)) {
+      found.push({ file, line: lineOf(match.index), sink: "objeto literal", value });
+    }
   }
 
   // (b) atribuicao direta a propriedade: `algo.operationalStatus = ...`.
@@ -276,8 +360,11 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-const FILES = sourceFiles("src");
-const DETECTED = FILES.flatMap((file) => scanSource(file, readFileSync(file, "utf8")));
+const FILES = sourceFiles("src").sort();
+/** Ordem estavel: a saida da falha nao pode depender da ordem do filesystem. */
+const DETECTED = FILES.flatMap((file) => scanSource(file, readFileSync(file, "utf8"))).sort(
+  (a, b) => a.file.localeCompare(b.file) || a.line - b.line,
+);
 
 const ALL_ALLOWED = [...ALLOWED_WRITES, ...ALLOWED_PASSTHROUGH];
 
@@ -301,11 +388,21 @@ test("a varredura encontrou codigo (a trava nao esta vazia por acidente)", () =>
 
 test("nenhum write de operationalStatus fora da allowlist", () => {
   const strays = DETECTED.filter((write) => !ALL_ALLOWED.some((a) => matches(write, a)));
+  // Um write no mesmo arquivo/sink de uma entrada conhecida quase sempre e o
+  // MESMO write com o valor renomeado (`status` -> `novoStatus`), nao um write
+  // novo. Dizer "novo write" nesse caso manda a pessoa procurar o que nao existe.
+  const describe = (s: DetectedWrite) => {
+    const renamed = ALL_ALLOWED.find((a) => a.file === s.file && a.sink === s.sink);
+    const hint = renamed
+      ? ` — parece o write conhecido \`${renamed.value}\` renomeado/alterado; se for, ajuste o \`value\` na allowlist`
+      : "";
+    return `  - ${s.file}:${s.line} — sink \`${s.sink}\`, valor \`${s.value}\`${hint}`;
+  };
   assert.deepEqual(
     strays,
     [],
     `${FAILURE_MESSAGE}\n\nEncontrado(s):\n${strays
-      .map((s) => `  - ${s.file}:${s.line} — sink \`${s.sink}\`, valor \`${s.value}\``)
+      .map(describe)
       .join("\n")}\n\nSe o write for legitimo e decidido, some-o a ALLOWED_WRITES com a justificativa e atualize docs/46 §3.`,
   );
 });
@@ -341,12 +438,18 @@ test("o inventario continua com 5 writes de decisao + 1 repasse canonico", () =>
 });
 
 test("os 5 writes estao onde docs/46 §3 diz que estao", () => {
-  const byFile = (file: string) => DETECTED.filter((w) => w.file === file).map((w) => w.value);
+  // Ordenado: reordenar os dois ramos de `reviewProcessDocument` e refatoracao
+  // inocente e nao deve quebrar a trava. O que importa e o CONJUNTO de valores
+  // gravados por arquivo, nao a ordem em que aparecem.
+  const byFile = (file: string) =>
+    DETECTED.filter((w) => w.file === file)
+      .map((w) => w.value)
+      .sort();
   assert.deepEqual(byFile("src/server/services/confirmPixPayment.ts"), ['"PAGO_EM_FILA"']);
   assert.deepEqual(byFile("src/server/services/uploadProcessDocument.ts"), ['"DOCUMENTO_ENVIADO"']);
   assert.deepEqual(byFile("src/server/services/reviewProcessDocument.ts"), [
-    '"DOCUMENTO_APROVADO"',
     '"BLOQUEADO"',
+    '"DOCUMENTO_APROVADO"',
   ]);
   assert.deepEqual(byFile("src/server/services/updateProcessOperations.ts"), ["status"]);
 });
@@ -445,12 +548,103 @@ test("a trava NAO dispara em leitura, filtro, select, tipo nem permissao RBAC", 
     `await requirePermission("process.operationalStatus");`,
     `return { operationalStatus: row.operationalStatus, priority: row.priority };`,
     `// muda o operationalStatus: comentario nao e codigo`,
+    `/* bloco: operationalStatus: "BLOQUEADO" dentro de comentario */`,
+    // Os dois abaixo so passam por causa dos ANTI-SINKS: tem valor literal do
+    // enum, que a regra nova trataria como write se `where`/`select` nao fossem
+    // reconhecidos como leitura. Filtrar a fila por um status fixo e legitimo.
+    `where: { operationalStatus: "PAGO_EM_FILA" }`,
+    `const q = { where: { operationalStatus: "EM_REVISAO_OPERACIONAL" }, select: { id: true } };`,
   ];
   for (const line of benign) {
     assert.deepEqual(
       scanSource("src/exemplo.ts", line),
       [],
       `padrao inofensivo foi tratado como write: ${line}`,
+    );
+  }
+});
+
+// ------------------------------------- 7. alcance real: o que pega, o que nao
+
+test("PEGA write por objeto intermediario e por porta generica nova", () => {
+  // Os dois bypasses que a revisao do PR sondou. Nenhum dos dois e evasao
+  // exotica: sao estilos de codigo comuns, e por isso precisavam ser fechados —
+  // um write novo nao deve escapar so porque o patch ganhou uma variavel.
+  const viaVariavel = scanSource(
+    "src/server/services/novo.ts",
+    `const patch = { operationalStatus: "CANCELADO_DEV" };
+     await updateProcessOperations(id, patch);`,
+  );
+  assert.deepEqual(
+    viaVariavel.map((w) => `${w.sink}:${w.value}`),
+    ['objeto literal:"CANCELADO_DEV"'],
+    "objeto intermediario com valor literal precisa acender a trava",
+  );
+
+  // `as const` e como o TS costuma exigir o literal num objeto solto — sondado
+  // em src/ real durante a revisao, e furava a trava antes desta correcao.
+  const comAssercao = scanSource(
+    "src/server/services/novo.ts",
+    `const patch = { operationalStatus: "CANCELADO_DEV" as const };
+     await updateProcessOperations(id, patch);`,
+  );
+  assert.equal(comAssercao.length, 1, "`as const` nao pode servir de escape");
+
+  const viaPortaNova = scanSource(
+    "src/server/services/novo.ts",
+    `await patchProcess(id, { operationalStatus: "BLOQUEADO" });`,
+  );
+  assert.deepEqual(
+    viaPortaNova.map((w) => `${w.sink}:${w.value}`),
+    ['objeto literal:"BLOQUEADO"'],
+    "porta generica nova com valor literal precisa acender a trava",
+  );
+});
+
+test("os 9 valores do enum vem do schema, nao de copia", () => {
+  // Se `OperationalStatus` ganhar um valor, a regra de literal passa a cobri-lo
+  // sozinha. Copiar a lista aqui criaria uma segunda fonte de verdade.
+  assert.equal(OPERATIONAL_STATUS_VALUES.length, 9);
+  assert.ok(OPERATIONAL_STATUS_VALUES.includes("PRONTO_PARA_PROTOCOLO_MANUAL"));
+  assert.equal(OPERATIONAL_STATUS_VALUES.includes("CONCLUIDO"), false, "esse e InternalStatus");
+});
+
+test("LIMITE conhecido: indirecao dinamica NAO e detectada", () => {
+  // Documentado de proposito, no mesmo espirito do "LIMITE conhecido" de
+  // labRedaction.test.ts: a trava impede crescimento acidental/plausivel, nao
+  // prova ausencia. Cobrir estes casos exigiria parser TypeScript completo —
+  // custo desproporcional para a Fase 5b.
+  //
+  // Se algum dia um destes aparecer de verdade, a defesa nao e esta trava: e a
+  // revisao de PR e a decisao da Fase 5d.
+  const naoCobertos = [
+    // chave montada em runtime
+    `const campo = "operationalStatus"; patch[campo] = "BLOQUEADO";`,
+    // valor vindo de variavel, fora de sink conhecido
+    `const alvo = "BLOQUEADO"; await patchProcess(id, { operationalStatus: alvo });`,
+    // factory dinamica
+    `const build = (v: string) => ({ operationalStatus: v }); await patchProcess(id, build("BLOQUEADO"));`,
+  ];
+  for (const linha of naoCobertos) {
+    assert.deepEqual(
+      scanSource("src/exemplo.ts", linha),
+      [],
+      `este caso passou a ser detectado — otimo: atualize o LIMITE do cabecalho: ${linha}`,
+    );
+  }
+});
+
+test("as linhas reportadas sao as linhas REAIS do arquivo", () => {
+  // Regressao do bug corrigido: `codeOnly` colapsava comentario de bloco num
+  // unico espaco e a linha reportada saia deslocada (52 linhas em
+  // transitionInternalStatus.ts). A mensagem da trava existe para apontar o
+  // write ofensor; linha errada a torna inutil.
+  for (const write of DETECTED) {
+    const linhaReal = readFileSync(write.file, "utf8").split("\n")[write.line - 1];
+    assert.match(
+      linhaReal ?? "",
+      /operationalStatus/,
+      `${write.file}:${write.line} nao contem operationalStatus — a linha reportada esta deslocada`,
     );
   }
 });
