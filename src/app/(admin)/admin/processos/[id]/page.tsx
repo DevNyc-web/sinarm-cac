@@ -26,6 +26,10 @@ import {
   SLA_LABELS,
   type SlaStatus,
 } from "@/server/processes/operationalSignals";
+import {
+  diagnoseStatusDivergence,
+  type DivergenceSeverity,
+} from "@/server/processes/statusDivergence";
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
 import {
   getProcessReadinessState,
@@ -59,6 +63,14 @@ const SLA_CLASS: Record<SlaStatus, string> = {
   DENTRO_DO_PRAZO: "text-neutral-700",
   ATENCAO: "font-medium text-amber-700",
   ATRASADO: "font-medium text-red-700",
+};
+
+/** Fase 5c (docs/46 §9) — so rotulo/cor de exibicao, nao muda a severidade. */
+const DIVERGENCE_CLASS: Record<DivergenceSeverity, string> = {
+  none: "text-neutral-500",
+  expected_legacy: "text-neutral-600",
+  needs_decision: "font-medium text-amber-700",
+  invalid_projection: "font-medium text-red-700",
 };
 
 /** Permissoes relevantes para o detalhe do processo (docs/11 §3/§5.12). */
@@ -124,6 +136,13 @@ export default async function AdminProcessoDetalhePage({
   const revisionChecklist = detail.checklist.filter((item) => item.group === "REVISAO");
   const gruChecklist = detail.checklist.filter((item) => item.group === "GRU");
   const postProtocolChecklist = detail.checklist.filter((item) => item.group === "POS_PROTOCOLO");
+  // Fase 5c (docs/46 §9) — leitura pura, so para exibicao. Nao filtra fila,
+  // nao muda permissao nem readiness: ver DIVERGENCE_CLASS acima.
+  const statusDivergence = diagnoseStatusDivergence({
+    internalStatus: detail.internalStatus,
+    operationalStatus: detail.operationalStatus,
+    manualExecutionStatus: detail.manualExecutionStatus,
+  });
 
   return (
     <Container>
@@ -169,6 +188,16 @@ export default async function AdminProcessoDetalhePage({
           <p className="text-xs text-neutral-400">
             Coluna `userFacingStatus` (persistida, nao exibida ao cliente):{" "}
             {USER_FACING_STATUS_LABELS[detail.userFacingStatus]}
+          </p>
+          {/*
+            Diagnostico interno (Fase 5c, docs/46 §9) — so leitura, calculado a
+            partir dos campos ja carregados. NAO e fonte de fila, permissao,
+            readiness ou status visivel ao cliente: aquilo continua vindo de
+            operationalStatus/clientVisibleStatusLabel, sem mudanca nenhuma.
+          */}
+          <p className={`text-xs ${DIVERGENCE_CLASS[statusDivergence.severity]}`}>
+            Diagnostico de status (interno, nao afeta fila nem operacao):{" "}
+            {statusDivergence.severity} — {statusDivergence.reason}
           </p>
           <p className="text-xs text-neutral-500">
             Criado em {detail.createdAt.toLocaleDateString("pt-BR")}
