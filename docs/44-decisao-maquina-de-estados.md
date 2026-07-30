@@ -146,6 +146,16 @@ arquitetural**.
 > equivalente canônico** — dependência que esta seção não previa. A Fase 5 passa a
 > começar por inventário (5a), guardas (5b) e diagnóstico (5c), com a projeção só
 > na 5h.
+>
+> ⚠️ **Fase 5d decidida por [`docs/47`](47-decisao-estados-workflow-humano.md)
+> (2026-07-30).** Dos 6 estados sem equivalente, **2** viram candidatos a
+> `InternalStatus` (`DOCUMENTO_ENVIADO` → `DOCUMENTO_RECEBIDO_PARA_ANALISE`;
+> `DOCUMENTO_APROVADO` → `DOCUMENTO_VALIDADO`), **3** permanecem só
+> operacionais (`EM_REVISAO_OPERACIONAL`, `PRONTO_PARA_PROTOCOLO_MANUAL`,
+> `CANCELADO_DEV`) e **1** (`BLOQUEADO`) tem direção dada mas forma final
+> adiada para PR próprio. **Consequência: a projeção da 5h NÃO será 100%
+> derivada** — `operationalStatus` mantém papel residual permanente para os 3
+> valores só-operacionais. Isto revisa, sem reverter, o parágrafo abaixo.
 
 - Papel temporário: **projeção operacional derivada** de `internalStatus`.
 - **Continua existindo** enquanto fila, permissões e telas dependerem dele.
@@ -216,7 +226,7 @@ coragem, e a 6 é destrutiva.
 | **2** | **Novos estados** — `AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`; avaliar `AGUARDANDO_PAGAMENTO_GRU` e `EXCECAO_BAIXA_CONFIANCA` | não (migration aditiva) |
 | **3** | **Novos fluxos escrevem `internalStatus`** — exceções assistidas e automações nascem já no canônico | não |
 | **4** | ~~**`userFacingStatus` deriva de `internalStatus`**~~ — **REESCRITA por [`docs/45`](45-decisao-user-facing-status.md)**: a coluna não é lida pelo cliente, então foi **deprecada** em vez de promovida. Entregue como correção das telas (admin e dashboard passaram a usar `clientVisibleStatusLabel`) | risco baixo — concluída |
-| **5** | ~~**`operationalStatus` vira projeção** direto~~ — **REORDENADA por [`docs/46`](46-inventario-operational-status.md)**: passa a começar por inventário (5a), guarda contra novos writes (5b) e diagnóstico de divergência (5c); migração dos writes em 5e–5g; **projeção só na 5h**. Motivo: `internalStatus` tem 2/17 valores alcançáveis e 6 estados operacionais não têm equivalente canônico | **risco alto** — exige testes de equivalência de fila |
+| **5** | ~~**`operationalStatus` vira projeção** direto~~ — **REORDENADA por [`docs/46`](46-inventario-operational-status.md)**: passa a começar por inventário (5a), guarda contra novos writes (5b) e diagnóstico de divergência (5c); **decisão sobre os 6 estados sem equivalente na 5d** ([`docs/47`](47-decisao-estados-workflow-humano.md): híbrida — 2 migram, 3 permanecem operacionais, 1 parcial); migração dos writes em 5e–5g; **projeção parcial só na 5h**. Motivo: `internalStatus` tem 2/17 valores alcançáveis e 6 estados operacionais não têm equivalente canônico | **risco alto** — exige testes de equivalência de fila |
 | **6** | **Depreciação final** — remover `operationalStatus` do schema só quando não houver leitores; **e também `userFacingStatus`** (`docs/45 §6`) | migration destrutiva, por último |
 
 As fases **1–3 já destravam** os PRs de heartbeat e exceções assistidas **sem

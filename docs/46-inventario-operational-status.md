@@ -227,6 +227,11 @@ território da Fase 2 — ou aceitar perda de informação na fila.
 
 > **Esta é uma dependência OCULTA da Fase 5**, não registrada no `docs/44 §5.2`.
 > É a principal razão da reordenação.
+>
+> **Decidido em [`docs/47`](47-decisao-estados-workflow-humano.md) (2026-07-30):**
+> 2 destes 6 viram candidatos a `InternalStatus`, 3 permanecem só operacionais,
+> 1 (`BLOQUEADO`) tem forma adiada. Este inventário não muda — a decisão está
+> em `docs/47`.
 
 ---
 
@@ -252,7 +257,7 @@ alcançáveis suficientes para cobrir a fila **sem perda**.
 | **5a** | **Inventário documental** — este documento | docs | nenhum |
 | **5b** | **Teste de guarda** contra novos writes soltos de `operationalStatus` | teste | baixo |
 | **5c** | **Diagnóstico de divergência** `internalStatus` × `operationalStatus`, sem mudar comportamento | código | baixo |
-| **5d** | **Decisão sobre novos `InternalStatus`** para os estados operacionais humanos do §7 | docs | nenhum |
+| **5d** | ~~**Decisão sobre novos `InternalStatus`**~~ — **DECIDIDA por [`docs/47`](47-decisao-estados-workflow-humano.md)**: 2 dos 6 estados migram, 3 permanecem operacionais, 1 parcial | docs | nenhum |
 | **5e** | **Migrar `uploadProcessDocument`** — um gatilho, um valor, guarda clara | código | médio |
 | **5f** | **Migrar `reviewProcessDocument`** — dois caminhos, um deles `BLOQUEADO` | código | médio-alto |
 | **5g** | **Migrar `updateProcessOperations`** — porta do admin, 9 valores | código | **alto** |
