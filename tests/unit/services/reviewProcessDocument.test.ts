@@ -91,6 +91,55 @@ test("aprovacao nao deixa motivo de rejeicao pendurado", async () => {
   assert.equal(doc.rejectionReason, null, "aprovado nao pode manter motivo");
 });
 
+/* -------------------------------- internalStatus canonico, lado aprovacao (Fase 5f) --- */
+
+test("aprovacao avanca internalStatus para DOCUMENTO_VALIDADO", async () => {
+  // Fase 5f, lado aprovacao (docs/47 §6.2): via transitionInternalStatus, nao
+  // mais so operationalStatus direto.
+  const { processo } = semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "APROVADO");
+  assert.equal(processo.internalStatus, "DOCUMENTO_VALIDADO");
+});
+
+test("internalStatus e operationalStatus avancam JUNTOS na mesma aprovacao", async () => {
+  const { processo } = semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
+  const result = await reviewProcessDocument(REVISOR, DOC_ID, "APROVADO");
+  assert.equal(result.ok, true);
+  assert.equal(processo.internalStatus, "DOCUMENTO_VALIDADO");
+  assert.equal(processo.operationalStatus, "DOCUMENTO_APROVADO");
+});
+
+test("aprovacao que NAO regride (guarda) tambem nao toca internalStatus", async () => {
+  // Mesma guarda de sempre (operationalStatus === DOCUMENTO_ENVIADO): se a
+  // fila ja passou do pagamento, nem operationalStatus nem internalStatus se
+  // movem — nao deveria ter chamado transitionInternalStatus.
+  const { processo } = semear(
+    {},
+    { operationalStatus: "PAGO_EM_FILA", internalStatus: "PAGO_EM_FILA" },
+  );
+  await reviewProcessDocument(REVISOR, DOC_ID, "APROVADO");
+  assert.equal(processo.internalStatus, "PAGO_EM_FILA");
+});
+
+test("aprovacao registra evento tipado com fromStatus/toStatus e o ator da revisao", async () => {
+  semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "APROVADO");
+
+  assert.equal(db.processStatusEvent.rows.length, 1);
+  const [evento] = db.processStatusEvent.rows;
+  assert.equal(evento.processId, PROCESS_ID);
+  assert.equal(evento.fromStatus, "DOCUMENTO_RECEBIDO_PARA_ANALISE");
+  assert.equal(evento.toStatus, "DOCUMENTO_VALIDADO");
+  assert.equal(evento.actorMockUserId, REVISOR.id);
+  assert.equal(evento.actorRole, REVISOR.role);
+});
+
+test("aprovacao bloqueada pela guarda NAO gera evento", async () => {
+  semear({}, { operationalStatus: "PAGO_EM_FILA", internalStatus: "PAGO_EM_FILA" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "APROVADO");
+  assert.equal(db.processStatusEvent.rows.length, 0);
+});
+
 /* ---------------------------------------------------------------- rejeicao --- */
 
 test("revisor rejeita com motivo", async () => {
@@ -134,6 +183,44 @@ test("rejeicao NAO mexe em processo cancelado", async () => {
   const { processo } = semear({}, { operationalStatus: "CANCELADO_DEV" });
   await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "ilegivel");
   assert.equal(processo.operationalStatus, "CANCELADO_DEV");
+});
+
+test("rejeicao continua LEGADA: nao toca internalStatus nem gera evento tipado", async () => {
+  // Fase 5f migra so o lado APROVACAO (docs/47 §9). BLOQUEADO exige decisao
+  // propria antes de ganhar porta canonica (docs/47 §6.5) — mapear para
+  // BLOQUEADO_INSTABILIDADE/EXCECAO_* sem essa decisao e PROIBIDO (docs/46
+  // §3.4). Este teste trava que o lado rejeicao NAO foi tocado.
+  const { processo } = semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "ilegivel");
+  assert.equal(
+    processo.internalStatus,
+    "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+    "rejeicao nao deveria mexer em internalStatus",
+  );
+  assert.equal(db.processStatusEvent.rows.length, 0, "rejeicao nao usa a porta canonica");
+});
+
+test("rejeicao nao referencia transitionInternalStatus no codigo-fonte", () => {
+  // Estrutural: garante que o caminho REJEITADO nao foi tocado por engano —
+  // so o bloco de codigo do lado APROVACAO deveria mencionar a porta canonica.
+  const code = readFileSync("src/server/services/reviewProcessDocument.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  // Ancora especifica do bloco de rejeicao (nao a guarda inicial de motivo,
+  // que tambem contem 'decision === "REJEITADO"").
+  const ancora = 'document.process.operationalStatus !== "CANCELADO_DEV"';
+  assert.ok(code.includes(ancora), "bloco de rejeicao nao encontrado — ancora do teste ficou desatualizada");
+  const ladoRejeicao = code.slice(code.indexOf(ancora));
+  assert.doesNotMatch(
+    ladoRejeicao,
+    /transitionInternalStatus/,
+    "o bloco de rejeicao nao deveria chamar a porta canonica",
+  );
+  assert.doesNotMatch(
+    ladoRejeicao,
+    /BLOQUEADO_INSTABILIDADE|EXCECAO_DOC_INVALIDO|EXCECAO_ARMA_DIVERGENTE|EXCECAO_DESTINO_INCOMPLETO|BLOQUEADO_OPERACIONAL/,
+    "rejeicao nao pode mapear BLOQUEADO para excecao automatica nem criar categoria nova",
+  );
 });
 
 /* ------------------------------------------------------------------ guardas --- */

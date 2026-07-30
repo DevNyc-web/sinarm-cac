@@ -10,6 +10,7 @@ import {
   updateDocumentReview,
 } from "@/server/repositories/processDocumentRepository";
 import { updateProcessOperations } from "@/server/repositories/processRepository";
+import { transitionInternalStatus } from "./transitionInternalStatus";
 
 export type ReviewDecision = "APROVADO" | "REJEITADO";
 
@@ -41,10 +42,26 @@ export async function reviewProcessDocument(
     });
 
     // Reflete a decisao na fila, sem regredir quem ja passou do pagamento.
+    //
+    // Fase 5f, lado aprovacao (docs/47 §6.2, §9): via `transitionInternalStatus`,
+    // mesma porta canonica de `confirmPixPayment`/`uploadProcessDocument`.
+    // `internalStatus` vai para o candidato aprovado pela Fase 5d;
+    // `operationalStatus` continua indo para `DOCUMENTO_APROVADO`, passado em
+    // `alsoSet` — MESMO efeito final na fila, no admin e no status visivel ao
+    // cliente. O lado REJEITADO fica de fora de proposito: `BLOQUEADO` exige
+    // decisao propria antes de ganhar porta canonica (docs/47 §6.5) — mapear
+    // para um InternalStatus de excecao automatica sem essa decisao e
+    // PROIBIDO (docs/46 §3.4).
     if (decision === "APROVADO" && document.process.operationalStatus === "DOCUMENTO_ENVIADO") {
-      await updateProcessOperations(document.processId, {
-        operationalStatus: "DOCUMENTO_APROVADO",
+      const transition = await transitionInternalStatus({
+        processId: document.processId,
+        toStatus: "DOCUMENTO_VALIDADO",
+        alsoSet: { operationalStatus: "DOCUMENTO_APROVADO" },
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        note: "Documento aprovado pela equipe",
       });
+      if (!transition.ok) return { ok: false, error: transition.error };
     }
     if (decision === "REJEITADO" && document.process.operationalStatus !== "CANCELADO_DEV") {
       await updateProcessOperations(document.processId, {

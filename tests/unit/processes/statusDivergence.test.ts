@@ -101,17 +101,40 @@ test("DOCUMENTO_RECEBIDO_PARA_ANALISE + DOCUMENTO_ENVIADO: par migrado, sem dive
   assert.equal(result.expectedOperationalStatus, "DOCUMENTO_ENVIADO");
 });
 
-test("DOCUMENTO_VALIDADO continua needs_decision — Fase 5f ainda nao migrou", () => {
-  // Mesma tabela (docs/47 §6.2), mas o lado aprovacao de reviewProcessDocument
-  // nao foi tocado por este PR. O candidato aprovado nao vira `none` so por
-  // ter sido decidido — precisa de write real (Fase 5f) produzindo o par.
+test("DOCUMENTO_VALIDADO + DOCUMENTO_APROVADO: par migrado, sem divergencia (Fase 5f)", () => {
+  // reviewProcessDocument (lado aprovacao) passou a escrever pela porta
+  // canonica (docs/47 §6.2): esta combinacao e agora o resultado ESPERADO de
+  // uma aprovacao nova, nao mais needs_decision.
   const result = diagnoseStatusDivergence({
     internalStatus: "DOCUMENTO_VALIDADO",
     operationalStatus: "DOCUMENTO_APROVADO",
   });
-  assert.equal(result.hasDivergence, true);
-  assert.equal(result.severity, "needs_decision");
+  assert.equal(result.hasDivergence, false);
+  assert.equal(result.severity, "none");
   assert.equal(result.expectedOperationalStatus, "DOCUMENTO_APROVADO");
+});
+
+test("DOCUMENTO_VALIDADO com operationalStatus DIFERENTE de DOCUMENTO_APROVADO ainda diverge", () => {
+  // Migrado nao significa "sempre none" — so a combinacao ESPERADA e segura.
+  // Qualquer outra continua sinalizando divergencia real.
+  const operacionais = [
+    "RASCUNHO",
+    "DOCUMENTO_ENVIADO",
+    "AGUARDANDO_PAGAMENTO",
+    "PAGO_EM_FILA",
+    "EM_REVISAO_OPERACIONAL",
+    "PRONTO_PARA_PROTOCOLO_MANUAL",
+    "BLOQUEADO",
+    "CANCELADO_DEV",
+  ] as const;
+  for (const operationalStatus of operacionais) {
+    const result = diagnoseStatusDivergence({
+      internalStatus: "DOCUMENTO_VALIDADO",
+      operationalStatus,
+    });
+    assert.notEqual(result.severity, "none", `DOCUMENTO_VALIDADO + ${operationalStatus}`);
+    assert.equal(result.hasDivergence, true, `DOCUMENTO_VALIDADO + ${operationalStatus}`);
+  }
 });
 
 test("RASCUNHO + DOCUMENTO_ENVIADO continua expected_legacy — dado anterior a Fase 5e", () => {
@@ -127,6 +150,19 @@ test("RASCUNHO + DOCUMENTO_ENVIADO continua expected_legacy — dado anterior a 
   assert.match(result.reason, /ANTERIOR a Fase 5e/);
 });
 
+test("RASCUNHO + DOCUMENTO_APROVADO virou expected_legacy — dado anterior a Fase 5f", () => {
+  // Mesmo raciocinio da linha acima, agora para o lado aprovacao: a decisao
+  // (docs/47) foi tomada E implementada (5f) — a divergencia remanescente e
+  // so idade do dado, nao mais "decisao pendente". needs_decision mentiria
+  // aqui: nao ha mais nada para decidir sobre este write especifico.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "RASCUNHO",
+    operationalStatus: "DOCUMENTO_APROVADO",
+  });
+  assert.equal(result.severity, "expected_legacy");
+  assert.match(result.reason, /ANTERIOR a Fase 5f/);
+});
+
 // --------------------------------------- 2. writes legados (docs/46 §3/§7)
 
 test("legado esperado: internalStatus RASCUNHO, operationalStatus DOCUMENTO_ENVIADO", () => {
@@ -139,13 +175,14 @@ test("legado esperado: internalStatus RASCUNHO, operationalStatus DOCUMENTO_ENVI
   assert.match(result.reason, /uploadProcessDocument/);
 });
 
-test("needs_decision: internalStatus RASCUNHO, operationalStatus DOCUMENTO_APROVADO", () => {
+test("expected_legacy: internalStatus RASCUNHO, operationalStatus DOCUMENTO_APROVADO (migrado na 5f)", () => {
   const result = diagnoseStatusDivergence({
     internalStatus: "RASCUNHO",
     operationalStatus: "DOCUMENTO_APROVADO",
   });
   assert.equal(result.hasDivergence, true);
-  assert.equal(result.severity, "needs_decision");
+  assert.equal(result.severity, "expected_legacy");
+  assert.match(result.reason, /reviewProcessDocument/);
 });
 
 test("needs_decision: internalStatus RASCUNHO, operationalStatus BLOQUEADO", () => {
@@ -164,9 +201,13 @@ test("needs_decision: internalStatus RASCUNHO, operationalStatus BLOQUEADO", () 
 test("os 6 estados sem equivalente canonico (docs/46 §7) tem severidade coerente", () => {
   // EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL e CANCELADO_DEV nao
   // tem teste obrigatorio individual no pedido, mas fecham a cobertura dos 6.
+  // DOCUMENTO_ENVIADO e DOCUMENTO_APROVADO sao expected_legacy — os dois ja
+  // tem par migrado (Fases 5e/5f); o resto continua needs_decision porque
+  // NENHUM deles tem fluxo migrado ou decisao fechada (BLOQUEADO exige
+  // decisao propria, docs/47 §6.5).
   const casos: [import("@prisma/client").OperationalStatus, DivergenceSeverity][] = [
     ["DOCUMENTO_ENVIADO", "expected_legacy"],
-    ["DOCUMENTO_APROVADO", "needs_decision"],
+    ["DOCUMENTO_APROVADO", "expected_legacy"],
     ["EM_REVISAO_OPERACIONAL", "needs_decision"],
     ["PRONTO_PARA_PROTOCOLO_MANUAL", "needs_decision"],
     ["BLOQUEADO", "needs_decision"],
@@ -416,15 +457,17 @@ test("apenas os pares seguros produzem severity 'none'", () => {
     "CANCELADO_DEV",
   ] as const;
 
-  // Independente da tabela interna do modulo, de proposito: o par
-  // DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (Fase 5e, docs/47) e o
-  // primeiro seguro com NOMES DIFERENTES nos dois campos — os 3 originais
-  // (docs/46 §6) tem o mesmo nome nos dois lados.
+  // Independente da tabela interna do modulo, de proposito: os pares
+  // DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (Fase 5e) e
+  // DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (Fase 5f, docs/47) sao os seguros
+  // com NOMES DIFERENTES nos dois campos — os 3 originais (docs/46 §6) tem o
+  // mesmo nome nos dois lados.
   const PARES_SEGUROS: Record<string, string> = {
     RASCUNHO: "RASCUNHO",
     AGUARDANDO_PAGAMENTO: "AGUARDANDO_PAGAMENTO",
     PAGO_EM_FILA: "PAGO_EM_FILA",
     DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
+    DOCUMENTO_VALIDADO: "DOCUMENTO_APROVADO",
   };
 
   let semDivergencia = 0;
@@ -446,8 +489,9 @@ test("apenas os pares seguros produzem severity 'none'", () => {
   }
   assert.equal(
     semDivergencia,
-    4,
-    "RASCUNHO/idem, AGUARDANDO_PAGAMENTO/idem, PAGO_EM_FILA/idem, DOCUMENTO_RECEBIDO_PARA_ANALISE+DOCUMENTO_ENVIADO",
+    5,
+    "RASCUNHO/idem, AGUARDANDO_PAGAMENTO/idem, PAGO_EM_FILA/idem, " +
+      "DOCUMENTO_RECEBIDO_PARA_ANALISE+DOCUMENTO_ENVIADO, DOCUMENTO_VALIDADO+DOCUMENTO_APROVADO",
   );
 });
 
