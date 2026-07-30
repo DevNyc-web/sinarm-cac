@@ -181,7 +181,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 12 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * Os 14 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
  * §6): hoje nenhum fluxo real os escreve (so `confirmPixPayment` escreve
  * `internalStatus`, e so produz os 3 seguros), mas o diagnostico cobre a
  * combinacao mesmo assim - conservador por definicao, nao por observacao.
@@ -189,6 +189,13 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * `operationalStatus` ausente = "sem equivalente documentado". Nao
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
+ *
+ * Duas das 14 SAO documentadas (`DOCUMENTO_RECEBIDO_PARA_ANALISE`,
+ * `DOCUMENTO_VALIDADO`, aprovadas pela Fase 5d/docs/47) mas ainda SEM
+ * CONSUMIDOR: nenhum fluxo as escreve ate as Fases 5e/5f migrarem
+ * `uploadProcessDocument`/`reviewProcessDocument`. Ate la, severity continua
+ * `needs_decision` — o candidato aprovado nao vira `none` so por existir no
+ * enum; teria que existir tambem um write real produzindo a combinacao.
  */
 const UNDOCUMENTED_REASON =
   "internalStatus avancou alem dos 3 valores com projecao segura (docs/46 6); " +
@@ -198,6 +205,20 @@ const UNDOCUMENTED_REASON =
 const RISKY_BLOQUEADO_REASON =
   "docs/46 6: mapear para BLOQUEADO perderia a causa especifica e dispararia " +
   "BLOQUEIO_MANUAL em operationalSignals sem que humano tenha bloqueado.";
+
+/**
+ * Candidato APROVADO (docs/47), nao so citado — mas ainda SEM CONSUMIDOR: a
+ * Fase 5d decidiu a direcao, nao migrou o fluxo. `severity` continua
+ * `needs_decision` porque nenhum write real produz esta combinacao ainda; se
+ * aparecer, e sinal de escrita fora de banda, nao do caminho aprovado.
+ */
+function candidatoAprovadoReason(estado: string, fase: string, operationalStatus: string): string {
+  return (
+    `docs/47: candidato aprovado para ${operationalStatus} (Fase 5d), mas ${fase} ` +
+    `ainda nao migrou - nenhum fluxo escreve ${estado} hoje. Se aparecer, e ` +
+    "escrita fora de banda, nao o caminho aprovado."
+  );
+}
 
 type AdvancedInternalStatus = Exclude<InternalStatus, SafeInternalStatus | Phase2InternalStatus>;
 
@@ -259,6 +280,24 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "docs/46 6: CANCELADO_DEV afirmaria cancelamento de ambiente de " +
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
+  },
+  DOCUMENTO_RECEBIDO_PARA_ANALISE: {
+    candidateOperationalStatus: "DOCUMENTO_ENVIADO",
+    severity: "needs_decision",
+    reason: candidatoAprovadoReason(
+      "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+      "a Fase 5e (uploadProcessDocument)",
+      "DOCUMENTO_ENVIADO",
+    ),
+  },
+  DOCUMENTO_VALIDADO: {
+    candidateOperationalStatus: "DOCUMENTO_APROVADO",
+    severity: "needs_decision",
+    reason: candidatoAprovadoReason(
+      "DOCUMENTO_VALIDADO",
+      "o lado aprovacao da Fase 5f (reviewProcessDocument)",
+      "DOCUMENTO_APROVADO",
+    ),
   },
 };
 

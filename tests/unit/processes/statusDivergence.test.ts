@@ -306,6 +306,8 @@ test("severity sempre e um dos 4 valores declarados", () => {
     "CANCELADO_REEMBOLSADO",
     "AGUARDANDO_CONFIRMACAO_HUMANA",
     "AGUARDANDO_CAPTCHA",
+    "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+    "DOCUMENTO_VALIDADO",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -318,7 +320,11 @@ test("severity sempre e um dos 4 valores declarados", () => {
     "BLOQUEADO",
     "CANCELADO_DEV",
   ] as const;
-  assert.equal(internos.length, 17, "os 17 valores de InternalStatus, docs/46 §2");
+  assert.equal(
+    internos.length,
+    19,
+    "17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47): DOCUMENTO_RECEBIDO_PARA_ANALISE, DOCUMENTO_VALIDADO",
+  );
   assert.equal(operacionais.length, 9, "os 9 valores de OperationalStatus, docs/46 §2");
 
   for (const internalStatus of internos) {
@@ -354,6 +360,8 @@ test("apenas as 3 combinacoes seguras produzem severity 'none'", () => {
     "CANCELADO_REEMBOLSADO",
     "AGUARDANDO_CONFIRMACAO_HUMANA",
     "AGUARDANDO_CAPTCHA",
+    "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+    "DOCUMENTO_VALIDADO",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -438,7 +446,9 @@ test("o dropdown e a acao de mudar operationalStatus continuam intactos", () => 
   );
 });
 
-test("os 17 valores de InternalStatus vem do schema, nao de copia", () => {
+test("os 19 valores de InternalStatus vem do schema, nao de copia", () => {
+  // 17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47, migration
+  // 20260731010000_add_document_internal_statuses).
   const schema = readFileSync("prisma/schema.prisma", "utf8");
   const bloco = /enum InternalStatus \{([\s\S]*?)\n\}/.exec(schema);
   assert.ok(bloco, "enum InternalStatus nao encontrado em prisma/schema.prisma");
@@ -446,5 +456,7 @@ test("os 17 valores de InternalStatus vem do schema, nao de copia", () => {
     .split("\n")
     .map((line) => line.replace(/\/\/\/.*$/, "").trim())
     .filter((line) => /^[A-Z][A-Z0-9_]*$/.test(line));
-  assert.equal(valores.length, 17);
+  assert.equal(valores.length, 19);
+  assert.ok(valores.includes("DOCUMENTO_RECEBIDO_PARA_ANALISE"));
+  assert.ok(valores.includes("DOCUMENTO_VALIDADO"));
 });

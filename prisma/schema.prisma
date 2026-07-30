@@ -572,6 +572,24 @@ enum InternalStatus {
   /// sistema pode retomar sozinho quando o portal voltar.
   AGUARDANDO_CAPTCHA
 
+  /// Candidatos aprovados pela Fase 5d (docs/47) para os 2 dos 6 estados
+  /// operacionais humanos (docs/46 §7) com jornada legitima. SEM CONSUMIDOR
+  /// neste PR: nenhum fluxo escreve estes valores ainda — a migracao de
+  /// `uploadProcessDocument` (5e) e do lado aprovacao de `reviewProcessDocument`
+  /// (5f) ficam para PR proprio, mesmo padrao da Fase 2 acima.
+  ///
+  /// NO FIM DO ENUM pelo mesmo motivo da Fase 2: `ALTER TYPE ... ADD VALUE` sem
+  /// `BEFORE`/`AFTER` anexa ao fim no Postgres.
+  ///
+  /// Equivalente a `OperationalStatus.DOCUMENTO_ENVIADO` (docs/47 §6.1):
+  /// documento recebido do cliente, aguardando conferencia da equipe.
+  DOCUMENTO_RECEBIDO_PARA_ANALISE
+  /// Equivalente a `OperationalStatus.DOCUMENTO_APROVADO` (docs/47 §6.2):
+  /// documento conferido e validado pela equipe. Nome distinto do
+  /// `OperationalStatus` de origem de proposito — evita confundir os dois
+  /// enums na leitura de codigo (docs/47 §6.2).
+  DOCUMENTO_VALIDADO
+
   @@map("internal_status")
 }
 
