@@ -25,9 +25,10 @@
 começa por inventário, guardas e diagnóstico — não por projeção.
 
 - `operationalStatus` é **campo operacional ativo**: dirige fila, sinalizadores,
-  prontidão de automação, filtros e o dropdown do admin.
+  filtros, guardas de serviço e o dropdown do admin. **Não** dirige prontidão de
+  automação (§4.2).
 - `internalStatus` **não tem cobertura suficiente**: 1 caminho de escrita, 1
-  chamador, 2 de 17 valores alcançáveis.
+  chamador, 2 de 17 valores alcançáveis, 2 leituras de decisão.
 - **Projetar agora colapsaria a operação.** Todo processo projetaria para
   `RASCUNHO` ou `PAGO_EM_FILA`; `DOCUMENTO_ENVIADO`, `DOCUMENTO_APROVADO`,
   `EM_REVISAO_OPERACIONAL`, `PRONTO_PARA_PROTOCOLO_MANUAL`, `BLOQUEADO` e
@@ -43,11 +44,16 @@ começa por inventário, guardas e diagnóstico — não por projeção.
 | Caminhos de escrita | **5** | **1** (`transitionInternalStatus`) |
 | Services que escrevem | **4** | **1** (`confirmPixPayment`) |
 | Valores alcançáveis | **9 de 9** | **2 de 17** |
-| Leituras que decidem comportamento | **13** (contadas em §4) | **1** |
+| Leituras que decidem comportamento | **13** (contadas em §4) | **2** (§5) |
 
-> **Nota de precisão:** o mapeamento inicial estimou "~14" leituras de decisão. A
-> contagem exata é **13**. Registrado aqui porque um número redondo repetido em
-> documento vira fato falso depois.
+> **Nota de precisão.** Duas correções de contagem, registradas porque número
+> repetido em documento vira fato falso depois:
+>
+> - `operationalStatus`: o mapeamento inicial estimou "~14" leituras de decisão. A
+>   contagem exata é **13**.
+> - `internalStatus`: a primeira versão deste documento disse **1** leitura de
+>   decisão. São **2** — faltava a que decide `canCreateCharge` na tela do cliente
+>   (§5). Não muda a conclusão: 2 leituras ainda é cobertura quase inerte.
 
 ---
 
@@ -114,13 +120,26 @@ demais.
 ### 4.2 Operacional (11)
 
 - **`operationalSignals` — 7 leituras**: `isClosed()`, `BLOQUEIO_MANUAL` a partir
-  de `BLOQUEADO`, SLA interno, prontidão, próximas ações. **É o maior
+  de `BLOQUEADO`, SLA interno, `PRONTO_PARA_CHECKPOINT_GRU`, `deriveReadiness`
+  (prontidão de **conferência humana**, `docs/11 §7`), próximas ações. **É o maior
   acoplamento do campo.**
-- `automationReadiness` — consome `operationalSignals`, logo `operationalStatus`
-  influencia **prontidão para automação**.
 - `updateProcessOperations` — guarda de idempotência (no-op se igual).
 - `uploadProcessDocument` — guarda `if RASCUNHO`.
 - `reviewProcessDocument` — 2 guardas (`DOCUMENTO_ENVIADO`, `≠ CANCELADO_DEV`).
+
+> **`automationReadiness` NÃO entra nesta conta — e não é acoplamento.** Ele **não
+> lê `operationalStatus`** e **não consome `operationalSignals`**: é módulo **puro**,
+> derivado de destino, arma/PCE, documentos, sugestões e pagamento. A única menção
+> a `operationalSignals` no arquivo é um comentário comparando **estilo de
+> modelagem** (ambos derivam em vez de persistir), não um import. Registrado
+> explicitamente porque uma versão anterior desta seção afirmava o contrário:
+> `operationalStatus` **não influencia prontidão para automação**, e a projeção da
+> Fase 5 não tem risco por esse caminho.
+>
+> **Não confundir as duas "prontidões":** `deriveReadiness`, dentro de
+> `operationalSignals`, **lê** `operationalStatus` (é uma das 7 acima) e trata de
+> **conferência humana** (`docs/11 §7`); `automationReadiness`, em
+> `src/server/automation/`, é o checklist pré-execução e **não lê** o campo.
 
 ### 4.3 Visual (5)
 
@@ -151,8 +170,13 @@ demais.
 - **Alcançáveis:** `RASCUNHO` (default do schema) e `PAGO_EM_FILA`.
 - **Os outros 15** são futuros/documentais — incluindo os dois da Fase 2
   (`AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`).
-- **Lido para decidir:** 1 lugar (`createPixPayment`, guarda de
-  `RASCUNHO`/`AGUARDANDO_PAGAMENTO`).
+- **Lido para decidir:** **2 lugares**, ambos com a mesma dupla
+  `RASCUNHO`/`AGUARDANDO_PAGAMENTO`:
+  - `createPixPayment:32` — guarda de serviço, recusa criar cobrança fora dessa
+    dupla.
+  - `src/app/(user)/processos/[id]/page.tsx:85` — compõe `canCreateCharge`, que
+    decide se o cliente vê a ação de pagar (junto com "não há cobrança ativa nem
+    paga").
 
 **`internalStatus` ainda não pode substituir `operationalStatus`.** A Fase 3
 entregou a porta canônica; ninguém além do Pix entra por ela.
@@ -244,12 +268,17 @@ Ordem de 5e a 5g: do menor para o maior acoplamento, cada uma reversível sozinh
 |---|---|
 | **Processo sumir da fila** — `getAdminQueue` e o filtro leem `operationalStatus` | **alto** |
 | **`operationalSignals` errar** — 7 leituras; `BLOQUEIO_MANUAL` falso, SLA errado | **alto** |
-| **`automationReadiness` errar** — consome os sinais; prontidão de automação incorreta | **alto** |
+| **Guardas de serviço travarem ou vazarem** — 4 leituras (`uploadProcessDocument`, 2 em `reviewProcessDocument`, idempotência de `updateProcessOperations`) | **alto** |
 | **`isClosed()` não reconhece `CONCLUIDO`** — só `CANCELADO_DEV` fecha | médio |
 | Botão/dropdown admin aparecer errado — `<select defaultValue>` lê o valor atual | médio |
 | **`internalStatus` quase inerte** — é a causa raiz, não risco lateral | **alto** |
 | **6 estados sem equivalente** — dependência oculta de novos enums | **alto** |
 | Testes atuais não cobrem equivalência de fila | médio |
+
+> **Risco retirado:** *"`automationReadiness` errar"* constava aqui como **alto** por
+> supor que o módulo consome `operationalSignals`. Ele não consome, e não lê
+> `operationalStatus` (§4.2) — não havia risco por esse caminho. Removido em vez de
+> rebaixado: risco inventado desperdiça blindagem na 5b/5c.
 
 ---
 
