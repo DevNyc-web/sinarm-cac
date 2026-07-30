@@ -123,6 +123,13 @@ arquitetural**.
 
 ### 5.1 `userFacingStatus` → **projeção derivada de `internalStatus`**
 
+> ⚠️ **SUPERADO por [`docs/45`](45-decisao-user-facing-status.md) (2026-07-30).**
+> O mapeamento da Fase 4 mostrou que **nenhuma tela do cliente lê**
+> `userFacingStatus` — a premissa de "peso contratual" do §9 era falsa. A coluna
+> foi **deprecada como fonte visual** em vez de promovida: a fonte real é
+> `clientVisibleStatusLabel`, e a remoção fica para a Fase 6. A instrução de
+> trocar por `USER_FACING_BY_INTERNAL` está **revogada**.
+
 - Trocar `USER_FACING_BY_OPERATIONAL` por `USER_FACING_BY_INTERNAL`.
 - **Eliminar os writes literais diretos** (`confirmPixPayment`,
   `reviewProcessDocument`) — o campo passa a ter origem única.
@@ -199,9 +206,9 @@ coragem, e a 6 é destrutiva.
 | **1** | **Auditoria tipada** — eventos futuros registram enum `InternalStatus`; rótulos existentes ficam como legado | não (aditivo) |
 | **2** | **Novos estados** — `AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`; avaliar `AGUARDANDO_PAGAMENTO_GRU` e `EXCECAO_BAIXA_CONFIANCA` | não (migration aditiva) |
 | **3** | **Novos fluxos escrevem `internalStatus`** — exceções assistidas e automações nascem já no canônico | não |
-| **4** | **`userFacingStatus` deriva de `internalStatus`** — substituir a âncora, remover writes literais, preservar semântica do cliente | risco baixo, testável |
+| **4** | ~~**`userFacingStatus` deriva de `internalStatus`**~~ — **REESCRITA por [`docs/45`](45-decisao-user-facing-status.md)**: a coluna não é lida pelo cliente, então foi **deprecada** em vez de promovida. Entregue como correção das telas (admin e dashboard passaram a usar `clientVisibleStatusLabel`) | risco baixo — concluída |
 | **5** | **`operationalStatus` vira projeção** — fila, permissões e telas leem o equivalente derivado | **risco alto** — exige testes de equivalência |
-| **6** | **Depreciação final** — remover `operationalStatus` do schema só quando não houver leitores | migration destrutiva, por último |
+| **6** | **Depreciação final** — remover `operationalStatus` do schema só quando não houver leitores; **e também `userFacingStatus`** (`docs/45 §6`) | migration destrutiva, por último |
 
 As fases **1–3 já destravam** os PRs de heartbeat e exceções assistidas **sem
 tocar no que roda hoje**.
@@ -220,7 +227,7 @@ tocar no que roda hoje**.
 | Risco | Mitigação |
 |-------|-----------|
 | `operationalStatus` **dirige a fila e as permissões hoje** | Projeção equivalente **antes** de trocar leitores; Fase 5 só com teste de equivalência |
-| `userFacingStatus` tem **peso contratual** com o cliente | A projeção preserva a semântica atual; mudança de rótulo em processo ativo é ruído para quem pagou |
+| ~~`userFacingStatus` tem **peso contratual** com o cliente~~ | **RISCO INVÁLIDO** — `docs/45 §2`: nenhuma tela do cliente lê a coluna, e ela já divergia do que o cliente via em 4 dos 9 estados operacionais. O peso contratual está em `clientVisibleStatusLabel`, não nela |
 | `manualExecutionStatus` representa **ato humano declarado** | Não apagar, não reinterpretar; migrar semântica para evento sem tocar no histórico |
 | **Eventos antigos em texto** não serão retroativamente tipados | Assumido: a trilha anterior à Fase 1 fica como está |
 | **Processos em andamento durante a virada** | Regra a definir na Fase 3: migrar, congelar ou terminar no modelo antigo — decisão explícita, não implícita |
