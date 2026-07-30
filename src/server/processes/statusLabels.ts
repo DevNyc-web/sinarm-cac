@@ -36,6 +36,12 @@ export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   // automatica. Burlar captcha e proibido de forma permanente (docs/00 §8), e
   // rotulo de tela e onde essa promessa vaza primeiro.
   AGUARDANDO_CAPTCHA: "Aguardando validacao humana",
+  // Candidatos aprovados pela Fase 5d (docs/47) — SEM CONSUMIDOR neste PR, mesmo
+  // status dos dois rotulos acima. Rotulo tecnico para admin/diagnostico; nunca
+  // fonte visual do cliente (docs/45 — clientVisibleStatusLabel nao le
+  // internalStatus).
+  DOCUMENTO_RECEBIDO_PARA_ANALISE: "Documento recebido para analise",
+  DOCUMENTO_VALIDADO: "Documento validado",
 };
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {

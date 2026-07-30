@@ -1,0 +1,37 @@
+-- Candidatos aprovados pela Fase 5d (docs/47) no enum `internal_status`.
+--
+-- MIGRATION ADITIVA: `ALTER TYPE ... ADD VALUE` nao reescreve tabela, nao trava
+-- linha e nao altera dado algum. Nenhuma linha existente muda de estado.
+--
+-- SEM CONSUMIDOR NESTE PR: nenhum fluxo escreve estes valores. `docs/47` aprovou
+-- os dois como candidatos legitimos (jornada do processo, gatilho de dominio
+-- unico), mas a migracao de `uploadProcessDocument` (Fase 5e) e do lado
+-- aprovacao de `reviewProcessDocument` (Fase 5f) ficam para PR proprio, mesmo
+-- padrao da migration `20260731000000_add_assisted_exception_states` (Fase 2).
+--
+-- ORDEM: sem `BEFORE`/`AFTER`, o Postgres anexa ao FIM do tipo. O
+-- `schema.prisma` lista os dois no fim tambem, depois dos estados da Fase 2 —
+-- se um dia divergirem, a ordem do banco e a que vale em `ORDER BY` sobre a
+-- coluna.
+--
+-- `IF NOT EXISTS`: o `prisma migrate dev` nao gera esta clausula, ela foi
+-- adicionada a mao. Como o CI nao tem Postgres, esta migration nunca e
+-- exercitada por teste antes de rodar em ambiente real — idempotencia e a unica
+-- defesa contra reaplicacao parcial.
+--
+-- NAO USAR `db:push`: ele sincroniza o banco com o schema e desconhece o
+-- historico de migrations. Use `npm run db:migrate` (dev) ou `npm run db:deploy`
+-- (aplicar) — mesmo criterio da migration da Fase 2.
+--
+-- POSTGRESQL < 12: `ALTER TYPE ... ADD VALUE` NAO podia rodar dentro de bloco de
+-- transacao antes do PG 12, e o Prisma executa cada migration em transacao. Do
+-- PG 12 em diante funciona, com a restricao de que o valor novo nao seja USADO
+-- na mesma transacao — o que este arquivo nao faz. CONFIRMAR a versao do
+-- servidor antes do primeiro deploy; se for < 12, esta migration precisa rodar
+-- fora de transacao.
+--
+-- SEM BACKFILL: nenhuma linha existente e tocada. Nenhum default muda —
+-- `internalStatus` continua com default `RASCUNHO` (docs/46 §5).
+
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'DOCUMENTO_RECEBIDO_PARA_ANALISE';
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'DOCUMENTO_VALIDADO';
