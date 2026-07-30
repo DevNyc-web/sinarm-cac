@@ -26,6 +26,7 @@ import {
 
 const ADMIN_PAGE = "src/app/(admin)/admin/processos/[id]/page.tsx";
 const CLIENT_PAGE = "src/app/(user)/processos/[id]/page.tsx";
+const DASHBOARD_PAGE = "src/app/(user)/dashboard/page.tsx";
 
 test("execucao manual NAO iniciada: usa o rotulo do status operacional", () => {
   const label = clientVisibleStatusLabel({
@@ -148,4 +149,45 @@ test("a tela do cliente usa a MESMA funcao — sem regra duplicada", () => {
     !code.includes("EXECUCAO_MANUAL_NAO_INICIADA\"\n              ?"),
     "sem ternario inline remanescente",
   );
+});
+
+test("o dashboard do cliente usa a MESMA funcao que o detalhe", () => {
+  // A lista lia so `operationalStatus`: um processo em execucao manual aparecia
+  // com um status na lista e outro ao abrir. Mesma pergunta, duas respostas.
+  const code = readFileSync(DASHBOARD_PAGE, "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+
+  assert.match(code, /clientVisibleStatusLabel\(process\)/, "dashboard le da funcao compartilhada");
+  assert.ok(
+    !code.includes("OPERATIONAL_STATUS_USER_LABELS"),
+    "a linha principal de status nao pode voltar a ler o mapa direto",
+  );
+});
+
+test("dashboard e detalhe leem a MESMA funcao — nenhuma tela do cliente diverge", () => {
+  // Guarda contra reintroduzir divergencia: as duas telas do cliente tem de
+  // chamar `clientVisibleStatusLabel`, e nenhuma delas pode usar o mapa
+  // operacional direto para o status principal.
+  for (const pagina of [CLIENT_PAGE, DASHBOARD_PAGE]) {
+    const code = readFileSync(pagina, "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+    assert.match(code, /clientVisibleStatusLabel\(/, `${pagina}: usa a funcao compartilhada`);
+    assert.ok(!code.includes("OPERATIONAL_STATUS_USER_LABELS"), `${pagina}: sem mapa direto`);
+    assert.ok(!code.includes("MANUAL_EXECUTION_USER_LABELS"), `${pagina}: sem mapa manual direto`);
+  }
+});
+
+test("no dashboard, execucao manual ativa sobrescreve o status operacional", () => {
+  // A regra e a mesma do detalhe — este teste existe para deixar explicito que o
+  // dashboard passou a respeita-la, nao so que importa a funcao.
+  const emFila = clientVisibleStatusLabel({
+    operationalStatus: "PAGO_EM_FILA",
+    manualExecutionStatus: "EXECUCAO_MANUAL_NAO_INICIADA",
+  });
+  const emExecucao = clientVisibleStatusLabel({
+    operationalStatus: "PAGO_EM_FILA",
+    manualExecutionStatus: "GOVBR_ABERTO_PELO_OPERADOR",
+  });
+
+  assert.equal(emFila, "Pagamento confirmado — em fila");
+  assert.equal(emExecucao, "Em execucao");
+  assert.notEqual(emFila, emExecucao, "era exatamente aqui que lista e detalhe divergiam");
 });
