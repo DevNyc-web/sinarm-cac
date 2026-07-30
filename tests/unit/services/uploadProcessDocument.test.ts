@@ -205,6 +205,63 @@ test("status ja avancado NAO regride", async () => {
   }
 });
 
+/* ------------------------------------- internalStatus canonico (Fase 5e) --- */
+
+test("RASCUNHO avanca internalStatus para DOCUMENTO_RECEBIDO_PARA_ANALISE", async () => {
+  // Fase 5e (docs/47 §6.1): via transitionInternalStatus, nao mais so
+  // operationalStatus direto.
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+  assert.equal(processo.internalStatus, "DOCUMENTO_RECEBIDO_PARA_ANALISE");
+});
+
+test("operationalStatus final continua DOCUMENTO_ENVIADO — mesmo efeito da fila/admin", async () => {
+  // A porta mudou (transitionInternalStatus + alsoSet), mas o resultado em
+  // operationalStatus tem que ser IDENTICO ao comportamento anterior: mesma
+  // fila, mesmo badge, mesmo <select> no admin.
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO" });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+  assert.equal(processo.operationalStatus, "DOCUMENTO_ENVIADO");
+});
+
+test("internalStatus e operationalStatus avancam JUNTOS na mesma chamada", async () => {
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  const result = await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+  assert.equal(result.ok, true);
+  assert.equal(processo.internalStatus, "DOCUMENTO_RECEBIDO_PARA_ANALISE");
+  assert.equal(processo.operationalStatus, "DOCUMENTO_ENVIADO");
+});
+
+test("status ja avancado tambem NAO regride internalStatus", async () => {
+  // Mesma guarda de sempre (operationalStatus === RASCUNHO): se a fila ja
+  // passou do inicio, nem operationalStatus nem internalStatus se movem.
+  const processo = semearProcesso({
+    operationalStatus: "DOCUMENTO_APROVADO",
+    internalStatus: "RASCUNHO",
+  });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+  assert.equal(processo.internalStatus, "RASCUNHO", "nao deveria ter chamado transitionInternalStatus");
+});
+
+test("registra evento tipado com fromStatus/toStatus e o ator do upload", async () => {
+  semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+
+  assert.equal(db.processStatusEvent.rows.length, 1);
+  const [evento] = db.processStatusEvent.rows;
+  assert.equal(evento.processId, PROCESS_ID);
+  assert.equal(evento.fromStatus, "RASCUNHO");
+  assert.equal(evento.toStatus, "DOCUMENTO_RECEBIDO_PARA_ANALISE");
+  assert.equal(evento.actorMockUserId, DONO.id);
+  assert.equal(evento.actorRole, DONO.role);
+});
+
+test("status ja avancado NAO gera evento (guarda bloqueia antes da porta canonica)", async () => {
+  semearProcesso({ operationalStatus: "PAGO_EM_FILA", internalStatus: "PAGO_EM_FILA" });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+  assert.equal(db.processStatusEvent.rows.length, 0);
+});
+
 /* ------------------------------------------------------------ escopo/limites --- */
 
 test("o service nao devolve storageKey ao chamador", async () => {

@@ -74,9 +74,9 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
   },
   {
     file: "src/server/services/uploadProcessDocument.ts",
-    sink: "updateProcessOperations(...)",
+    sink: "alsoSet",
     value: '"DOCUMENTO_ENVIADO"',
-    why: "docs/46 §3.2 — legado conhecido, permitido temporariamente. Migra na 5e. Bloqueio: nao existe `InternalStatus` para 'documento enviado, aguardando conferencia'.",
+    why: "docs/46 §3.2 — JA MIGRADO na Fase 5e (docs/47 §6.1): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_RECEBIDO_PARA_ANALISE`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`.",
   },
   {
     file: "src/server/services/reviewProcessDocument.ts",
@@ -435,6 +435,23 @@ test("o inventario continua com 5 writes de decisao + 1 repasse canonico", () =>
   ).length;
   assert.equal(decisions, 5, "docs/46 §2/§3 registra 5 caminhos de escrita de decisao");
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
+});
+
+test("a Fase 5e reduziu os writes soltos: 2 migrados (sink alsoSet), 3 ainda legado", () => {
+  // "Write solto" = decisao de operationalStatus que NAO passa pela porta
+  // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
+  // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1) e agora
+  // tambem `uploadProcessDocument` (Fase 5e, docs/47 §6.1). Antes desta fase,
+  // eram 1 migrado / 4 soltos; este teste trava que baixou para 2 / 3 — e
+  // falha se algum dia SUBIR de novo, o que indicaria um write novo escapando
+  // da porta canonica sem decisao (a trava "nenhum write fora da allowlist"
+  // ja pegaria isso, mas este teste torna a contagem explicita).
+  const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
+  const migrados = decisoes.filter((write) => write.sink === "alsoSet").length;
+  const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
+  assert.equal(migrados, 2, "confirmPixPayment + uploadProcessDocument");
+  assert.equal(soltos, 3, "reviewProcessDocument (x2) + updateProcessOperations");
+  assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");
 });
 
 test("os 5 writes estao onde docs/46 §3 diz que estao", () => {

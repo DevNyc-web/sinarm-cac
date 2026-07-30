@@ -4,19 +4,34 @@
  * enum `InternalStatus`, adicionados pela migration
  * `20260731010000_add_document_internal_statuses`.
  *
- * O que estes testes protegem — mesmo espirito de `internalStatusStates.test.ts`
- * (Fase 2), aplicado aos dois estados desta fase:
+ * ATUALIZADO na Fase 5e (docs/47 §6.1): `uploadProcessDocument` passou a
+ * escrever `DOCUMENTO_RECEBIDO_PARA_ANALISE` pela porta canonica. Os dois
+ * estados NAO tem mais o mesmo status:
+ *
+ *  - `DOCUMENTO_RECEBIDO_PARA_ANALISE` — MIGRADO. Tem consumidor real
+ *    (`uploadProcessDocument`), e a combinacao com `DOCUMENTO_ENVIADO` e
+ *    "none" no diagnostico da 5c.
+ *  - `DOCUMENTO_VALIDADO` — AINDA SEM CONSUMIDOR. Fica para a Fase 5f (lado
+ *    aprovacao de `reviewProcessDocument`); continua `needs_decision`.
+ *
+ * O que estes testes protegem, mesmo espirito de `internalStatusStates.test.ts`
+ * (Fase 2):
  *
  * 1. Os dois valores existem no enum e tem rotulo util (nao vazio, nao
  *    placeholder, nao o proprio nome cru).
- * 2. `docs/47` aprovou a DIRECAO, nao migrou o fluxo: nenhum service ainda
- *    escreve estes valores. Se algum comecar a escreve-los sem migration de
- *    fluxo dedicada (Fase 5e/5f, PR proprio), o teste falha.
- * 3. Os rotulos nunca alimentam tela do cliente — `internalStatus` nao e fonte
+ * 2. `DOCUMENTO_RECEBIDO_PARA_ANALISE` tem EXATAMENTE um consumidor
+ *    (`uploadProcessDocument`, via `transitionInternalStatus`); nenhum outro
+ *    arquivo o escreve.
+ * 3. `DOCUMENTO_VALIDADO` continua sem nenhum consumidor — se algum comecar a
+ *    escreve-lo sem a migration de fluxo dedicada (Fase 5f, PR proprio), o
+ *    teste falha.
+ * 4. `reviewProcessDocument` e `updateProcessOperations` continuam nao
+ *    migrados — nenhum dos dois estados aparece neles.
+ * 5. Os rotulos nunca alimentam tela do cliente — `internalStatus` nao e fonte
  *    visual (docs/45); os rotulos existem so para admin/diagnostico tecnico.
- * 4. O diagnostico da Fase 5c (`statusDivergence.ts`) trata os dois de forma
- *    conservadora: `needs_decision`, nunca `none`, mesmo pareados com o
- *    `operationalStatus` que `docs/47` aprovou como candidato.
+ * 6. O diagnostico da Fase 5c (`statusDivergence.ts`) reflete a divergencia:
+ *    `DOCUMENTO_RECEBIDO_PARA_ANALISE` + `DOCUMENTO_ENVIADO` e `none`;
+ *    `DOCUMENTO_VALIDADO` continua `needs_decision`, nunca `none`.
  *
  * Sem banco, sem rede: le o enum gerado pelo Prisma e os arquivos de fonte.
  */
@@ -30,6 +45,8 @@ import { INTERNAL_STATUS_LABELS } from "../../../src/server/processes/statusLabe
 import { diagnoseStatusDivergence } from "../../../src/server/processes/statusDivergence";
 
 const NOVOS_ESTADOS = ["DOCUMENTO_RECEBIDO_PARA_ANALISE", "DOCUMENTO_VALIDADO"] as const;
+const MIGRADO = "DOCUMENTO_RECEBIDO_PARA_ANALISE" as const;
+const NAO_MIGRADO = "DOCUMENTO_VALIDADO" as const;
 
 /** Remove comentarios: mencao em comentario e documentacao, nao uso. */
 function codeOnly(source: string): string {
@@ -82,24 +99,51 @@ test("todo InternalStatus continua com rotulo apos a migration (Record exaustivo
   }
 });
 
-// ---------------------------------------------- 2. sem consumidor real ainda
+// ------------------------------------------- 2. DOCUMENTO_RECEBIDO_PARA_ANALISE (migrado)
 
-test("estados novos ainda NAO sao usados por nenhum fluxo", () => {
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE um consumidor: uploadProcessDocument", () => {
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
+  const consumidores = fluxos
+    .filter((caminho) => codeOnly(readFileSync(caminho, "utf8")).includes(MIGRADO))
+    .map((c) => c.split("\\").join("/"));
+
+  assert.deepEqual(
+    consumidores,
+    ["src/server/services/uploadProcessDocument.ts"],
+    "DOCUMENTO_RECEBIDO_PARA_ANALISE deveria aparecer so em uploadProcessDocument.ts (Fase 5e)",
+  );
+});
+
+test("uploadProcessDocument usa a porta canonica, com o novo estado e alsoSet", () => {
+  const code = codeOnly(readFileSync("src/server/services/uploadProcessDocument.ts", "utf8"));
+  assert.match(code, /\btransitionInternalStatus\s*\(/, "deveria chamar transitionInternalStatus");
+  assert.match(code, /toStatus:\s*"DOCUMENTO_RECEBIDO_PARA_ANALISE"/);
+  assert.match(
+    code,
+    /alsoSet:\s*\{\s*operationalStatus:\s*"DOCUMENTO_ENVIADO"\s*\}/,
+    "operationalStatus deveria continuar indo para DOCUMENTO_ENVIADO, via alsoSet",
+  );
+  // Nao pode mais escrever operationalStatus fora do alsoSet (updateProcessOperations
+  // direto seria o write solto que a Fase 5e removeu).
+  assert.doesNotMatch(code, /updateProcessOperations\s*\(/);
+});
+
+// ------------------------------------------------- 3. DOCUMENTO_VALIDADO (nao migrado)
+
+test("DOCUMENTO_VALIDADO continua sem nenhum consumidor", () => {
+  const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   for (const caminho of fluxos) {
     const code = codeOnly(readFileSync(caminho, "utf8"));
-    for (const estado of NOVOS_ESTADOS) {
-      assert.ok(
-        !code.includes(estado),
-        `${caminho} usa ${estado} — Fase 5d aprovou a direcao, nao migrou o fluxo (5e/5f ficam para PR proprio)`,
-      );
-    }
+    assert.ok(
+      !code.includes(NAO_MIGRADO),
+      `${caminho} usa ${NAO_MIGRADO} — Fase 5d aprovou a direcao, a Fase 5f (PR proprio) ainda nao migrou`,
+    );
   }
 });
 
-test("estados novos nao aparecem em workers, repositorios nem automacao", () => {
+test("os dois estados nao aparecem em workers, repositorios nem automacao", () => {
   const outros = [
     ...arquivosDeFluxo("src/server/workers"),
     ...arquivosDeFluxo("src/server/repositories"),
@@ -114,26 +158,29 @@ test("estados novos nao aparecem em workers, repositorios nem automacao", () => 
   }
 });
 
-test("uploadProcessDocument e reviewProcessDocument nao foram migrados", () => {
-  // Chamada explicita dos dois arquivos que a Fase 5e/5f vao migrar — a
-  // varredura acima ja cobre, mas o pedido desta fase nomeia os dois services
-  // por extenso, entao o teste fica explicito tambem.
+test("reviewProcessDocument e updateProcessOperations continuam nao migrados", () => {
+  // reviewProcessDocument: nenhum dos dois estados novos, e ainda nao chama a
+  // porta canonica (Fase 5f, fora do escopo desta fase).
+  // updateProcessOperations: mesma coisa (Fase 5g).
   for (const arquivo of [
-    "src/server/services/uploadProcessDocument.ts",
     "src/server/services/reviewProcessDocument.ts",
+    "src/server/services/updateProcessOperations.ts",
   ]) {
     const code = codeOnly(readFileSync(arquivo, "utf8"));
     for (const estado of NOVOS_ESTADOS) {
       assert.ok(!code.includes(estado), `${arquivo} usa ${estado} — migracao de fluxo nao aprovada aqui`);
     }
-    assert.doesNotMatch(code, /transitionInternalStatus/, `${arquivo} nao deveria chamar a porta canonica`);
+    assert.doesNotMatch(
+      code,
+      /\btransitionInternalStatus\s*\(/,
+      `${arquivo} nao deveria chamar a porta canonica ainda`,
+    );
   }
 });
 
-test("transitionInternalStatus nao ganhou novo chamador", () => {
-  // A porta canonica continua com o mesmo unico chamador real (docs/46 §5):
-  // confirmPixPayment. Nenhum arquivo novo deveria importa-la por causa desta
-  // migration — ela so adiciona capacidade ao enum, nao muda quem escreve.
+test("transitionInternalStatus tem exatamente 2 chamadores reais: confirmPixPayment e uploadProcessDocument", () => {
+  // A porta canonica tinha 1 chamador (docs/46 §5); a Fase 5e soma o segundo.
+  // Nenhum outro arquivo deveria importa-la por causa desta migration.
   const chamadores = [
     ...arquivosDeFluxo("src/server/services"),
     ...arquivosDeFluxo("src/app"),
@@ -141,15 +188,15 @@ test("transitionInternalStatus nao ganhou novo chamador", () => {
     const code = codeOnly(readFileSync(caminho, "utf8"));
     return /\btransitionInternalStatus\s*\(/.test(code);
   });
-  const relativos = chamadores.map((c) => c.split("\\").join("/"));
+  const relativos = chamadores.map((c) => c.split("\\").join("/")).sort();
   assert.deepEqual(
     relativos.filter((c) => !c.endsWith("transitionInternalStatus.ts")),
-    ["src/server/services/confirmPixPayment.ts"],
-    "chamador real de transitionInternalStatus mudou — deveria continuar sendo so confirmPixPayment",
+    ["src/server/services/confirmPixPayment.ts", "src/server/services/uploadProcessDocument.ts"],
+    "os chamadores reais de transitionInternalStatus mudaram",
   );
 });
 
-// -------------------------------------------- 3. nunca fonte visual do cliente
+// -------------------------------------------- 4. nunca fonte visual do cliente
 
 test("rotulos dos estados novos nao aparecem em nenhuma tela do cliente", () => {
   const telasCliente = arquivosDeFluxo("src/app/(user)");
@@ -168,9 +215,39 @@ test("rotulos dos estados novos nao aparecem em nenhuma tela do cliente", () => 
   }
 });
 
-// -------------------------------------- 4. diagnostico da 5c trata como needs_decision
+// -------------------------------------- 5. diagnostico da 5c reflete a divergencia
 
-test("diagnoseStatusDivergence trata os dois estados como needs_decision, nunca none", () => {
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE + DOCUMENTO_ENVIADO: none — combinacao migrada (Fase 5e)", () => {
+  const result = diagnoseStatusDivergence({
+    internalStatus: MIGRADO,
+    operationalStatus: "DOCUMENTO_ENVIADO",
+  });
+  assert.equal(result.hasDivergence, false);
+  assert.equal(result.severity, "none");
+  assert.equal(result.expectedOperationalStatus, "DOCUMENTO_ENVIADO");
+});
+
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE com operationalStatus DIFERENTE de DOCUMENTO_ENVIADO ainda diverge", () => {
+  // Migrado nao significa "sempre none" — so a combinacao ESPERADA e segura.
+  // Qualquer outra continua sinalizando divergencia real.
+  const operacionais = [
+    "RASCUNHO",
+    "DOCUMENTO_APROVADO",
+    "AGUARDANDO_PAGAMENTO",
+    "PAGO_EM_FILA",
+    "EM_REVISAO_OPERACIONAL",
+    "PRONTO_PARA_PROTOCOLO_MANUAL",
+    "BLOQUEADO",
+    "CANCELADO_DEV",
+  ] as const;
+  for (const operationalStatus of operacionais) {
+    const result = diagnoseStatusDivergence({ internalStatus: MIGRADO, operationalStatus });
+    assert.notEqual(result.severity, "none", `${MIGRADO} + ${operationalStatus}`);
+    assert.equal(result.hasDivergence, true, `${MIGRADO} + ${operationalStatus}`);
+  }
+});
+
+test("DOCUMENTO_VALIDADO continua needs_decision, nunca none — Fase 5f nao migrou", () => {
   const operacionais = [
     "RASCUNHO",
     "DOCUMENTO_ENVIADO",
@@ -183,49 +260,33 @@ test("diagnoseStatusDivergence trata os dois estados como needs_decision, nunca 
     "CANCELADO_DEV",
   ] as const;
 
-  for (const internalStatus of NOVOS_ESTADOS) {
-    for (const operationalStatus of operacionais) {
-      const result = diagnoseStatusDivergence({ internalStatus, operationalStatus });
-      assert.equal(
-        result.severity,
-        "needs_decision",
-        `${internalStatus} + ${operationalStatus} deveria ser needs_decision (candidato aprovado, sem consumidor)`,
-      );
-      assert.equal(result.hasDivergence, true, `${internalStatus} + ${operationalStatus}`);
-    }
+  for (const operationalStatus of operacionais) {
+    const result = diagnoseStatusDivergence({ internalStatus: NAO_MIGRADO, operationalStatus });
+    assert.equal(
+      result.severity,
+      "needs_decision",
+      `${NAO_MIGRADO} + ${operationalStatus} deveria ser needs_decision (candidato aprovado, sem consumidor)`,
+    );
+    assert.equal(result.hasDivergence, true, `${NAO_MIGRADO} + ${operationalStatus}`);
   }
 });
 
-test("o candidato aprovado por docs/47 aparece em expectedOperationalStatus, mas severity continua needs_decision", () => {
+test("o candidato aprovado por docs/47 aparece em expectedOperationalStatus mesmo para DOCUMENTO_VALIDADO", () => {
   // Diferenca do caso "sem candidato documentado" (docs/46 §6): aqui HA
   // candidato aprovado — mas aprovar a direcao nao e o mesmo que migrar o
   // fluxo. severity so vira `none` quando existir write real produzindo a
-  // combinacao (Fase 5e/5f), nao so porque o enum tem o valor.
-  const recebido = diagnoseStatusDivergence({
-    internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE",
-    operationalStatus: "DOCUMENTO_ENVIADO",
-  });
-  assert.equal(recebido.expectedOperationalStatus, "DOCUMENTO_ENVIADO");
-  assert.equal(recebido.severity, "needs_decision");
-
+  // combinacao (Fase 5f), nao so porque o enum tem o valor.
   const validado = diagnoseStatusDivergence({
-    internalStatus: "DOCUMENTO_VALIDADO",
+    internalStatus: NAO_MIGRADO,
     operationalStatus: "DOCUMENTO_APROVADO",
   });
   assert.equal(validado.expectedOperationalStatus, "DOCUMENTO_APROVADO");
   assert.equal(validado.severity, "needs_decision");
 });
 
-test("a razao cita docs/47 e a fase de migracao pendente", () => {
-  const recebido = diagnoseStatusDivergence({
-    internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE",
-    operationalStatus: "RASCUNHO",
-  });
-  assert.match(recebido.reason, /docs\/47/);
-  assert.match(recebido.reason, /5e/);
-
+test("a razao de DOCUMENTO_VALIDADO cita docs/47 e a Fase 5f pendente", () => {
   const validado = diagnoseStatusDivergence({
-    internalStatus: "DOCUMENTO_VALIDADO",
+    internalStatus: NAO_MIGRADO,
     operationalStatus: "RASCUNHO",
   });
   assert.match(validado.reason, /docs\/47/);
