@@ -138,6 +138,15 @@ arquitetural**.
 
 ### 5.2 `operationalStatus` → **deprecar em fases**
 
+> ⚠️ **REORDENADO por [`docs/46`](46-inventario-operational-status.md)
+> (2026-07-30).** A decisão de deprecar **continua valendo**, mas a projeção
+> direta era prematura: `operationalStatus` tem 5 caminhos de escrita e 9/9
+> valores alcançáveis, enquanto `internalStatus` tem 1 caminho e 2/17. Projetar
+> agora colapsaria a fila. Além disso, **6 estados operacionais não têm
+> equivalente canônico** — dependência que esta seção não previa. A Fase 5 passa a
+> começar por inventário (5a), guardas (5b) e diagnóstico (5c), com a projeção só
+> na 5h.
+
 - Papel temporário: **projeção operacional derivada** de `internalStatus`.
 - **Continua existindo** enquanto fila, permissões e telas dependerem dele.
 - **Não remover antes de testes de equivalência.**
@@ -207,7 +216,7 @@ coragem, e a 6 é destrutiva.
 | **2** | **Novos estados** — `AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`; avaliar `AGUARDANDO_PAGAMENTO_GRU` e `EXCECAO_BAIXA_CONFIANCA` | não (migration aditiva) |
 | **3** | **Novos fluxos escrevem `internalStatus`** — exceções assistidas e automações nascem já no canônico | não |
 | **4** | ~~**`userFacingStatus` deriva de `internalStatus`**~~ — **REESCRITA por [`docs/45`](45-decisao-user-facing-status.md)**: a coluna não é lida pelo cliente, então foi **deprecada** em vez de promovida. Entregue como correção das telas (admin e dashboard passaram a usar `clientVisibleStatusLabel`) | risco baixo — concluída |
-| **5** | **`operationalStatus` vira projeção** — fila, permissões e telas leem o equivalente derivado | **risco alto** — exige testes de equivalência |
+| **5** | ~~**`operationalStatus` vira projeção** direto~~ — **REORDENADA por [`docs/46`](46-inventario-operational-status.md)**: passa a começar por inventário (5a), guarda contra novos writes (5b) e diagnóstico de divergência (5c); migração dos writes em 5e–5g; **projeção só na 5h**. Motivo: `internalStatus` tem 2/17 valores alcançáveis e 6 estados operacionais não têm equivalente canônico | **risco alto** — exige testes de equivalência de fila |
 | **6** | **Depreciação final** — remover `operationalStatus` do schema só quando não houver leitores; **e também `userFacingStatus`** (`docs/45 §6`) | migration destrutiva, por último |
 
 As fases **1–3 já destravam** os PRs de heartbeat e exceções assistidas **sem
