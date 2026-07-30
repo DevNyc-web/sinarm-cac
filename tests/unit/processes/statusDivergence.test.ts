@@ -86,6 +86,47 @@ test("zona segura com valores DIFERENTES entre si: needs_decision, nao none", ()
   assert.equal(result.expectedOperationalStatus, "RASCUNHO");
 });
 
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE + DOCUMENTO_ENVIADO: par migrado, sem divergencia (Fase 5e)", () => {
+  // uploadProcessDocument passou a escrever pela porta canonica (docs/47 §6.1):
+  // esta combinacao e agora o resultado ESPERADO de um upload novo, nao mais
+  // needs_decision. Nomes diferentes nos dois campos, de proposito
+  // (docs/47 §6.2) — o teste confirma que o diagnostico nao exige nome igual
+  // para reconhecer "seguro".
+  const result = diagnoseStatusDivergence({
+    internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+    operationalStatus: "DOCUMENTO_ENVIADO",
+  });
+  assert.equal(result.hasDivergence, false);
+  assert.equal(result.severity, "none");
+  assert.equal(result.expectedOperationalStatus, "DOCUMENTO_ENVIADO");
+});
+
+test("DOCUMENTO_VALIDADO continua needs_decision — Fase 5f ainda nao migrou", () => {
+  // Mesma tabela (docs/47 §6.2), mas o lado aprovacao de reviewProcessDocument
+  // nao foi tocado por este PR. O candidato aprovado nao vira `none` so por
+  // ter sido decidido — precisa de write real (Fase 5f) produzindo o par.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "DOCUMENTO_VALIDADO",
+    operationalStatus: "DOCUMENTO_APROVADO",
+  });
+  assert.equal(result.hasDivergence, true);
+  assert.equal(result.severity, "needs_decision");
+  assert.equal(result.expectedOperationalStatus, "DOCUMENTO_APROVADO");
+});
+
+test("RASCUNHO + DOCUMENTO_ENVIADO continua expected_legacy — dado anterior a Fase 5e", () => {
+  // A combinacao antiga (internalStatus preso em RASCUNHO enquanto
+  // operationalStatus ja avancou) nao desaparece: processos criados ANTES
+  // desta migracao podem estar assim, e nao ha backfill. Severidade
+  // inalterada; so a razao passou a explicar que e caso historico.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "RASCUNHO",
+    operationalStatus: "DOCUMENTO_ENVIADO",
+  });
+  assert.equal(result.severity, "expected_legacy");
+  assert.match(result.reason, /ANTERIOR a Fase 5e/);
+});
+
 // --------------------------------------- 2. writes legados (docs/46 §3/§7)
 
 test("legado esperado: internalStatus RASCUNHO, operationalStatus DOCUMENTO_ENVIADO", () => {
@@ -341,7 +382,7 @@ test("severity sempre e um dos 4 valores declarados", () => {
   }
 });
 
-test("apenas as 3 combinacoes seguras produzem severity 'none'", () => {
+test("apenas os pares seguros produzem severity 'none'", () => {
   const internos = [
     "RASCUNHO",
     "AGUARDANDO_PAGAMENTO",
@@ -375,6 +416,17 @@ test("apenas as 3 combinacoes seguras produzem severity 'none'", () => {
     "CANCELADO_DEV",
   ] as const;
 
+  // Independente da tabela interna do modulo, de proposito: o par
+  // DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (Fase 5e, docs/47) e o
+  // primeiro seguro com NOMES DIFERENTES nos dois campos — os 3 originais
+  // (docs/46 §6) tem o mesmo nome nos dois lados.
+  const PARES_SEGUROS: Record<string, string> = {
+    RASCUNHO: "RASCUNHO",
+    AGUARDANDO_PAGAMENTO: "AGUARDANDO_PAGAMENTO",
+    PAGO_EM_FILA: "PAGO_EM_FILA",
+    DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
+  };
+
   let semDivergencia = 0;
   for (const internalStatus of internos) {
     for (const operationalStatus of operacionais) {
@@ -382,13 +434,21 @@ test("apenas as 3 combinacoes seguras produzem severity 'none'", () => {
       if (result.severity === "none") {
         semDivergencia++;
         assert.equal(result.hasDivergence, false, `${internalStatus} + ${operationalStatus}`);
-        assert.equal(internalStatus, operationalStatus, `${internalStatus} + ${operationalStatus}`);
+        assert.equal(
+          PARES_SEGUROS[internalStatus],
+          operationalStatus,
+          `${internalStatus} + ${operationalStatus} nao e um par seguro conhecido`,
+        );
       } else {
         assert.equal(result.hasDivergence, true, `${internalStatus} + ${operationalStatus}`);
       }
     }
   }
-  assert.equal(semDivergencia, 3, "so RASCUNHO/RASCUNHO, AGUARDANDO_PAGAMENTO/idem e PAGO_EM_FILA/idem");
+  assert.equal(
+    semDivergencia,
+    4,
+    "RASCUNHO/idem, AGUARDANDO_PAGAMENTO/idem, PAGO_EM_FILA/idem, DOCUMENTO_RECEBIDO_PARA_ANALISE+DOCUMENTO_ENVIADO",
+  );
 });
 
 test("os 9 valores de OperationalStatus vem do schema, nao de copia", () => {

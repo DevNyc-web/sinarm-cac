@@ -12,11 +12,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { type AuthUser } from "@/server/auth/mockUsers";
 import { type DocumentKind, toPrismaDocumentType } from "@/server/documents";
 import { createDocument } from "@/server/repositories/processDocumentRepository";
-import {
-  findProcessByIdForUser,
-  updateProcessOperations,
-} from "@/server/repositories/processRepository";
+import { findProcessByIdForUser } from "@/server/repositories/processRepository";
 import { getStorageAdapter } from "@/server/storage";
+import { transitionInternalStatus } from "./transitionInternalStatus";
 
 export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024; // 2 MB (dev)
 
@@ -70,8 +68,23 @@ export async function uploadProcessDocument(
     });
 
     // Avanca a fila apenas se ainda estava no inicio (nao regride status).
+    //
+    // Fase 5e (docs/47 §6.1, §9): via `transitionInternalStatus`, mesma porta
+    // canonica de `confirmPixPayment`. `internalStatus` vai para o candidato
+    // aprovado pela Fase 5d; `operationalStatus` continua indo para
+    // `DOCUMENTO_ENVIADO`, passado em `alsoSet` — MESMO efeito final na fila,
+    // no admin e no status visivel ao cliente. O helper nao deriva um a partir
+    // do outro; quem decide os dois valores continua sendo este fluxo.
     if (process.operationalStatus === "RASCUNHO") {
-      await updateProcessOperations(process.id, { operationalStatus: "DOCUMENTO_ENVIADO" });
+      const transition = await transitionInternalStatus({
+        processId: process.id,
+        toStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE",
+        alsoSet: { operationalStatus: "DOCUMENTO_ENVIADO" },
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        note: "Documento enviado pelo cliente, aguardando conferencia",
+      });
+      if (!transition.ok) return { ok: false, error: transition.error };
     }
 
     return { ok: true };

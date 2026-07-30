@@ -25,9 +25,11 @@
  *    saida, sempre.
  *
  * COMO LER A SAIDA:
- *  - `severity: "none"` — os dois campos concordam num dos 3 valores com
- *    projecao segura (docs/46 §6: `RASCUNHO`, `AGUARDANDO_PAGAMENTO`,
- *    `PAGO_EM_FILA`). Unico caso sem divergencia.
+ *  - `severity: "none"` — os dois campos concordam num par com projecao
+ *    segura: os 3 originais de docs/46 §6 (`RASCUNHO`, `AGUARDANDO_PAGAMENTO`,
+ *    `PAGO_EM_FILA`, mesmo valor nos dois campos) mais os pares migrados fase
+ *    a fase pela porta canonica (`DOCUMENTO_RECEBIDO_PARA_ANALISE` ↔
+ *    `DOCUMENTO_ENVIADO`, Fase 5e/docs/47). Unico caso sem divergencia.
  *  - `severity: "expected_legacy"` — divergencia CONHECIDA e de baixo risco:
  *    `operationalStatus` avancou via um write legado (docs/46 §3) que ainda
  *    nao tem porta canonica, mas o hop e simples e sem ambiguidade.
@@ -77,17 +79,28 @@ export type StatusDivergenceDiagnosis = {
 // --------------------------------------------------------- zonas conhecidas
 
 /**
- * Os 3 valores com projecao segura (docs/46 §6) — mesmo significado nos dois
- * campos. E TUDO que `internalStatus` alcanca hoje na pratica: so
- * `transitionInternalStatus` escreve, e o unico chamador real
- * (`confirmPixPayment`) so produz `RASCUNHO` (default do schema) e
- * `PAGO_EM_FILA` (docs/46 §5). `AGUARDANDO_PAGAMENTO` entra aqui por
+ * Pares com projecao segura — o valor de `internalStatus` (chave) e o
+ * `operationalStatus` esperado (valor) quando o processo passou pela porta
+ * canonica.
+ *
+ * Os 3 primeiros vem de docs/46 §6, mesmo nome nos dois campos: so
+ * `transitionInternalStatus` escreve `internalStatus`, e por muito tempo o
+ * unico chamador real (`confirmPixPayment`) so produzia `RASCUNHO` (default
+ * do schema) e `PAGO_EM_FILA` (docs/46 §5). `AGUARDANDO_PAGAMENTO` entrava por
  * completude estrutural, mesmo pouco alcancavel.
+ *
+ * `DOCUMENTO_RECEBIDO_PARA_ANALISE` e o primeiro par com NOMES DIFERENTES nos
+ * dois campos — a Fase 5e (docs/47 §6.1) migrou `uploadProcessDocument` para
+ * a porta canonica, mas o candidato aprovado pela 5d tem nome proprio no
+ * `InternalStatus` (nao reusa `DOCUMENTO_ENVIADO` do `OperationalStatus`, por
+ * decisao do docs/47 §6.2). `operationalStatus` continua indo para
+ * `DOCUMENTO_ENVIADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
  */
 const SAFE_PROJECTION = {
   RASCUNHO: "RASCUNHO",
   AGUARDANDO_PAGAMENTO: "AGUARDANDO_PAGAMENTO",
   PAGO_EM_FILA: "PAGO_EM_FILA",
+  DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
 } as const satisfies Partial<Record<InternalStatus, OperationalStatus>>;
 
 const SAFE_INTERNAL_VALUES = Object.keys(SAFE_PROJECTION) as (keyof typeof SAFE_PROJECTION)[];
@@ -136,9 +149,11 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
   DOCUMENTO_ENVIADO: {
     severity: "expected_legacy",
     reason:
-      "uploadProcessDocument escreve isto sozinho, sem tocar internalStatus " +
-      "(docs/46 3.2) - e o hop mais simples depois de RASCUNHO, sem julgamento " +
-      "humano envolvido (Fase 5e e a de menor risco entre as migracoes, docs/46 9).",
+      "so aparece com internalStatus fora de DOCUMENTO_RECEBIDO_PARA_ANALISE em " +
+      "dado ANTERIOR a Fase 5e (docs/47 §6.1): uploadProcessDocument escrevia " +
+      "isto sozinho, sem tocar internalStatus (docs/46 3.2). Fluxos novos passam " +
+      "por transitionInternalStatus e produzem o par seguro " +
+      "DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (severity none).",
   },
   DOCUMENTO_APROVADO: {
     severity: "needs_decision",
@@ -181,21 +196,21 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 14 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
- * §6): hoje nenhum fluxo real os escreve (so `confirmPixPayment` escreve
- * `internalStatus`, e so produz os 3 seguros), mas o diagnostico cobre a
- * combinacao mesmo assim - conservador por definicao, nao por observacao.
+ * Os 13 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * §6): nenhum fluxo real os escreve, mas o diagnostico cobre a combinacao
+ * mesmo assim - conservador por definicao, nao por observacao.
  *
  * `operationalStatus` ausente = "sem equivalente documentado". Nao
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
  *
- * Duas das 14 SAO documentadas (`DOCUMENTO_RECEBIDO_PARA_ANALISE`,
- * `DOCUMENTO_VALIDADO`, aprovadas pela Fase 5d/docs/47) mas ainda SEM
- * CONSUMIDOR: nenhum fluxo as escreve ate as Fases 5e/5f migrarem
- * `uploadProcessDocument`/`reviewProcessDocument`. Ate la, severity continua
- * `needs_decision` — o candidato aprovado nao vira `none` so por existir no
- * enum; teria que existir tambem um write real produzindo a combinacao.
+ * Um dos 13 (`DOCUMENTO_VALIDADO`) E documentado — candidato aprovado pela
+ * Fase 5d/docs/47 §6.2 — mas ainda SEM CONSUMIDOR: nenhum fluxo o escreve ate
+ * a Fase 5f migrar o lado aprovacao de `reviewProcessDocument`. Ate la,
+ * severity continua `needs_decision` — o candidato aprovado nao vira `none`
+ * so por existir no enum; precisa tambem de um write real produzindo a
+ * combinacao. `DOCUMENTO_RECEBIDO_PARA_ANALISE` NAO esta mais aqui: a Fase 5e
+ * migrou o fluxo, e o par virou seguro (`SAFE_PROJECTION` acima).
  */
 const UNDOCUMENTED_REASON =
   "internalStatus avancou alem dos 3 valores com projecao segura (docs/46 6); " +
@@ -208,9 +223,12 @@ const RISKY_BLOQUEADO_REASON =
 
 /**
  * Candidato APROVADO (docs/47), nao so citado — mas ainda SEM CONSUMIDOR: a
- * Fase 5d decidiu a direcao, nao migrou o fluxo. `severity` continua
- * `needs_decision` porque nenhum write real produz esta combinacao ainda; se
- * aparecer, e sinal de escrita fora de banda, nao do caminho aprovado.
+ * Fase 5d decidiu a direcao, a fase de migracao correspondente ainda nao
+ * rodou. `severity` continua `needs_decision` porque nenhum write real
+ * produz esta combinacao ainda; se aparecer, e sinal de escrita fora de
+ * banda, nao do caminho aprovado. Usado hoje so por `DOCUMENTO_VALIDADO` —
+ * `DOCUMENTO_RECEBIDO_PARA_ANALISE` saiu desta categoria quando a Fase 5e
+ * migrou `uploadProcessDocument` (ver `SAFE_PROJECTION`).
  */
 function candidatoAprovadoReason(estado: string, fase: string, operationalStatus: string): string {
   return (
@@ -281,15 +299,6 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
   },
-  DOCUMENTO_RECEBIDO_PARA_ANALISE: {
-    candidateOperationalStatus: "DOCUMENTO_ENVIADO",
-    severity: "needs_decision",
-    reason: candidatoAprovadoReason(
-      "DOCUMENTO_RECEBIDO_PARA_ANALISE",
-      "a Fase 5e (uploadProcessDocument)",
-      "DOCUMENTO_ENVIADO",
-    ),
-  },
   DOCUMENTO_VALIDADO: {
     candidateOperationalStatus: "DOCUMENTO_APROVADO",
     severity: "needs_decision",
@@ -324,10 +333,17 @@ export function diagnoseStatusDivergence(input: StatusDivergenceInput): StatusDi
     const expected = SAFE_PROJECTION[internalStatus];
 
     if (operationalStatus === expected) {
+      // Mesmo nome nos dois campos (os 3 originais, docs/46 6) ou nomes
+      // diferentes por um par migrado (ex.: DOCUMENTO_RECEBIDO_PARA_ANALISE /
+      // DOCUMENTO_ENVIADO, Fase 5e/docs/47) — os dois casos sao "none".
+      const mesmoNome = internalStatus === expected;
       return {
         hasDivergence: false,
         severity: "none",
-        reason: `internalStatus e operationalStatus concordam no valor seguro (docs/46 6): ${expected}.`,
+        reason: mesmoNome
+          ? `internalStatus e operationalStatus concordam no valor seguro (docs/46 6): ${expected}.`
+          : `internalStatus (${internalStatus}) e o par seguro de operationalStatus ` +
+            `(${expected}) migrado pela porta canonica (docs/47).`,
         expectedOperationalStatus: expected,
       };
     }
