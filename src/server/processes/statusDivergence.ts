@@ -29,7 +29,8 @@
  *    segura: os 3 originais de docs/46 §6 (`RASCUNHO`, `AGUARDANDO_PAGAMENTO`,
  *    `PAGO_EM_FILA`, mesmo valor nos dois campos) mais os pares migrados fase
  *    a fase pela porta canonica (`DOCUMENTO_RECEBIDO_PARA_ANALISE` ↔
- *    `DOCUMENTO_ENVIADO`, Fase 5e/docs/47). Unico caso sem divergencia.
+ *    `DOCUMENTO_ENVIADO`, Fase 5e; `DOCUMENTO_VALIDADO` ↔ `DOCUMENTO_APROVADO`,
+ *    Fase 5f — docs/47). Unico caso sem divergencia.
  *  - `severity: "expected_legacy"` — divergencia CONHECIDA e de baixo risco:
  *    `operationalStatus` avancou via um write legado (docs/46 §3) que ainda
  *    nao tem porta canonica, mas o hop e simples e sem ambiguidade.
@@ -89,18 +90,23 @@ export type StatusDivergenceDiagnosis = {
  * do schema) e `PAGO_EM_FILA` (docs/46 §5). `AGUARDANDO_PAGAMENTO` entrava por
  * completude estrutural, mesmo pouco alcancavel.
  *
- * `DOCUMENTO_RECEBIDO_PARA_ANALISE` e o primeiro par com NOMES DIFERENTES nos
- * dois campos — a Fase 5e (docs/47 §6.1) migrou `uploadProcessDocument` para
- * a porta canonica, mas o candidato aprovado pela 5d tem nome proprio no
- * `InternalStatus` (nao reusa `DOCUMENTO_ENVIADO` do `OperationalStatus`, por
- * decisao do docs/47 §6.2). `operationalStatus` continua indo para
- * `DOCUMENTO_ENVIADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
+ * `DOCUMENTO_RECEBIDO_PARA_ANALISE` e `DOCUMENTO_VALIDADO` sao os pares com
+ * NOMES DIFERENTES nos dois campos — a Fase 5e (docs/47 §6.1) migrou
+ * `uploadProcessDocument`, e a Fase 5f (docs/47 §6.2) migrou o lado aprovacao
+ * de `reviewProcessDocument`, ambos para a porta canonica. Os candidatos
+ * aprovados pela 5d tem nome proprio no `InternalStatus` (nao reusam o nome
+ * do `OperationalStatus` de origem, por decisao do docs/47 §6.2).
+ * `operationalStatus` continua indo para `DOCUMENTO_ENVIADO`/
+ * `DOCUMENTO_APROVADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
+ * O lado REJEITADO de `reviewProcessDocument` (→ `BLOQUEADO`) NAO migrou:
+ * fica em `LEGACY_OPERATIONAL_DRIFT` ate a decisao propria do docs/47 §6.5.
  */
 const SAFE_PROJECTION = {
   RASCUNHO: "RASCUNHO",
   AGUARDANDO_PAGAMENTO: "AGUARDANDO_PAGAMENTO",
   PAGO_EM_FILA: "PAGO_EM_FILA",
   DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
+  DOCUMENTO_VALIDADO: "DOCUMENTO_APROVADO",
 } as const satisfies Partial<Record<InternalStatus, OperationalStatus>>;
 
 const SAFE_INTERNAL_VALUES = Object.keys(SAFE_PROJECTION) as (keyof typeof SAFE_PROJECTION)[];
@@ -156,13 +162,13 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
       "DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (severity none).",
   },
   DOCUMENTO_APROVADO: {
-    severity: "needs_decision",
+    severity: "expected_legacy",
     reason:
-      "reviewProcessDocument (aprovacao) escreve isto sozinho (docs/46 3.3): " +
-      "exige que um ADMIN/OPERADOR ja tenha revisado o documento - decisao " +
-      "humana que a Fase 5d precisa nomear em InternalStatus antes de " +
-      "qualquer projecao confiar nela (nao ha InternalStatus para " +
-      "'aguardando conferencia', docs/46 7).",
+      "so aparece com internalStatus fora de DOCUMENTO_VALIDADO em dado " +
+      "ANTERIOR a Fase 5f (docs/47 §6.2): reviewProcessDocument (aprovacao) " +
+      "escrevia isto sozinho, sem tocar internalStatus (docs/46 3.3). Fluxos " +
+      "novos passam por transitionInternalStatus e produzem o par seguro " +
+      "DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (severity none).",
   },
   EM_REVISAO_OPERACIONAL: {
     severity: "needs_decision",
@@ -196,7 +202,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 13 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * Os 12 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
  * §6): nenhum fluxo real os escreve, mas o diagnostico cobre a combinacao
  * mesmo assim - conservador por definicao, nao por observacao.
  *
@@ -204,13 +210,14 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
  *
- * Um dos 13 (`DOCUMENTO_VALIDADO`) E documentado — candidato aprovado pela
- * Fase 5d/docs/47 §6.2 — mas ainda SEM CONSUMIDOR: nenhum fluxo o escreve ate
- * a Fase 5f migrar o lado aprovacao de `reviewProcessDocument`. Ate la,
- * severity continua `needs_decision` — o candidato aprovado nao vira `none`
- * so por existir no enum; precisa tambem de um write real produzindo a
- * combinacao. `DOCUMENTO_RECEBIDO_PARA_ANALISE` NAO esta mais aqui: a Fase 5e
- * migrou o fluxo, e o par virou seguro (`SAFE_PROJECTION` acima).
+ * Nenhum dos 12 tem candidato APROVADO pendente de migracao — os dois que
+ * tinham (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e; `DOCUMENTO_VALIDADO`,
+ * Fase 5f) saíram desta tabela quando os fluxos correspondentes migraram, e
+ * os pares viraram seguros (`SAFE_PROJECTION` acima). Os candidatos restantes
+ * aqui (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
+ * `PROTOCOLADO_GRU_GERADA` → `PRONTO_PARA_PROTOCOLO_MANUAL`,
+ * `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`) sao ARRISCADOS ou FALSOS, nao
+ * aprovados — nao tem migracao proposta.
  */
 const UNDOCUMENTED_REASON =
   "internalStatus avancou alem dos 3 valores com projecao segura (docs/46 6); " +
@@ -220,23 +227,6 @@ const UNDOCUMENTED_REASON =
 const RISKY_BLOQUEADO_REASON =
   "docs/46 6: mapear para BLOQUEADO perderia a causa especifica e dispararia " +
   "BLOQUEIO_MANUAL em operationalSignals sem que humano tenha bloqueado.";
-
-/**
- * Candidato APROVADO (docs/47), nao so citado — mas ainda SEM CONSUMIDOR: a
- * Fase 5d decidiu a direcao, a fase de migracao correspondente ainda nao
- * rodou. `severity` continua `needs_decision` porque nenhum write real
- * produz esta combinacao ainda; se aparecer, e sinal de escrita fora de
- * banda, nao do caminho aprovado. Usado hoje so por `DOCUMENTO_VALIDADO` —
- * `DOCUMENTO_RECEBIDO_PARA_ANALISE` saiu desta categoria quando a Fase 5e
- * migrou `uploadProcessDocument` (ver `SAFE_PROJECTION`).
- */
-function candidatoAprovadoReason(estado: string, fase: string, operationalStatus: string): string {
-  return (
-    `docs/47: candidato aprovado para ${operationalStatus} (Fase 5d), mas ${fase} ` +
-    `ainda nao migrou - nenhum fluxo escreve ${estado} hoje. Se aparecer, e ` +
-    "escrita fora de banda, nao o caminho aprovado."
-  );
-}
 
 type AdvancedInternalStatus = Exclude<InternalStatus, SafeInternalStatus | Phase2InternalStatus>;
 
@@ -298,15 +288,6 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "docs/46 6: CANCELADO_DEV afirmaria cancelamento de ambiente de " +
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
-  },
-  DOCUMENTO_VALIDADO: {
-    candidateOperationalStatus: "DOCUMENTO_APROVADO",
-    severity: "needs_decision",
-    reason: candidatoAprovadoReason(
-      "DOCUMENTO_VALIDADO",
-      "o lado aprovacao da Fase 5f (reviewProcessDocument)",
-      "DOCUMENTO_APROVADO",
-    ),
   },
 };
 

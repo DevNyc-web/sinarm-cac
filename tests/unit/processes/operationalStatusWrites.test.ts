@@ -80,9 +80,9 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
   },
   {
     file: "src/server/services/reviewProcessDocument.ts",
-    sink: "updateProcessOperations(...)",
+    sink: "alsoSet",
     value: '"DOCUMENTO_APROVADO"',
-    why: "docs/46 §3.3 — legado conhecido (aprovacao), permitido temporariamente. Migra na 5f. Mesmo bloqueio do 3.2.",
+    why: "docs/46 §3.3 — JA MIGRADO na Fase 5f, lado aprovacao (docs/47 §6.2): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_VALIDADO`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`/`uploadProcessDocument`. O lado REJEITADO (proxima entrada) NAO foi tocado.",
   },
   {
     file: "src/server/services/reviewProcessDocument.ts",
@@ -437,21 +437,32 @@ test("o inventario continua com 5 writes de decisao + 1 repasse canonico", () =>
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
 });
 
-test("a Fase 5e reduziu os writes soltos: 2 migrados (sink alsoSet), 3 ainda legado", () => {
+test("a Fase 5f reduziu ainda mais os writes soltos: 3 migrados (sink alsoSet), 2 ainda legado", () => {
   // "Write solto" = decisao de operationalStatus que NAO passa pela porta
   // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
-  // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1) e agora
-  // tambem `uploadProcessDocument` (Fase 5e, docs/47 §6.1). Antes desta fase,
-  // eram 1 migrado / 4 soltos; este teste trava que baixou para 2 / 3 — e
-  // falha se algum dia SUBIR de novo, o que indicaria um write novo escapando
-  // da porta canonica sem decisao (a trava "nenhum write fora da allowlist"
-  // ja pegaria isso, mas este teste torna a contagem explicita).
+  // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1),
+  // `uploadProcessDocument` (Fase 5e, docs/47 §6.1) e agora tambem o lado
+  // aprovacao de `reviewProcessDocument` (Fase 5f, docs/47 §6.2). Progressao:
+  // 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f). Este teste trava que nao SOBE
+  // de novo, o que indicaria um write novo escapando da porta canonica sem
+  // decisao (a trava "nenhum write fora da allowlist" ja pegaria isso, mas
+  // este teste torna a contagem explicita).
   const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
   const migrados = decisoes.filter((write) => write.sink === "alsoSet").length;
   const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
-  assert.equal(migrados, 2, "confirmPixPayment + uploadProcessDocument");
-  assert.equal(soltos, 3, "reviewProcessDocument (x2) + updateProcessOperations");
+  assert.equal(migrados, 3, "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao)");
+  assert.equal(soltos, 2, "reviewProcessDocument (rejeicao) + updateProcessOperations");
   assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");
+});
+
+test("o lado REJEITADO de reviewProcessDocument continua legado (BLOQUEADO, sink solto)", () => {
+  // Explicito, alem do teste generico acima: garante que especificamente o
+  // BLOQUEADO de reviewProcessDocument nao migrou junto com a aprovacao.
+  const rejeicao = DETECTED.find(
+    (write) => write.file === "src/server/services/reviewProcessDocument.ts" && write.value === '"BLOQUEADO"',
+  );
+  assert.ok(rejeicao, "write de BLOQUEADO em reviewProcessDocument nao encontrado");
+  assert.equal(rejeicao!.sink, "updateProcessOperations(...)", "BLOQUEADO ainda deveria ser write solto");
 });
 
 test("os 5 writes estao onde docs/46 §3 diz que estao", () => {
