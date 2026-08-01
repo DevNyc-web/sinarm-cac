@@ -26,7 +26,7 @@ começa por inventário, guardas e diagnóstico — não por projeção.
 
 - `operationalStatus` é **campo operacional ativo**: dirige fila, sinalizadores,
   filtros, guardas de serviço e o dropdown do admin. **Não** dirige prontidão de
-  automação (§4.2).
+  automação (§4.2). Continua persistido — **nenhum write é removido nesta fase**.
 - `internalStatus` **não tem cobertura suficiente**: 1 caminho de escrita, 1
   chamador, 2 de 17 valores alcançáveis, 2 leituras de decisão.
 - **Projetar agora colapsaria a operação.** Todo processo projetaria para
@@ -46,67 +46,19 @@ começa por inventário, guardas e diagnóstico — não por projeção.
 | Valores alcançáveis | **9 de 9** | **2 de 17** |
 | Leituras que decidem comportamento | **13** (contadas em §4) | **2** (§5) |
 
-> **Nota de precisão.** Duas correções de contagem, registradas porque número
-> repetido em documento vira fato falso depois:
->
-> - `operationalStatus`: o mapeamento inicial estimou "~14" leituras de decisão. A
->   contagem exata é **13**.
-> - `internalStatus`: a primeira versão deste documento disse **1** leitura de
->   decisão. São **2** — faltava a que decide `canCreateCharge` na tela do cliente
->   (§5). Não muda a conclusão: 2 leituras ainda é cobertura quase inerte.
-
 ---
 
 ## 3. Inventário de writes de `operationalStatus`
 
-Cinco caminhos. Um migrado, quatro não.
+Cinco caminhos. Um migrado, quatro não. **Todos afetam a fila.**
 
-### 3.1 `confirmPixPayment` → `PAGO_EM_FILA` — ✅ **já migrado**
-
-- Gatilho: webhook Pix confirmado.
-- Escreve `internalStatus`: **sim** (`PAGO_EM_FILA`).
-- Usa `transitionInternalStatus`: **sim**, com `alsoSet`.
-- Registra evento **tipado** (`fromStatus`/`toStatus`).
-- Afeta fila: sim.
-
-É o único write que já passa pela porta canônica. Serve de referência para os
-demais.
-
-### 3.2 `uploadProcessDocument` → `DOCUMENTO_ENVIADO` — ⚠️ **precisa de decisão**
-
-- Gatilho: cliente envia documento (guarda: só se `operationalStatus === RASCUNHO`).
-- Escreve `internalStatus`: **não**.
-- Usa o helper: **não** — vai por `updateProcessOperations`.
-- Afeta fila: sim.
-- **Bloqueio:** não existe `InternalStatus` equivalente a "documento enviado,
-  aguardando conferência".
-
-### 3.3 `reviewProcessDocument` (aprovação) → `DOCUMENTO_APROVADO` — ⚠️ **precisa de decisão**
-
-- Gatilho: ADMIN/OPERADOR aprova o documento (guarda: `operationalStatus === DOCUMENTO_ENVIADO`).
-- Escreve `internalStatus`: **não**.
-- Usa o helper: **não**.
-- Afeta fila: sim.
-- **Bloqueio:** mesmo caso do 3.2 — sem equivalente canônico.
-
-### 3.4 `reviewProcessDocument` (rejeição) → `BLOQUEADO` — ❌ **proibido mapear**
-
-- Gatilho: documento rejeitado (guarda: `operationalStatus !== CANCELADO_DEV`).
-- Escreve `internalStatus`: **não**.
-- Usa o helper: **não**.
-- Afeta fila: sim.
-- **Proibição:** mapear para `BLOQUEADO_INSTABILIDADE` ou qualquer `EXCECAO_*`
-  **sem decisão própria** inventaria a causa do bloqueio. `docs/44` já fixou isso
-  para o sentido inverso, e a regra vale nos dois.
-
-### 3.5 `updateProcessOperations` → **qualquer um dos 9** — ❌ **depende de decisão própria**
-
-- Gatilho: admin move o status na tela (permissão `process.operationalStatus`).
-- Escreve `internalStatus`: **não**.
-- Registra evento **operacional** (rótulo em `fromValue`/`toValue`, não enum).
-- Afeta fila: sim.
-- **Risco: alto.** É a porta única do campo operacional e aceita os nove valores.
-  Migrar aqui é a última etapa, não a primeira.
+| Write (§) | Valor | Canônico? | Bloqueio / motivo |
+|---|---|---|---|
+| **3.1** `confirmPixPayment` — webhook Pix confirmado | `PAGO_EM_FILA` | ✅ `transitionInternalStatus` com `alsoSet`; evento **tipado** (`fromStatus`/`toStatus`) | — único write pela porta canônica; serve de referência para os demais |
+| **3.2** `uploadProcessDocument` — cliente envia documento (guarda: `operationalStatus === RASCUNHO`) | `DOCUMENTO_ENVIADO` | ❌ não escreve `internalStatus`; vai por `updateProcessOperations` | ⚠️ **precisa de decisão** — não existe `InternalStatus` equivalente a "documento enviado, aguardando conferência" |
+| **3.3** `reviewProcessDocument` (aprovação) — ADMIN/OPERADOR aprova (guarda: `operationalStatus === DOCUMENTO_ENVIADO`) | `DOCUMENTO_APROVADO` | ❌ | ⚠️ **precisa de decisão** — mesmo caso do 3.2, sem equivalente canônico |
+| **3.4** `reviewProcessDocument` (rejeição) — documento rejeitado (guarda: `operationalStatus !== CANCELADO_DEV`) | `BLOQUEADO` | ❌ | ❌ **proibido mapear** para `BLOQUEADO_INSTABILIDADE` ou qualquer `EXCECAO_*` sem decisão própria: inventaria a causa do bloqueio. `docs/44` fixou isso para o sentido inverso, e a regra vale nos dois |
+| **3.5** `updateProcessOperations` — admin move o status na tela (permissão `process.operationalStatus`); evento **operacional** (rótulo em `fromValue`/`toValue`, não enum) | **qualquer um dos 9** | ❌ | **risco alto** — porta única do campo operacional, aceita os nove valores. Migrar aqui é a última etapa, não a primeira |
 
 ---
 
@@ -131,8 +83,7 @@ demais.
 > lê `operationalStatus`** e **não consome `operationalSignals`**: é módulo **puro**,
 > derivado de destino, arma/PCE, documentos, sugestões e pagamento. A única menção
 > a `operationalSignals` no arquivo é um comentário comparando **estilo de
-> modelagem** (ambos derivam em vez de persistir), não um import. Registrado
-> explicitamente porque uma versão anterior desta seção afirmava o contrário:
+> modelagem** (ambos derivam em vez de persistir), não um import.
 > `operationalStatus` **não influencia prontidão para automação**, e a projeção da
 > Fase 5 não tem risco por esse caminho.
 >
@@ -185,13 +136,8 @@ entregou a porta canônica; ninguém além do Pix entra por ela.
 
 ## 6. Mapeamento `internalStatus → operationalStatus`
 
-**Somente 3 projeções são seguras:**
-
-| `internalStatus` | → `operationalStatus` | Por quê é seguro |
-|---|---|---|
-| `RASCUNHO` | `RASCUNHO` | 1:1, mesmo significado |
-| `AGUARDANDO_PAGAMENTO` | `AGUARDANDO_PAGAMENTO` | 1:1 |
-| `PAGO_EM_FILA` | `PAGO_EM_FILA` | 1:1 |
+**Somente 3 projeções são seguras** — 1:1, mesmo nome e mesmo significado:
+`RASCUNHO`, `AGUARDANDO_PAGAMENTO` e `PAGO_EM_FILA`.
 
 Os outros 14 são **arriscados, sem equivalente ou com perda de informação**.
 Casos que merecem nome:
@@ -204,9 +150,6 @@ Casos que merecem nome:
 - `CONCLUIDO` → sem equivalente. `isClosed()` reconhece apenas `CANCELADO_DEV`.
 - `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`: afirmaria cancelamento de
   desenvolvimento onde houve reembolso.
-
-> **Nenhum mapa em código.** Esta tabela é análise, não especificação de
-> implementação.
 
 ---
 
@@ -237,12 +180,9 @@ território da Fase 2 — ou aceitar perda de informação na fila.
 
 ## 8. Decisão de reordenação
 
-- **A Fase 5 NÃO deve começar por projeção.**
-- **A Fase 5 começa por inventário, guardas e diagnóstico.**
-- `operationalStatus` **continua persistido e operacional** — nenhum write é
-  removido nesta fase.
-- `internalStatus` **deve ganhar cobertura real** antes de virar fonte de
-  projeção.
+**A Fase 5 NÃO começa por projeção:** começa por este inventário (5a), guardas
+(5b) e diagnóstico (5c) — ver §9. `internalStatus` **deve ganhar cobertura real**
+antes de virar fonte de projeção.
 
 O critério para reavaliar a projeção: quando os writes de `operationalStatus`
 estiverem migrados para a porta canônica e `internalStatus` tiver valores
@@ -254,7 +194,6 @@ alcançáveis suficientes para cobrir a fila **sem perda**.
 
 | Subfase | O quê | Natureza | Risco |
 |---|---|---|---|
-| **5a** | **Inventário documental** — este documento | docs | nenhum |
 | **5b** | **Teste de guarda** contra novos writes soltos de `operationalStatus` | teste | baixo |
 | **5c** | **Diagnóstico de divergência** `internalStatus` × `operationalStatus`, sem mudar comportamento | código | baixo |
 | **5d** | ~~**Decisão sobre novos `InternalStatus`**~~ — **DECIDIDA por [`docs/47`](47-decisao-estados-workflow-humano.md)**: 2 dos 6 estados migram, 3 permanecem operacionais, 1 parcial | docs | nenhum |
@@ -273,17 +212,10 @@ Ordem de 5e a 5g: do menor para o maior acoplamento, cada uma reversível sozinh
 |---|---|
 | **Processo sumir da fila** — `getAdminQueue` e o filtro leem `operationalStatus` | **alto** |
 | **`operationalSignals` errar** — 7 leituras; `BLOQUEIO_MANUAL` falso, SLA errado | **alto** |
-| **Guardas de serviço travarem ou vazarem** — 4 leituras (`uploadProcessDocument`, 2 em `reviewProcessDocument`, idempotência de `updateProcessOperations`) | **alto** |
+| **Guardas de serviço travarem ou vazarem** — 4 leituras (§4.2) | **alto** |
 | **`isClosed()` não reconhece `CONCLUIDO`** — só `CANCELADO_DEV` fecha | médio |
 | Botão/dropdown admin aparecer errado — `<select defaultValue>` lê o valor atual | médio |
-| **`internalStatus` quase inerte** — é a causa raiz, não risco lateral | **alto** |
-| **6 estados sem equivalente** — dependência oculta de novos enums | **alto** |
 | Testes atuais não cobrem equivalência de fila | médio |
-
-> **Risco retirado:** *"`automationReadiness` errar"* constava aqui como **alto** por
-> supor que o módulo consome `operationalSignals`. Ele não consome, e não lê
-> `operationalStatus` (§4.2) — não havia risco por esse caminho. Removido em vez de
-> rebaixado: risco inventado desperdiça blindagem na 5b/5c.
 
 ---
 
@@ -296,18 +228,6 @@ Ordem de 5e a 5g: do menor para o maior acoplamento, cada uma reversível sozinh
 - ❌ Fechar gate de `docs/26 §19`.
 - ❌ Tocar Gov.br/SINARM/PF.
 - ❌ Usar `db:push`.
-
----
-
-## 12. Checklist de segurança
-
-- `PHASE9_REAL_EXECUTION_ENABLED` permanece **`false as const`**.
-- `docs/26 §19` **inalterado** — gates 1, 2, 3 e 5 seguem **abertos**.
-- **Execução real segue bloqueada.**
-- Sem código, sem testes, sem migration, sem schema, sem enum.
-- Sem UI, sem fila, sem readiness, sem automação.
-- Sem schedule, sem heartbeat, sem OCR real.
-- Sem Gov.br/SINARM/PF, sem credenciais, cookies ou tokens.
 
 ---
 

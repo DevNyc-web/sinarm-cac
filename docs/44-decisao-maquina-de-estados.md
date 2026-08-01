@@ -138,24 +138,13 @@ arquitetural**.
 
 ### 5.2 `operationalStatus` → **deprecar em fases**
 
-> ⚠️ **REORDENADO por [`docs/46`](46-inventario-operational-status.md)
-> (2026-07-30).** A decisão de deprecar **continua valendo**, mas a projeção
-> direta era prematura: `operationalStatus` tem 5 caminhos de escrita e 9/9
-> valores alcançáveis, enquanto `internalStatus` tem 1 caminho e 2/17. Projetar
-> agora colapsaria a fila. Além disso, **6 estados operacionais não têm
-> equivalente canônico** — dependência que esta seção não previa. A Fase 5 passa a
-> começar por inventário (5a), guardas (5b) e diagnóstico (5c), com a projeção só
-> na 5h.
->
-> ⚠️ **Fase 5d decidida por [`docs/47`](47-decisao-estados-workflow-humano.md)
-> (2026-07-30).** Dos 6 estados sem equivalente, **2** viram candidatos a
-> `InternalStatus` (`DOCUMENTO_ENVIADO` → `DOCUMENTO_RECEBIDO_PARA_ANALISE`;
-> `DOCUMENTO_APROVADO` → `DOCUMENTO_VALIDADO`), **3** permanecem só
-> operacionais (`EM_REVISAO_OPERACIONAL`, `PRONTO_PARA_PROTOCOLO_MANUAL`,
-> `CANCELADO_DEV`) e **1** (`BLOQUEADO`) tem direção dada mas forma final
-> adiada para PR próprio. **Consequência: a projeção da 5h NÃO será 100%
-> derivada** — `operationalStatus` mantém papel residual permanente para os 3
-> valores só-operacionais. Isto revisa, sem reverter, o parágrafo abaixo.
+> ⚠️ **Revisado pela Fase 5d ([`docs/47`](47-decisao-estados-workflow-humano.md),
+> 2026-07-30).** A decisão de deprecar **continua valendo** — a reordenação da
+> Fase 5 e o resultado da 5d estão na tabela do §8. **Consequência que esta seção
+> não previa: a projeção da 5h NÃO será 100% derivada** — `operationalStatus`
+> mantém papel residual permanente para `EM_REVISAO_OPERACIONAL`,
+> `PRONTO_PARA_PROTOCOLO_MANUAL` e `CANCELADO_DEV`. Isto revisa, sem reverter, o
+> parágrafo abaixo.
 
 - Papel temporário: **projeção operacional derivada** de `internalStatus`.
 - **Continua existindo** enquanto fila, permissões e telas dependerem dele.
