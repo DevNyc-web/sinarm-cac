@@ -19,6 +19,7 @@ import {
   findProcessByIdForAdmin,
   updateProcessOperations,
 } from "@/server/repositories/processRepository";
+import { transitionInternalStatus } from "@/server/services/transitionInternalStatus";
 
 export type OperationResult = { ok: true } | { ok: false; error: string };
 
@@ -150,6 +151,45 @@ export async function changeOperationalStatus(
     const process = await findProcessByIdForAdmin(processId, false);
     if (!process) return { ok: false, error: "Processo nao encontrado." };
     if (process.operationalStatus === status) return { ok: true };
+
+    // Fase 5g (docs/46 §3.5, docs/48): so os 3 valores com InternalStatus
+    // homonimo (mesmo nome, mesmo significado) passam pela porta canonica
+    // aqui. Os outros 6 — inclusive DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO, que
+    // TEM candidato canonico nos fluxos naturais (uploadProcessDocument/
+    // reviewProcessDocument) — continuam no caminho legado abaixo: esta porta
+    // e MANUAL/admin e sem validacao de maquina de transicoes, entao mover o
+    // internalStatus aqui poderia retroceder uma jornada ja avancada por um
+    // fluxo real, sem a checagem que so aquele fluxo faz.
+    if (status === "RASCUNHO") {
+      const result = await transitionInternalStatus({
+        processId,
+        toStatus: "RASCUNHO",
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        alsoSet: { operationalStatus: "RASCUNHO", userFacingStatus: "RECEBIDO" },
+      });
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
+    if (status === "AGUARDANDO_PAGAMENTO") {
+      const result = await transitionInternalStatus({
+        processId,
+        toStatus: "AGUARDANDO_PAGAMENTO",
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        alsoSet: { operationalStatus: "AGUARDANDO_PAGAMENTO", userFacingStatus: "RECEBIDO" },
+      });
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
+    if (status === "PAGO_EM_FILA") {
+      const result = await transitionInternalStatus({
+        processId,
+        toStatus: "PAGO_EM_FILA",
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        alsoSet: { operationalStatus: "PAGO_EM_FILA", userFacingStatus: "PAGAMENTO_CONFIRMADO" },
+      });
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
 
     await updateProcessOperations(processId, {
       operationalStatus: status,

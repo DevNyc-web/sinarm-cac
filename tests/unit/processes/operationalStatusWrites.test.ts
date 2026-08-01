@@ -92,9 +92,27 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
   },
   {
     file: "src/server/services/updateProcessOperations.ts",
+    sink: "alsoSet",
+    value: '"RASCUNHO"',
+    why: "docs/46 §3.5 — JA MIGRADO na Fase 5g: um dos 3 valores com InternalStatus homonimo (docs/46 §6), passa pela porta canonica `transitionInternalStatus`.",
+  },
+  {
+    file: "src/server/services/updateProcessOperations.ts",
+    sink: "alsoSet",
+    value: '"AGUARDANDO_PAGAMENTO"',
+    why: "docs/46 §3.5 — JA MIGRADO na Fase 5g: mesmo padrao do write acima, internalStatus vai para `AGUARDANDO_PAGAMENTO`.",
+  },
+  {
+    file: "src/server/services/updateProcessOperations.ts",
+    sink: "alsoSet",
+    value: '"PAGO_EM_FILA"',
+    why: "docs/46 §3.5 — JA MIGRADO na Fase 5g: mesmo padrao, internalStatus vai para `PAGO_EM_FILA` (mesmo alvo que `confirmPixPayment` ja produz).",
+  },
+  {
+    file: "src/server/services/updateProcessOperations.ts",
     sink: "updateProcessOperations(...)",
     value: "status",
-    why: "docs/46 §3.5 — porta manual/admin, aceita os 9 valores. Risco alto: migra na 5g, por ultimo.",
+    why: "docs/46 §3.5 — legado conhecido para os 6 valores SEM InternalStatus homonimo (DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO, EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL, BLOQUEADO, CANCELADO_DEV). Os dois primeiros TEM candidato canonico nos fluxos naturais (uploadProcessDocument/reviewProcessDocument), mas esta porta e MANUAL/admin e nao valida maquina de transicoes — migrar aqui poderia retroceder uma jornada ja avancada por um fluxo real sem a checagem que so aquele fluxo faz. Decisao explicita sobre esses dois ficou de fora da Fase 5g.",
   },
 ];
 
@@ -423,36 +441,71 @@ test("allowlist nao guarda entrada morta", () => {
   );
 });
 
-test("o inventario continua com 5 writes de decisao + 1 repasse canonico", () => {
+test("o inventario continua com 5 CAMINHOS de decisao, agora 8 escritas literais + 1 repasse canonico", () => {
   // Trava o NUMERO, nao so o conteudo: docs/46 §2 publica "5 caminhos de
-  // escrita", e numero repetido em documento vira fato falso quando o codigo
-  // anda sozinho.
+  // escrita" — numero de ARQUIVOS/funcoes de decisao, que NAO muda na Fase 5g
+  // (updateProcessOperations continua sendo 1 caminho). O que muda e quantas
+  // ESCRITAS LITERAIS esse caminho produz: a Fase 5g trocou 1 escrita dinamica
+  // (`status`, cobrindo os 9 valores em uma linha so) por 4 (3 literais
+  // migrados + 1 dinamica remanescente para os 6 valores legados) — o mesmo
+  // padrao que `reviewProcessDocument` ja tinha (1 caminho, 2 escritas) desde
+  // antes da Fase 5f. 5 caminhos - 1 (a escrita antiga) + 4 (as novas) = 8.
   const decisions = DETECTED.filter((write) =>
     ALLOWED_WRITES.some((a) => matches(write, a)),
   ).length;
   const passthrough = DETECTED.filter((write) =>
     ALLOWED_PASSTHROUGH.some((a) => matches(write, a)),
   ).length;
-  assert.equal(decisions, 5, "docs/46 §2/§3 registra 5 caminhos de escrita de decisao");
+  assert.equal(
+    decisions,
+    8,
+    "docs/46 §2/§3 registra 5 caminhos; a Fase 5g fez updateProcessOperations produzir 4 escritas (era 1)",
+  );
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
 });
 
-test("a Fase 5f reduziu ainda mais os writes soltos: 3 migrados (sink alsoSet), 2 ainda legado", () => {
+test("a Fase 5g reduziu os writes soltos: 6 migrados (sink alsoSet), 2 ainda legado", () => {
   // "Write solto" = decisao de operationalStatus que NAO passa pela porta
   // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
   // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1),
-  // `uploadProcessDocument` (Fase 5e, docs/47 §6.1) e agora tambem o lado
-  // aprovacao de `reviewProcessDocument` (Fase 5f, docs/47 §6.2). Progressao:
-  // 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f). Este teste trava que nao SOBE
-  // de novo, o que indicaria um write novo escapando da porta canonica sem
-  // decisao (a trava "nenhum write fora da allowlist" ja pegaria isso, mas
-  // este teste torna a contagem explicita).
+  // `uploadProcessDocument` (Fase 5e), o lado aprovacao de
+  // `reviewProcessDocument` (Fase 5f) e agora RASCUNHO/AGUARDANDO_PAGAMENTO/
+  // PAGO_EM_FILA de `updateProcessOperations` (Fase 5g). Progressao: 1/4
+  // (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2 (5g). "Soltos" NAO caiu na
+  // 5g porque a escrita dinamica que sobrou (`status`, os 6 valores sem
+  // InternalStatus homonimo) e UMA linha so, igual antes — o solto que sumiu
+  // foi substituido por 3 escritas migradas, nao por reducao do legado.
   const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
   const migrados = decisoes.filter((write) => write.sink === "alsoSet").length;
   const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
-  assert.equal(migrados, 3, "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao)");
-  assert.equal(soltos, 2, "reviewProcessDocument (rejeicao) + updateProcessOperations");
+  assert.equal(
+    migrados,
+    6,
+    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao) + updateProcessOperations (RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA)",
+  );
+  assert.equal(soltos, 2, "reviewProcessDocument (rejeicao) + updateProcessOperations (os 6 valores legados, 1 linha dinamica)");
   assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");
+});
+
+test("a Fase 5g migra so 3 dos 9 valores de updateProcessOperations; os outros 6 continuam na mesma linha legada", () => {
+  // Explicito, alem dos testes gerais acima: garante que especificamente os 3
+  // valores com InternalStatus homonimo saem pelo sink `alsoSet`, e que a
+  // linha dinamica remanescente (sink `updateProcessOperations(...)`, valor
+  // `status`) e a UNICA escrita legada que sobra neste arquivo — cobrindo os
+  // 6 valores sem equivalencia (inclusive DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO,
+  // que tem candidato nos fluxos naturais mas NAO foram migrados aqui: porta
+  // manual/admin, decisao explicita ficou de fora da Fase 5g).
+  const doArquivo = DETECTED.filter(
+    (write) => write.file === "src/server/services/updateProcessOperations.ts",
+  );
+  const migrados = doArquivo.filter((w) => w.sink === "alsoSet").map((w) => w.value).sort();
+  const soltos = doArquivo.filter((w) => w.sink === "updateProcessOperations(...)");
+  assert.deepEqual(migrados, ['"AGUARDANDO_PAGAMENTO"', '"PAGO_EM_FILA"', '"RASCUNHO"']);
+  assert.deepEqual(
+    soltos.map((w) => w.value),
+    ["status"],
+    "so deve sobrar UMA escrita dinamica, cobrindo os 6 valores legados",
+  );
 });
 
 test("o lado REJEITADO de reviewProcessDocument continua legado (BLOQUEADO, sink solto)", () => {
@@ -479,7 +532,12 @@ test("os 5 writes estao onde docs/46 §3 diz que estao", () => {
     '"BLOQUEADO"',
     '"DOCUMENTO_APROVADO"',
   ]);
-  assert.deepEqual(byFile("src/server/services/updateProcessOperations.ts"), ["status"]);
+  assert.deepEqual(byFile("src/server/services/updateProcessOperations.ts"), [
+    '"AGUARDANDO_PAGAMENTO"',
+    '"PAGO_EM_FILA"',
+    '"RASCUNHO"',
+    "status",
+  ]);
 });
 
 // -------------------------------------------- 5. precisao: leitura nao e write

@@ -27,8 +27,12 @@
  *    placeholder, nao o proprio nome cru).
  * 2. Cada um dos dois tem EXATAMENTE um consumidor real, e nenhum outro
  *    arquivo os escreve.
- * 3. O lado rejeicao de `reviewProcessDocument` e `updateProcessOperations`
- *    continuam sem usar nenhum dos dois estados, nem chamar a porta canonica.
+ * 3. O lado rejeicao de `reviewProcessDocument` continua sem usar nenhum dos
+ *    dois estados, nem chamar a porta canonica. `updateProcessOperations`
+ *    passou a chamar a porta canonica na Fase 5g (para RASCUNHO/
+ *    AGUARDANDO_PAGAMENTO/PAGO_EM_FILA), mas continua sem usar nenhum dos
+ *    DOIS estados desta fase — DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO
+ *    continuam legado ali, decisao explicita fora do escopo da 5g.
  * 4. Os rotulos nunca alimentam tela do cliente — `internalStatus` nao e fonte
  *    visual (docs/45); os rotulos existem so para admin/diagnostico tecnico.
  * 5. O diagnostico da Fase 5c (`statusDivergence.ts`) reflete os dois pares
@@ -191,20 +195,30 @@ test("os dois estados nao aparecem em workers, repositorios nem automacao", () =
   }
 });
 
-test("updateProcessOperations continua sem usar nenhum dos dois estados nem a porta canonica", () => {
-  // Fase 5g, fora do escopo desta fase.
+test("updateProcessOperations chama a porta canonica (Fase 5g), mas nunca com os dois estados desta fase", () => {
+  // Fase 5g migrou RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA para
+  // `transitionInternalStatus` — nenhum dos dois com nome proprio (`DOCUMENTO_
+  // RECEBIDO_PARA_ANALISE`/`DOCUMENTO_VALIDADO`, Fase 5d) porque esses tem
+  // candidato so nos fluxos NATURAIS (upload/review); migrar aqui, na porta
+  // MANUAL/admin sem validacao de maquina de transicoes, ficou fora desta
+  // fase por decisao explicita.
   const code = codeOnly(readFileSync("src/server/services/updateProcessOperations.ts", "utf8"));
   for (const estado of NOVOS_ESTADOS) {
     assert.ok(!code.includes(estado), `updateProcessOperations.ts usa ${estado}`);
   }
-  assert.doesNotMatch(code, /\btransitionInternalStatus\s*\(/);
+  assert.match(
+    code,
+    /\btransitionInternalStatus\s*\(/,
+    "a Fase 5g deveria ter introduzido a porta canonica em updateProcessOperations.ts",
+  );
 });
 
-test("transitionInternalStatus tem exatamente 3 chamadores reais", () => {
+test("transitionInternalStatus tem exatamente 4 chamadores reais", () => {
   // A porta canonica tinha 1 chamador (docs/46 §5); a Fase 5e somou o
-  // segundo (uploadProcessDocument); a Fase 5f soma o terceiro
-  // (reviewProcessDocument, so o lado aprovacao). Nenhum outro arquivo
-  // deveria importa-la por causa desta migration.
+  // segundo (uploadProcessDocument); a Fase 5f somou o terceiro
+  // (reviewProcessDocument, so o lado aprovacao); a Fase 5g soma o quarto
+  // (updateProcessOperations, so RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA).
+  // Nenhum outro arquivo deveria importa-la por causa desta migration.
   const chamadores = [
     ...arquivosDeFluxo("src/server/services"),
     ...arquivosDeFluxo("src/app"),
@@ -218,6 +232,7 @@ test("transitionInternalStatus tem exatamente 3 chamadores reais", () => {
     [
       "src/server/services/confirmPixPayment.ts",
       "src/server/services/reviewProcessDocument.ts",
+      "src/server/services/updateProcessOperations.ts",
       "src/server/services/uploadProcessDocument.ts",
     ],
     "os chamadores reais de transitionInternalStatus mudaram",
