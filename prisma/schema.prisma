@@ -590,6 +590,26 @@ enum InternalStatus {
   /// enums na leitura de codigo (docs/47 §6.2).
   DOCUMENTO_VALIDADO
 
+  /// Decidido pelo docs/48 (2026-08-01) para `OperationalStatus.BLOQUEADO`.
+  /// SEM CONSUMIDOR neste PR: nenhum fluxo escreve este valor ainda — o lado
+  /// rejeicao de `reviewProcessDocument` (5f) e o `BLOQUEADO` da porta
+  /// manual/admin (5g) ficam para PR proprio, mesmo padrao da Fase 2 e da 5d
+  /// acima.
+  ///
+  /// NO FIM DO ENUM pelo mesmo motivo das duas adicoes anteriores:
+  /// `ALTER TYPE ... ADD VALUE` sem `BEFORE`/`AFTER` anexa ao fim no Postgres.
+  ///
+  /// Bloqueio decidido por um HUMANO (rejeicao de documento ou dropdown do
+  /// admin), sem causa apurada pelo sistema. Categoria NOVA de proposito:
+  /// reutilizar `BLOQUEADO_INSTABILIDADE` ou qualquer `EXCECAO_*` — que sao
+  /// pausas decididas pela AUTOMACAO, com causa ja tipada — afirmaria uma causa
+  /// que ninguem verificou (docs/48 §4, docs/46 §3.4).
+  ///
+  /// NAO confundir com `ManualExecutionStatus.BLOQUEADO_OPERACIONALMENTE`:
+  /// aquele descreve a execucao manual da equipe fora do app (Fase 7), este e o
+  /// estado canonico do processo.
+  BLOQUEADO_OPERACIONAL
+
   @@map("internal_status")
 }
 

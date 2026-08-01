@@ -273,6 +273,31 @@ test("PROTOCOLADO_GRU_GERADA: candidato documentado, mas inverte o tempo", () =>
   assert.match(result.reason, /inverte o tempo/);
 });
 
+test("BLOQUEADO_OPERACIONAL: candidato APROVADO (docs/48), mas continua needs_decision sem fluxo migrado", () => {
+  // A diferenca em relacao ao teste acima: aqui o candidato nao e "arriscado",
+  // e aprovado por decisao propria. Mesmo assim NAO vira `none` — enquanto
+  // nenhum write real produzir o par, a combinacao so pode ter chegado por
+  // escrita fora de banda. Mesmo tratamento que DOCUMENTO_RECEBIDO_PARA_ANALISE
+  // e DOCUMENTO_VALIDADO tiveram entre a migration da 5d e as Fases 5e/5f.
+  const comBloqueado = diagnoseStatusDivergence({
+    internalStatus: "BLOQUEADO_OPERACIONAL",
+    operationalStatus: "BLOQUEADO",
+  });
+  assert.equal(comBloqueado.hasDivergence, true, "par aprovado ainda nao e par migrado");
+  assert.equal(comBloqueado.severity, "needs_decision");
+  assert.equal(comBloqueado.expectedOperationalStatus, "BLOQUEADO");
+  assert.match(comBloqueado.reason, /docs\/48/);
+  assert.match(comBloqueado.reason, /fora de banda/);
+
+  // E com qualquer outro operationalStatus tambem nao vira `none`.
+  const comRascunho = diagnoseStatusDivergence({
+    internalStatus: "BLOQUEADO_OPERACIONAL",
+    operationalStatus: "RASCUNHO",
+  });
+  assert.equal(comRascunho.severity, "needs_decision");
+  assert.notEqual(comRascunho.severity, "none");
+});
+
 test("internalStatus avancado sem candidato documentado: needs_decision, sem inventar valor", () => {
   const semCandidato: import("@prisma/client").InternalStatus[] = [
     "AGUARDANDO_LOGIN_GOVBR",
@@ -390,6 +415,7 @@ test("severity sempre e um dos 4 valores declarados", () => {
     "AGUARDANDO_CAPTCHA",
     "DOCUMENTO_RECEBIDO_PARA_ANALISE",
     "DOCUMENTO_VALIDADO",
+    "BLOQUEADO_OPERACIONAL",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -404,8 +430,8 @@ test("severity sempre e um dos 4 valores declarados", () => {
   ] as const;
   assert.equal(
     internos.length,
-    19,
-    "17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47): DOCUMENTO_RECEBIDO_PARA_ANALISE, DOCUMENTO_VALIDADO",
+    20,
+    "17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47) + BLOQUEADO_OPERACIONAL (docs/48)",
   );
   assert.equal(operacionais.length, 9, "os 9 valores de OperationalStatus, docs/46 §2");
 
@@ -444,6 +470,10 @@ test("apenas os pares seguros produzem severity 'none'", () => {
     "AGUARDANDO_CAPTCHA",
     "DOCUMENTO_RECEBIDO_PARA_ANALISE",
     "DOCUMENTO_VALIDADO",
+    // docs/48: candidato APROVADO para BLOQUEADO, mas sem fluxo migrado — entra
+    // nesta varredura justamente para provar que continua FORA de PARES_SEGUROS
+    // abaixo. Estado aprovado no papel nao vira "none" so por existir no enum.
+    "BLOQUEADO_OPERACIONAL",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -550,9 +580,10 @@ test("o dropdown e a acao de mudar operationalStatus continuam intactos", () => 
   );
 });
 
-test("os 19 valores de InternalStatus vem do schema, nao de copia", () => {
+test("os 20 valores de InternalStatus vem do schema, nao de copia", () => {
   // 17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47, migration
-  // 20260731010000_add_document_internal_statuses).
+  // 20260731010000_add_document_internal_statuses) + BLOQUEADO_OPERACIONAL
+  // (docs/48, migration 20260801000000_add_blocked_operational_status).
   const schema = readFileSync("prisma/schema.prisma", "utf8");
   const bloco = /enum InternalStatus \{([\s\S]*?)\n\}/.exec(schema);
   assert.ok(bloco, "enum InternalStatus nao encontrado em prisma/schema.prisma");
@@ -560,7 +591,8 @@ test("os 19 valores de InternalStatus vem do schema, nao de copia", () => {
     .split("\n")
     .map((line) => line.replace(/\/\/\/.*$/, "").trim())
     .filter((line) => /^[A-Z][A-Z0-9_]*$/.test(line));
-  assert.equal(valores.length, 19);
+  assert.equal(valores.length, 20);
   assert.ok(valores.includes("DOCUMENTO_RECEBIDO_PARA_ANALISE"));
   assert.ok(valores.includes("DOCUMENTO_VALIDADO"));
+  assert.ok(valores.includes("BLOQUEADO_OPERACIONAL"));
 });

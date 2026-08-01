@@ -42,6 +42,15 @@ export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   // internalStatus).
   DOCUMENTO_RECEBIDO_PARA_ANALISE: "Documento recebido para analise",
   DOCUMENTO_VALIDADO: "Documento validado",
+  // Decidido pelo docs/48 — SEM CONSUMIDOR neste PR, mesmo status dos rotulos
+  // acima. "Bloqueado" seco DE PROPOSITO: o nome do enum ja carrega a
+  // especificidade tecnica, e um rotulo mais longo colidiria visualmente com
+  // `ManualExecutionStatus.BLOQUEADO_OPERACIONALMENTE` ("Bloqueado
+  // operacionalmente"), que aparece perto deste no diagnostico do admin.
+  // Continua distinto de `BLOQUEADO_INSTABILIDADE` ("Bloqueado /
+  // instabilidade", pausa que a AUTOMACAO decide e retoma sozinha) na mesma
+  // lista — a distincao que importa esta travada por teste.
+  BLOQUEADO_OPERACIONAL: "Bloqueado",
 };
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
