@@ -185,34 +185,38 @@ test("expected_legacy: internalStatus RASCUNHO, operationalStatus DOCUMENTO_APRO
   assert.match(result.reason, /reviewProcessDocument/);
 });
 
-test("needs_decision: internalStatus RASCUNHO, operationalStatus BLOQUEADO", () => {
+test("expected_legacy: internalStatus RASCUNHO, operationalStatus BLOQUEADO (dado anterior ao docs/48)", () => {
+  // Era `needs_decision` enquanto existia escritor legado vivo de BLOQUEADO.
+  // Com a rejeicao de reviewProcessDocument E o dropdown de
+  // updateProcessOperations migrados, so DADO ANTIGO produz esta combinacao —
+  // mesmo criterio de DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO.
   const result = diagnoseStatusDivergence({
     internalStatus: "RASCUNHO",
     operationalStatus: "BLOQUEADO",
   });
-  assert.equal(result.hasDivergence, true);
-  assert.equal(result.severity, "needs_decision");
-  // docs/46 §3.4: mapear BLOQUEADO de volta para um InternalStatus especifico
-  // sem decisao propria e PROIBIDO — a razao precisa citar isso, nao so dizer
-  // "precisa decidir".
+  assert.equal(result.hasDivergence, true, "dado antigo continua sendo divergencia");
+  assert.equal(result.severity, "expected_legacy");
+  assert.match(result.reason, /ANTERIOR/);
+  // docs/46 §3.4: reclassificar a severidade NAO afrouxa a proibicao — mapear
+  // dado antigo para excecao automatica continua vetado, e a razao precisa
+  // continuar dizendo isso.
   assert.match(result.reason, /PROIBIDO/);
 });
 
 test("os 6 estados sem equivalente canonico (docs/46 §7) tem severidade coerente", () => {
   // EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL e CANCELADO_DEV nao
   // tem teste obrigatorio individual no pedido, mas fecham a cobertura dos 6.
-  // DOCUMENTO_ENVIADO e DOCUMENTO_APROVADO sao expected_legacy — os dois ja
-  // tem par migrado (Fases 5e/5f) e SO dado antigo produz a combinacao.
-  // BLOQUEADO continua needs_decision mesmo tendo par migrado (docs/48): o
-  // dropdown de updateProcessOperations ainda o escreve HOJE sem tocar
-  // internalStatus, e a Fase 5g desse write segue aberta. Os outros tres nao
-  // tem fluxo migrado nem decisao fechada.
+  // DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO e BLOQUEADO sao expected_legacy: os
+  // tres tem par migrado e nenhum escritor vivo produz a combinacao — so dado
+  // antigo. Os outros tres permanecem needs_decision porque continuam sendo
+  // escritos HOJE pela linha dinamica de updateProcessOperations, sem candidato
+  // canonico (docs/47 §9: permanecem so operacionais).
   const casos: [import("@prisma/client").OperationalStatus, DivergenceSeverity][] = [
     ["DOCUMENTO_ENVIADO", "expected_legacy"],
     ["DOCUMENTO_APROVADO", "expected_legacy"],
+    ["BLOQUEADO", "expected_legacy"],
     ["EM_REVISAO_OPERACIONAL", "needs_decision"],
     ["PRONTO_PARA_PROTOCOLO_MANUAL", "needs_decision"],
-    ["BLOQUEADO", "needs_decision"],
     ["CANCELADO_DEV", "needs_decision"],
   ];
   for (const [operationalStatus, severity] of casos) {

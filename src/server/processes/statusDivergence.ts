@@ -100,13 +100,12 @@ export type StatusDivergenceDiagnosis = {
  * `operationalStatus` continua indo para `DOCUMENTO_ENVIADO`/
  * `DOCUMENTO_APROVADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
  *
- * `BLOQUEADO_OPERACIONAL` fecha a Fase 5f: o lado REJEITADO de
- * `reviewProcessDocument` passou pela mesma porta (docs/48), com
- * `operationalStatus` continuando em `BLOQUEADO` via `alsoSet`. ATENCAO — este
- * par e o unico em que o `operationalStatus` do lado direito AINDA TEM outro
- * escritor legado vivo: o dropdown de `updateProcessOperations` (Fase 5g,
- * pendente) escreve `BLOQUEADO` sem tocar `internalStatus`. Por isso o par
- * seguro nao torna `LEGACY_OPERATIONAL_DRIFT.BLOQUEADO` letra morta.
+ * `BLOQUEADO_OPERACIONAL` (docs/48) chegou em duas etapas: primeiro o lado
+ * REJEITADO de `reviewProcessDocument`, depois o `BLOQUEADO` do dropdown de
+ * `updateProcessOperations`. Com as duas migradas, NENHUM escritor vivo produz
+ * `operationalStatus = BLOQUEADO` sem mover o `internalStatus` junto — por isso
+ * `LEGACY_OPERATIONAL_DRIFT.BLOQUEADO` passou a `expected_legacy`, como
+ * `DOCUMENTO_ENVIADO`/`DOCUMENTO_APROVADO` ja eram.
  */
 const SAFE_PROJECTION = {
   RASCUNHO: "RASCUNHO",
@@ -191,21 +190,23 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
       "So chega via updateProcessOperations (docs/46 3.5).",
   },
   BLOQUEADO: {
-    // Continua `needs_decision`, ao contrario de DOCUMENTO_ENVIADO/
-    // DOCUMENTO_APROVADO acima: aqueles viraram `expected_legacy` porque, apos
-    // 5e/5f, so DADO ANTIGO produz a combinacao. Aqui nao — o dropdown de
-    // updateProcessOperations ainda escreve BLOQUEADO HOJE sem tocar
-    // internalStatus, e a Fase 5g sobre esse write segue aberta. Rebaixar
-    // agora diria "nada a decidir" sobre um write vivo.
-    severity: "needs_decision",
+    // Passou de `needs_decision` para `expected_legacy` quando o SEGUNDO (e
+    // ultimo) escritor de BLOQUEADO migrou: a rejeicao de
+    // `reviewProcessDocument` primeiro, o dropdown de
+    // `updateProcessOperations` depois. Sem escritor vivo produzindo a
+    // combinacao, so DADO ANTIGO chega aqui — mesmo criterio que ja valia para
+    // DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO acima.
+    severity: "expected_legacy",
     reason:
-      "a rejeicao de reviewProcessDocument MIGROU (docs/48) e agora produz o " +
-      "par seguro BLOQUEADO_OPERACIONAL/BLOQUEADO; esta combinacao restante e " +
-      "dado ANTERIOR a essa migracao OU escrita do dropdown de " +
-      "updateProcessOperations, que continua legado ate a Fase 5g (docs/46 " +
-      "3.5). Mapear para BLOQUEADO_INSTABILIDADE ou qualquer EXCECAO_* " +
-      "continua PROIBIDO (docs/46 3.4/6): afirmaria causa apurada pela " +
-      "automacao onde houve decisao humana.",
+      "so aparece com internalStatus fora de BLOQUEADO_OPERACIONAL em dado " +
+      "ANTERIOR as migracoes do docs/48: a rejeicao de reviewProcessDocument " +
+      "(docs/46 3.4) e o dropdown de updateProcessOperations (docs/46 3.5) " +
+      "escreviam BLOQUEADO sem tocar internalStatus. Fluxos novos passam por " +
+      "transitionInternalStatus e produzem o par seguro " +
+      "BLOQUEADO_OPERACIONAL/BLOQUEADO (severity none). Mapear dado antigo " +
+      "para BLOQUEADO_INSTABILIDADE ou qualquer EXCECAO_* continua PROIBIDO " +
+      "(docs/46 3.4/6): afirmaria causa apurada pela automacao onde houve " +
+      "decisao humana.",
   },
   CANCELADO_DEV: {
     severity: "needs_decision",
