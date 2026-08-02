@@ -14,6 +14,7 @@ import {
 import { findMockUser } from "@/server/auth/mockUsers";
 import {
   deriveOperationalIndicators,
+  isClosed,
   type OperationalSignal,
   type ReadinessLevel,
   type SlaStatus,
@@ -57,6 +58,7 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
     const indicators = deriveOperationalIndicators(
       {
         operationalStatus: row.operationalStatus,
+        internalStatus: row.internalStatus,
         createdAt: row.createdAt,
         lastEventAt: row.statusEvents[0]?.createdAt ?? null,
         hasDestination: row.destination !== null,
@@ -89,7 +91,12 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
       destinationLabel: row.destination
         ? `${row.destination.eventName} — ${row.destination.city}/${row.destination.uf}`
         : null,
+      // docs/52: processo com cancelamento real (CANCELADO_OPERACIONAL) nao
+      // deve continuar destacado como se estivesse ativo, mesmo que o
+      // operationalStatus antigo (preservado, sem alsoSet) ainda bata com a
+      // condicao abaixo.
       highlighted:
+        !isClosed(row.operationalStatus, row.internalStatus) &&
         paymentStatus === "PAGO" &&
         (row.operationalStatus === "PAGO_EM_FILA" ||
           row.operationalStatus === "EM_REVISAO_OPERACIONAL"),

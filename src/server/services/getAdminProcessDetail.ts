@@ -400,6 +400,7 @@ export async function getAdminProcessDetail(
   const checkedItems = checklistRows.filter((row) => row.checked);
   const indicators = deriveOperationalIndicators({
     operationalStatus: process.operationalStatus,
+    internalStatus: process.internalStatus,
     createdAt: process.createdAt,
     lastEventAt: statusEvents.at(-1)?.createdAt ?? null,
     hasDestination: process.destination !== null,

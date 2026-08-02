@@ -16,6 +16,7 @@
  */
 import {
   type DocumentStatus,
+  type InternalStatus,
   type OperationalStatus,
   type PaymentStatus,
 } from "@prisma/client";
@@ -66,6 +67,8 @@ export const SLA_LABELS: Record<SlaStatus, string> = {
 /** Retrato minimo do processo — so o necessario para derivar os indicadores. */
 export type ProcessSnapshot = {
   operationalStatus: OperationalStatus;
+  /** So para reconhecer cancelamento real (docs/52) — nao entra em nenhum calculo alem de `isClosed`. */
+  internalStatus: InternalStatus;
   createdAt: Date;
   lastEventAt: Date | null;
   hasDestination: boolean;
@@ -110,14 +113,22 @@ function hoursBetween(from: Date, to: Date): number {
   return Math.max(0, Math.round((to.getTime() - from.getTime()) / 36e5));
 }
 
-function isClosed(status: OperationalStatus): boolean {
-  return status === "CANCELADO_DEV";
+/**
+ * Fechamento do processo (docs/52) — `CANCELADO_DEV` (operationalStatus,
+ * tecnico/dev) OU `CANCELADO_OPERACIONAL` (internalStatus, cancelamento REAL,
+ * docs/51). `cancelProcess` nao altera `operationalStatus` de proposito (sem
+ * `alsoSet`), entao sem checar `internalStatus` aqui um processo cancelado de
+ * verdade continuaria com sinalizadores/prontidao/SLA de processo ativo.
+ * Exportada para `getAdminQueue` reusar na flag de destaque da fila.
+ */
+export function isClosed(operationalStatus: OperationalStatus, internalStatus: InternalStatus): boolean {
+  return operationalStatus === "CANCELADO_DEV" || internalStatus === "CANCELADO_OPERACIONAL";
 }
 
 /** Sinalizadores derivados (docs/11 §4: "sinalizadores" da fila). */
 export function deriveSignals(snapshot: ProcessSnapshot): OperationalSignal[] {
   const signals: OperationalSignal[] = [];
-  if (isClosed(snapshot.operationalStatus)) return signals;
+  if (isClosed(snapshot.operationalStatus, snapshot.internalStatus)) return signals;
 
   if (snapshot.operationalStatus === "BLOQUEADO") signals.push("BLOQUEIO_MANUAL");
   if (snapshot.documentStatus !== "APROVADO") signals.push("DOCUMENTO_PENDENTE");
@@ -145,7 +156,8 @@ export function deriveReadiness(snapshot: ProcessSnapshot): {
   metCount: number;
 } {
   const blocked =
-    snapshot.operationalStatus === "BLOQUEADO" || isClosed(snapshot.operationalStatus);
+    snapshot.operationalStatus === "BLOQUEADO" ||
+    isClosed(snapshot.operationalStatus, snapshot.internalStatus);
 
   const criteria: ReadinessCriterion[] = [
     { label: "Documento aprovado", met: snapshot.documentStatus === "APROVADO" },
@@ -173,7 +185,7 @@ export function deriveReadiness(snapshot: ProcessSnapshot): {
 
 /** SLA interno FICTICIO (dev) — nunca exibido ao usuario final. */
 export function deriveSla(snapshot: ProcessSnapshot, now: Date): SlaView | null {
-  if (isClosed(snapshot.operationalStatus)) return null;
+  if (isClosed(snapshot.operationalStatus, snapshot.internalStatus)) return null;
 
   const dueAt = new Date(snapshot.createdAt.getTime() + SLA_HOURS * 36e5);
   const warningAt = new Date(dueAt.getTime() - SLA_WARNING_HOURS * 36e5);
@@ -197,7 +209,7 @@ export function deriveSla(snapshot: ProcessSnapshot, now: Date): SlaView | null 
  * OPERADOR; contato com o usuario para SUPORTE; excecao para ADMIN.
  */
 export function derivePendings(snapshot: ProcessSnapshot): PendingAction[] {
-  if (isClosed(snapshot.operationalStatus)) return [];
+  if (isClosed(snapshot.operationalStatus, snapshot.internalStatus)) return [];
 
   const pendings: PendingAction[] = [];
 
