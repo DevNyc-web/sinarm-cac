@@ -125,6 +125,11 @@ canônica.** Se um dia existir cancelamento real de cliente (com ou sem
 reembolso), aí sim é decisão própria — provavelmente um estado canônico novo,
 nunca reuso de `CANCELADO_REEMBOLSADO`.
 
+> **Atualização (2026-08-02):** a decisão sobre o fluxo de cancelamento real
+> foi registrada em [`docs/51`](51-decisao-cancelamento-real.md) —
+> `CANCELADO_DEV` continua técnico, cancelamento real (quando existir) é
+> estado canônico novo por ação explícita própria. Nada foi implementado.
+
 ---
 
 ## 4. As três categorias
@@ -133,7 +138,7 @@ nunca reuso de `CANCELADO_REEMBOLSADO`.
 |---|---|---|
 | **A — legado, futuro por ação explícita** | `DOCUMENTO_ENVIADO`, `DOCUMENTO_APROVADO` | Têm candidato canônico, mas migrar a linha manual transformaria correção em retrocesso ou em validação sem revisor. Só saem do legado via ação própria |
 | **B — operacional permanente** | `EM_REVISAO_OPERACIONAL`, `PRONTO_PARA_PROTOCOLO_MANUAL` | Descrevem a EQUIPE. Não há candidato canônico, nem haverá |
-| **C — operacional com decisão pendente** | `CANCELADO_DEV` | Fecha o processo e é guarda; fica fora da projeção até existir cancelamento real |
+| **C — operacional com decisão pendente** | `CANCELADO_DEV` | Fecha o processo e é guarda; fica fora da projeção até existir cancelamento real. Fluxo de cancelamento real decidido em [`docs/51`](51-decisao-cancelamento-real.md) (não implementado) |
 
 ---
 
@@ -158,7 +163,10 @@ Isto confirma e detalha a consequência que `docs/47 §9` já havia registrado.
 
 - **Não desenha a ação explícita** dos dois valores da categoria A: guarda,
   permissão e evento ficam para o PR que a propuser.
-- **Não decide o cancelamento real** — categoria C continua aberta.
+- **Não decide o cancelamento real** — categoria C continua aberta. (O nível de
+  decisão sobre *o que fazer* foi registrado em
+  [`docs/51`](51-decisao-cancelamento-real.md); a implementação e as decisões
+  de reembolso/protocolo/reversão citadas lá continuam pendentes.)
 - **Não reclassifica o diagnóstico.** `statusDivergence` hoje trata os 3 valores
   de B e C como `needs_decision`. Depois desta decisão, "precisa decidir" ficou
   impreciso para eles: a decisão é que **não migram**. Reclassificar (ou criar
@@ -188,11 +196,16 @@ das pendências de `docs/23 §5`.
 > equivalência) **foram implementados**. A 5h é parcial **por construção**, como
 > esta seção previa: cobre os 6 pares canônicos e classifica os 3 valores
 > só-operacionais, sem tentar derivar `operationalStatus` por inteiro.
-> **Item 4 (decisão sobre cancelamento real de `CANCELADO_DEV`, categoria C)
-> continua ABERTO** — nenhum PR fechou essa decisão, e `CANCELADO_DEV` continua
-> fora da projeção canônica. Uso da projeção parcial em relatórios/admin (além
-> do diagnóstico interno) também continua **em aberto**, se algum dia for
-> desejado. **Execução real continua bloqueada.**
+> **Item 4 (decisão sobre cancelamento real de `CANCELADO_DEV`, categoria C):**
+> a decisão sobre **o que fazer** foi registrada em
+> [`docs/51`](51-decisao-cancelamento-real.md) — `CANCELADO_DEV` continua
+> técnico, cancelamento real (quando existir) é estado canônico novo por ação
+> explícita própria, nunca reuso de `CANCELADO_DEV`/`CANCELADO_REEMBOLSADO`.
+> **Nada disso foi implementado**, e `CANCELADO_DEV` continua fora da projeção
+> canônica. Reembolso/financeiro, processo já protocolado e reversão continuam
+> decisões futuras, fora de `docs/51`. Uso da projeção parcial em
+> relatórios/admin (além do diagnóstico interno) também continua **em
+> aberto**, se algum dia for desejado. **Execução real continua bloqueada.**
 
 ---
 
