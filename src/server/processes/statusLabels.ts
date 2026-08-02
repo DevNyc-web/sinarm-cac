@@ -51,6 +51,12 @@ export const INTERNAL_STATUS_LABELS: Record<InternalStatus, string> = {
   // instabilidade", pausa que a AUTOMACAO decide e retoma sozinha) na mesma
   // lista — a distincao que importa esta travada por teste.
   BLOQUEADO_OPERACIONAL: "Bloqueado",
+  // Decidido pelo docs/51 — SEM FLUXO neste PR, mesmo status dos rotulos
+  // acima. Distinto de `OperationalStatus.CANCELADO_DEV` ("Cancelado (dev)",
+  // estado TECNICO) e de `CANCELADO_REEMBOLSADO` ("Cancelado / reembolsado",
+  // que AFIRMA reembolso): este e o cancelamento REAL de cliente, ainda sem
+  // acao que o produza.
+  CANCELADO_OPERACIONAL: "Cancelado (operacional)",
 };
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {

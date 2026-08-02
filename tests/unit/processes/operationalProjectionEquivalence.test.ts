@@ -41,8 +41,8 @@ const CANONICAL_INTERNAL_STATUSES = Object.keys(
 /* ---------------------------------------- 1. a lei central de equivalencia */
 
 test("lei central: diagnoseStatusDivergence da severity 'none' SE E SOMENTE SE isCoherentPair for true", () => {
-  // Exaustivo sobre TODO o produto cartesiano (20 InternalStatus x 9
-  // OperationalStatus = 180 combinacoes) — nao uma amostra curada. Se os dois
+  // Exaustivo sobre TODO o produto cartesiano (21 InternalStatus x 9
+  // OperationalStatus = 189 combinacoes) — nao uma amostra curada. Se os dois
   // modulos algum dia divergirem (um novo par entrar num so dos dois, uma
   // trava relaxar sem a outra acompanhar), este teste pega, nao importa em
   // qual combinacao especifica isso acontecer.
@@ -145,15 +145,15 @@ test("nenhum InternalStatus fora dos 6 canonicos projeta operationalStatus (varr
   const naoCanonicos = ALL_INTERNAL_STATUSES.filter(
     (status) => !CANONICAL_INTERNAL_STATUSES.includes(status as CanonicalInternalStatus),
   );
-  assert.ok(naoCanonicos.length > 0, "varredura vazia — os 20 valores nao deveriam ser todos canonicos");
+  assert.ok(naoCanonicos.length > 0, "varredura vazia — os 21 valores nao deveriam ser todos canonicos");
   for (const internalStatus of naoCanonicos) {
     assert.equal(hasCanonicalProjection(internalStatus), false, internalStatus);
     assert.equal(projectOperationalStatus(internalStatus), undefined, internalStatus);
   }
 });
 
-test("os 20 valores de InternalStatus continuam vindo do schema, nao de copia (varredura nao fica vazia por acidente)", () => {
-  assert.equal(ALL_INTERNAL_STATUSES.length, 20);
+test("os 21 valores de InternalStatus continuam vindo do schema, nao de copia (varredura nao fica vazia por acidente)", () => {
+  assert.equal(ALL_INTERNAL_STATUSES.length, 21);
   assert.equal(ALL_OPERATIONAL_STATUSES.length, 9);
   assert.equal(CANONICAL_INTERNAL_STATUSES.length, 6);
 });

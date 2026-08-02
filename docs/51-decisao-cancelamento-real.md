@@ -180,6 +180,21 @@ ordem, não autorização de execução.
 
 ---
 
+> **Atualização (2026-08-02).** O `InternalStatus` `CANCELADO_OPERACIONAL` foi
+> preparado no enum (migration aditiva
+> `20260802000000_add_real_cancellation_status`), usando o nome já recomendado
+> no §5 acima — combinando os PRs 1 e 2 da tabela do §7, já que o nome não
+> exigiu uma decisão própria separada. **Continua SEM FLUXO**: nenhuma action,
+> permissao ou porta o escreve; `cancelProcess` (PR 6 do §7) continua não
+> implementado. `statusDivergence.ts` classifica qualquer combinação com
+> `CANCELADO_OPERACIONAL` como `needs_decision` (mesma categoria dos demais
+> `InternalStatus` avançados sem candidato); `operationalStatusProjection.ts`
+> não o projeta. `CANCELADO_DEV` não mudou. Os itens 11–13 (reembolso,
+> processo protocolado, reversão) continuam em aberto. **Execução real
+> continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**. Não implementa `cancelProcess`,
 > não cria `InternalStatus` novo, não migra `CANCELADO_DEV`, não fecha gate e
 > não autoriza execução real. Regras permanentes (`docs/00 §8`) e bloqueios de

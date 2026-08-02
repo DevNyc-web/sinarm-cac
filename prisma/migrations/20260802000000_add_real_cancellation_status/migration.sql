@@ -1,0 +1,47 @@
+-- Preparacao decidida pelo docs/51 no enum `internal_status`: cancelamento
+-- REAL de cliente, distinto do estado tecnico/de desenvolvimento.
+--
+-- MIGRATION ADITIVA: `ALTER TYPE ... ADD VALUE` nao reescreve tabela, nao trava
+-- linha e nao altera dado algum. Nenhuma linha existente muda de estado.
+--
+-- SEM FLUXO NESTE PR: nenhuma action, permissao ou porta escreve este valor
+-- ainda. `docs/51` decidiu a FORMA (estado canonico novo, acao explicita
+-- propria "cancelProcess", nunca dropdown generico), mas a implementacao da
+-- action fica para PR proprio, mesmo padrao das migrations
+-- `20260731000000_add_assisted_exception_states` (Fase 2),
+-- `20260731010000_add_document_internal_statuses` (Fase 5d) e
+-- `20260801000000_add_blocked_operational_status` (docs/48).
+--
+-- CATEGORIA NOVA, NAO REUSO: `CANCELADO_DEV` (`OperationalStatus`) continua
+-- sendo o estado TECNICO/de desenvolvimento, sem nenhuma mudanca — docs/51
+-- decidiu explicitamente que ele NUNCA vira cancelamento real por reuso ou
+-- reinterpretacao. `CANCELADO_REEMBOLSADO` tambem nao e reaproveitado: ele
+-- AFIRMA reembolso, e mapear cancelamento real generico para ele poderia
+-- afirmar um reembolso que nao aconteceu (docs/46 §6, docs/49 §3.5).
+--
+-- ORDEM: sem `BEFORE`/`AFTER`, o Postgres anexa ao FIM do tipo. O
+-- `schema.prisma` lista o valor no fim tambem, depois de `BLOQUEADO_OPERACIONAL`
+-- — se um dia divergirem, a ordem do banco e a que vale em `ORDER BY` sobre a
+-- coluna.
+--
+-- `IF NOT EXISTS`: o `prisma migrate dev` nao gera esta clausula, ela foi
+-- adicionada a mao. Como o CI nao tem Postgres, esta migration nunca e
+-- exercitada por teste antes de rodar em ambiente real — idempotencia e a unica
+-- defesa contra reaplicacao parcial.
+--
+-- NAO USAR `db:push`: ele sincroniza o banco com o schema e desconhece o
+-- historico de migrations. Use `npm run db:migrate` (dev) ou `npm run db:deploy`
+-- (aplicar) — mesmo criterio das migrations anteriores.
+--
+-- POSTGRESQL < 12: `ALTER TYPE ... ADD VALUE` NAO podia rodar dentro de bloco de
+-- transacao antes do PG 12, e o Prisma executa cada migration em transacao. Do
+-- PG 12 em diante funciona, com a restricao de que o valor novo nao seja USADO
+-- na mesma transacao — o que este arquivo nao faz. CONFIRMAR a versao do
+-- servidor antes do primeiro deploy; se for < 12, esta migration precisa rodar
+-- fora de transacao.
+--
+-- SEM BACKFILL: nenhuma linha existente e tocada. Nenhum processo hoje tem o
+-- `internalStatus` reescrito por esta migration. Nenhum default muda:
+-- `internalStatus` continua com default `RASCUNHO` (docs/46 §5).
+
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'CANCELADO_OPERACIONAL';

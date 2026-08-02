@@ -12,7 +12,7 @@
  *      divergencia entre os dois modulos.
  *
  * O que este arquivo NAO faz: nao testa `needs_decision`/`invalid_projection`
- * nem os 12 InternalStatus avancados — esses continuam sendo assunto exclusivo
+ * nem os 13 InternalStatus avancados — esses continuam sendo assunto exclusivo
  * de `statusDivergence.test.ts`, porque a projecao aqui e PARCIAL de proposito
  * (so os 6 pares seguros + os 3 valores so-operacionais).
  */
@@ -84,6 +84,10 @@ test("projectOperationalStatus devolve undefined para internalStatus SEM projeca
     "AGUARDANDO_LOGIN_GOVBR",
     "AGUARDANDO_CONFIRMACAO_HUMANA",
     "CANCELADO_REEMBOLSADO",
+    // docs/51 — preparado no enum SEM fluxo; nao tem candidato operationalStatus
+    // documentado, nem sequer arriscado, entao nao entra em ADVANCED_INTERNAL_
+    // PROJECTION com `candidateOperationalStatus` em statusDivergence.ts.
+    "CANCELADO_OPERACIONAL",
   ] as const) {
     assert.equal(projectOperationalStatus(internalStatus), undefined, internalStatus);
   }
@@ -189,7 +193,7 @@ test("equivalencia: as 3 categorias desta Fase 5h cobrem exatamente os 9 valores
 
 /* --------------------------------------------------- 4. pureza estrutural */
 
-test("o modulo e PARCIAL por desenho: nao tenta cobrir os 12 InternalStatus avancados", () => {
+test("o modulo e PARCIAL por desenho: nao tenta cobrir os 13 InternalStatus avancados", () => {
   // Nenhum dos valores exclusivos da Fase 2/avancados deveria aparecer no
   // codigo deste modulo - se aparecer, alguem tentou transformar a projecao
   // parcial em total.
@@ -206,6 +210,9 @@ test("o modulo e PARCIAL por desenho: nao tenta cobrir os 12 InternalStatus avan
     "EXCECAO_DOC_INVALIDO",
     "EXCECAO_ARMA_DIVERGENTE",
     "EXCECAO_DESTINO_INCOMPLETO",
+    // docs/51 — preparado no enum SEM fluxo; nao deveria virar par canonico
+    // por carona neste modulo.
+    "CANCELADO_OPERACIONAL",
   ]) {
     assert.ok(!codeOnly.includes(advancedStatus), advancedStatus);
   }

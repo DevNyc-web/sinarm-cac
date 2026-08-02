@@ -13,7 +13,7 @@
  * que passam pela porta canonica (`transitionInternalStatus`) e pelos 3
  * `OperationalStatus` que docs/49 decidiu que permanecem SO operacionais
  * (estado da EQUIPE, sem `InternalStatus` 1:1 — categorias B e C do docs/49).
- * Todo o resto (os 12 `InternalStatus` avancados, os 2 da Fase 2, os pares
+ * Todo o resto (os 13 `InternalStatus` avancados, os 2 da Fase 2, os pares
  * "legado esperado") continua sendo assunto de `statusDivergence.ts`, que tem
  * a narrativa e o motivo de cada caso.
  *
