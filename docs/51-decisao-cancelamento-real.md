@@ -218,6 +218,20 @@ ordem, não autorização de execução.
 
 ---
 
+> **Atualização (2026-08-02, docs).** A visibilidade/projeção de
+> `CANCELADO_OPERACIONAL` (deixada em aberto no §6 acima) foi decidida em
+> [`docs/52`](52-decisao-visibilidade-cancelamento-real.md): o admin **já vê**
+> o cancelamento hoje, como diagnóstico (`INTERNAL_STATUS_LABELS`, sem código
+> novo); o **cliente ainda não vê** nada (`clientVisibleStatusLabel` não lê
+> `internalStatus`); e **fila/prontidão/SLA** (`getAdminQueue.ts`,
+> `operationalSignals.ts`) **não sabem** do cancelamento, porque só leem
+> `operationalStatus`, que este service não altera — lacuna registrada, não
+> corrigida. Nenhuma UI/botão de cancelamento pode ser criada até essa lacuna
+> e a visibilidade ao cliente terem resposta própria. **Nada disso foi
+> implementado. Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**. Não implementa `cancelProcess`,
 > não cria `InternalStatus` novo, não migra `CANCELADO_DEV`, não fecha gate e
 > não autoriza execução real. Regras permanentes (`docs/00 §8`) e bloqueios de
