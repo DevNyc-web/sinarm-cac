@@ -35,10 +35,15 @@
  *  - `severity: "expected_legacy"` — divergencia CONHECIDA e de baixo risco:
  *    `operationalStatus` avancou via um write legado (docs/46 §3) que ainda
  *    nao tem porta canonica, mas o hop e simples e sem ambiguidade.
- *  - `severity: "needs_decision"` — divergencia real que a Fase 5d precisa
- *    resolver antes de qualquer projecao confiar nela: ou o `operationalStatus`
- *    atual exige julgamento humano para nomear a causa (ex.: `BLOQUEADO`), ou o
- *    `internalStatus` avancou para um valor sem correspondencia documentada.
+ *  - `severity: "operational_only"` — NAO ha o que decidir: o
+ *    `operationalStatus` atual e um estado da EQUIPE, nao da jornada do
+ *    processo, e docs/49 decidiu que ele permanece so operacional. A
+ *    divergencia e PERMANENTE e esperada — `hasDivergence` continua `true`
+ *    porque os dois campos realmente dizem coisas diferentes; o que muda e que
+ *    ninguem precisa agir. NAO confundir com `none`: aqui nao ha par migrado.
+ *  - `severity: "needs_decision"` — divergencia real que ainda espera decisao:
+ *    o `internalStatus` avancou para um valor sem correspondencia documentada,
+ *    e projetar antes de decidir afirmaria algo que ninguem analisou.
  *  - `severity: "invalid_projection"` — a MELHOR projecao disponivel para este
  *    `internalStatus` e documentadamente ERRADA ou inexistente (docs/46 §6):
  *    projetar aqui afirmaria algo falso, nao apenas incompleto.
@@ -53,6 +58,7 @@ import { type InternalStatus, type ManualExecutionStatus, type OperationalStatus
 export const DIVERGENCE_SEVERITIES = [
   "none",
   "expected_legacy",
+  "operational_only",
   "needs_decision",
   "invalid_projection",
 ] as const;
@@ -159,35 +165,50 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
   Exclude<OperationalStatus, SafeOperationalStatus>,
   { severity: DivergenceSeverity; reason: string }
 > = {
+  // Categoria A do docs/49: TEM candidato canonico e o fluxo natural ja migrou,
+  // mas a porta MANUAL/admin continua escrevendo os dois HOJE — por isso a razao
+  // nomeia as DUAS origens, nao so dado antigo. So saem do legado por acao
+  // explicita propria (reabrir conferencia / aprovar fora do fluxo de revisao),
+  // nunca por migracao automatica daquela linha.
   DOCUMENTO_ENVIADO: {
     severity: "expected_legacy",
     reason:
-      "so aparece com internalStatus fora de DOCUMENTO_RECEBIDO_PARA_ANALISE em " +
-      "dado ANTERIOR a Fase 5e (docs/47 §6.1): uploadProcessDocument escrevia " +
-      "isto sozinho, sem tocar internalStatus (docs/46 3.2). Fluxos novos passam " +
-      "por transitionInternalStatus e produzem o par seguro " +
+      "internalStatus fora de DOCUMENTO_RECEBIDO_PARA_ANALISE indica dado " +
+      "ANTERIOR a Fase 5e (docs/47 §6.1) OU escrita do dropdown de " +
+      "updateProcessOperations, que continua legado por decisao do docs/49 " +
+      "(categoria A: so sai por acao explicita, porque no dropdown este valor " +
+      "REABRE a conferencia documental). O uploadProcessDocument novo passa " +
+      "por transitionInternalStatus e produz o par seguro " +
       "DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (severity none).",
   },
   DOCUMENTO_APROVADO: {
     severity: "expected_legacy",
     reason:
-      "so aparece com internalStatus fora de DOCUMENTO_VALIDADO em dado " +
-      "ANTERIOR a Fase 5f (docs/47 §6.2): reviewProcessDocument (aprovacao) " +
-      "escrevia isto sozinho, sem tocar internalStatus (docs/46 3.3). Fluxos " +
-      "novos passam por transitionInternalStatus e produzem o par seguro " +
-      "DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (severity none).",
+      "internalStatus fora de DOCUMENTO_VALIDADO indica dado ANTERIOR a Fase " +
+      "5f (docs/47 §6.2) OU escrita do dropdown de updateProcessOperations, " +
+      "que continua legado por decisao do docs/49 (categoria A: so sai por " +
+      "acao explicita, porque o dropdown nao registra revisor). A aprovacao " +
+      "nova de reviewProcessDocument passa por transitionInternalStatus e " +
+      "produz o par seguro DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (none).",
   },
+  // Categoria B do docs/49: estado da EQUIPE, nao da jornada do processo. Nao
+  // ha candidato canonico, nem havera — a divergencia e permanente e decidida.
   EM_REVISAO_OPERACIONAL: {
-    severity: "needs_decision",
+    severity: "operational_only",
     reason:
-      "colide com EM_REVISAO_HUMANA, que e pausa de excecao da automacao - " +
-      "coisa outra (docs/46 7). So chega via updateProcessOperations (docs/46 3.5).",
+      "conferencia interna da equipe: docs/49 decidiu que permanece SO " +
+      "operationalStatus, sem InternalStatus 1:1. Nao ha o que decidir. " +
+      "EM_REVISAO_HUMANA nao serve — e pausa de excecao da automacao, coisa " +
+      "outra (docs/46 7). So chega via updateProcessOperations (docs/46 3.5).",
   },
   PRONTO_PARA_PROTOCOLO_MANUAL: {
-    severity: "needs_decision",
+    severity: "operational_only",
     reason:
-      "descreve a fila de trabalho do operador, nao o processo (docs/46 7). " +
-      "So chega via updateProcessOperations (docs/46 3.5).",
+      "fila de trabalho do operador, nao o processo: docs/49 decidiu que " +
+      "permanece SO operationalStatus, sem InternalStatus 1:1. Nao confundir " +
+      "com o ReadinessLevel homonimo de operationalSignals, que e DERIVADO de " +
+      "criterios e nao e projecao deste campo (docs/49 §3.4). So chega via " +
+      "updateProcessOperations (docs/46 3.5).",
   },
   BLOQUEADO: {
     // Passou de `needs_decision` para `expected_legacy` quando o SEGUNDO (e
@@ -208,12 +229,20 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
       "(docs/46 3.4/6): afirmaria causa apurada pela automacao onde houve " +
       "decisao humana.",
   },
+  // Categoria C do docs/49: operacional por ora, mas com decisao FORMAL
+  // pendente — diferente de B, que e permanente. Fica em `operational_only`
+  // mesmo assim porque a pergunta aberta e de PRODUTO ("existe cancelamento
+  // real de cliente?"), nao de diagnostico: enquanto nao existir, nao ha o que
+  // decidir aqui, e `needs_decision` mandaria agir sobre algo ja resolvido.
   CANCELADO_DEV: {
-    severity: "needs_decision",
+    severity: "operational_only",
     reason:
-      "cancelamento de ambiente de desenvolvimento, nao reembolso real " +
-      "(docs/46 7); CANCELADO_REEMBOLSADO afirma outra coisa. So chega via " +
-      "updateProcessOperations (docs/46 3.5).",
+      "cancelamento de ambiente de desenvolvimento: docs/49 decidiu que fica " +
+      "FORA da projecao canonica por ora. PROIBIDO mapear para " +
+      "CANCELADO_REEMBOLSADO, que afirma um reembolso que nao houve (docs/46 " +
+      "7). DECISAO FORMAL PENDENTE: se um dia existir cancelamento real de " +
+      "cliente, provavelmente exige estado canonico novo — nunca reuso deste " +
+      "(docs/49 §3.5). So chega via updateProcessOperations (docs/46 3.5).",
   },
 };
 

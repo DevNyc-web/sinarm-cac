@@ -204,25 +204,73 @@ test("expected_legacy: internalStatus RASCUNHO, operationalStatus BLOQUEADO (dad
 });
 
 test("os 6 estados sem equivalente canonico (docs/46 §7) tem severidade coerente", () => {
-  // EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL e CANCELADO_DEV nao
-  // tem teste obrigatorio individual no pedido, mas fecham a cobertura dos 6.
-  // DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO e BLOQUEADO sao expected_legacy: os
-  // tres tem par migrado e nenhum escritor vivo produz a combinacao — so dado
-  // antigo. Os outros tres permanecem needs_decision porque continuam sendo
-  // escritos HOJE pela linha dinamica de updateProcessOperations, sem candidato
-  // canonico (docs/47 §9: permanecem so operacionais).
+  // Depois do docs/49, NENHUM dos 6 e `needs_decision`: todos tem disposicao
+  // decidida. Tres sao `expected_legacy` — tem par migrado, e a combinacao vem
+  // de dado antigo ou (nos dois primeiros) do dropdown que so sai por acao
+  // explicita. Tres sao `operational_only` — estado da EQUIPE, decidido como
+  // permanente (categoria B) ou fora da projecao por ora (categoria C).
   const casos: [import("@prisma/client").OperationalStatus, DivergenceSeverity][] = [
     ["DOCUMENTO_ENVIADO", "expected_legacy"],
     ["DOCUMENTO_APROVADO", "expected_legacy"],
     ["BLOQUEADO", "expected_legacy"],
-    ["EM_REVISAO_OPERACIONAL", "needs_decision"],
-    ["PRONTO_PARA_PROTOCOLO_MANUAL", "needs_decision"],
-    ["CANCELADO_DEV", "needs_decision"],
+    ["EM_REVISAO_OPERACIONAL", "operational_only"],
+    ["PRONTO_PARA_PROTOCOLO_MANUAL", "operational_only"],
+    ["CANCELADO_DEV", "operational_only"],
   ];
   for (const [operationalStatus, severity] of casos) {
     const result = diagnoseStatusDivergence({ internalStatus: "RASCUNHO", operationalStatus });
     assert.equal(result.severity, severity, `RASCUNHO + ${operationalStatus}`);
-    assert.equal(result.hasDivergence, true);
+    // A mudanca e de LEITURA, nao de fato: os dois campos continuam divergindo.
+    assert.equal(result.hasDivergence, true, `RASCUNHO + ${operationalStatus}`);
+    assert.notEqual(result.severity, "none", `RASCUNHO + ${operationalStatus}`);
+  }
+});
+
+test("operational_only NAO e needs_decision e NAO e none — categoria propria", () => {
+  // O ponto do docs/49: para estes valores a decisao JA existe ("nao migram"),
+  // entao `needs_decision` mandaria agir sem haver o que fazer; mas os campos
+  // continuam dizendo coisas diferentes, entao `none` esconderia divergencia
+  // real. A categoria propria existe exatamente para nao ter que escolher entre
+  // dois rotulos errados.
+  const operacionais = [
+    "EM_REVISAO_OPERACIONAL",
+    "PRONTO_PARA_PROTOCOLO_MANUAL",
+    "CANCELADO_DEV",
+  ] as const;
+  for (const operationalStatus of operacionais) {
+    const result = diagnoseStatusDivergence({ internalStatus: "RASCUNHO", operationalStatus });
+    assert.equal(result.severity, "operational_only", operationalStatus);
+    assert.notEqual(result.severity, "needs_decision", operationalStatus);
+    assert.equal(result.hasDivergence, true, `${operationalStatus} continua divergindo de fato`);
+    assert.match(result.reason, /docs\/49/, `${operationalStatus} deveria citar a decisao`);
+  }
+});
+
+test("CANCELADO_DEV continua proibido de virar cancelamento formal", () => {
+  // Reclassificar a severidade nao afrouxa a proibicao: CANCELADO_REEMBOLSADO
+  // afirma um reembolso que nao houve, e a decisao formal segue pendente.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "RASCUNHO",
+    operationalStatus: "CANCELADO_DEV",
+  });
+  assert.match(result.reason, /PROIBIDO/);
+  assert.match(result.reason, /CANCELADO_REEMBOLSADO/);
+  assert.match(result.reason, /PENDENTE/);
+  // `expectedOperationalStatus` e o par seguro do internalStatus ATUAL, nunca
+  // um alvo inventado para o valor operacional — com RASCUNHO no canonico, o
+  // esperado e RASCUNHO, nao algo derivado de CANCELADO_DEV.
+  assert.equal(result.expectedOperationalStatus, "RASCUNHO");
+});
+
+test("DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO continuam expected_legacy, nunca none", () => {
+  // Categoria A do docs/49: nao migram automaticamente pela porta manual. A
+  // razao precisa nomear as DUAS origens — dado antigo E o dropdown vivo.
+  for (const operationalStatus of ["DOCUMENTO_ENVIADO", "DOCUMENTO_APROVADO"] as const) {
+    const result = diagnoseStatusDivergence({ internalStatus: "RASCUNHO", operationalStatus });
+    assert.equal(result.severity, "expected_legacy", operationalStatus);
+    assert.notEqual(result.severity, "none", operationalStatus);
+    assert.match(result.reason, /updateProcessOperations/, `${operationalStatus}: dropdown vivo`);
+    assert.match(result.reason, /acao explicita/, `${operationalStatus}: docs/49 categoria A`);
   }
 });
 
@@ -411,7 +459,7 @@ test("diagnoseStatusDivergence e deterministico: mesma entrada, mesma saida", ()
 
 // -------------------------------------------------- 6. cobertura exaustiva
 
-test("severity sempre e um dos 4 valores declarados", () => {
+test("severity sempre e um dos 5 valores declarados", () => {
   const internos = [
     "RASCUNHO",
     "AGUARDANDO_PAGAMENTO",
