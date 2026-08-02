@@ -130,7 +130,7 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
     file: "src/server/services/updateProcessOperations.ts",
     sink: "updateProcessOperations(...)",
     value: "status",
-    why: "docs/46 §3.5 — legado conhecido para os 5 valores restantes (DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO, EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL, CANCELADO_DEV). Os dois primeiros TEM candidato canonico nos fluxos naturais (uploadProcessDocument/reviewProcessDocument), mas esta porta e MANUAL/admin e nao valida maquina de transicoes — migrar aqui poderia retroceder uma jornada ja avancada por um fluxo real sem a checagem que so aquele fluxo faz. Os outros tres permanecem so operacionais para sempre (docs/47 §9): nao ha candidato, nem havera.",
+    why: "docs/46 §3.5 — legado conhecido no CODIGO para os 5 valores nao-canonicos (DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO, EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL, CANCELADO_DEV), mas so 3 alcancam esta escrita em RUNTIME: os dois primeiros TEM candidato canonico nos fluxos naturais (uploadProcessDocument/reviewProcessDocument) e sao recusados pela guarda MANUAL_PORT_BLOCKED antes de chegar aqui (docs/50 §3/§6) — migrar esta porta MANUAL/admin, sem validacao de maquina de transicoes, poderia retroceder uma jornada ja avancada por um fluxo real sem a checagem que so aquele fluxo faz. Os outros tres (operational-only, docs/49 categorias B/C — ver operationalStatusProjection.ts) permanecem so operacionais para sempre (docs/47 §9): nao ha candidato, nem havera.",
   },
 ];
 
