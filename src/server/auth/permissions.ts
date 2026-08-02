@@ -18,6 +18,11 @@ export const PERMISSIONS = [
   "sinarm.execute", // Registrar a execucao manual feita fora do app (docs/11 §3)
   "review.checklist", // Aplicar/registrar checklist de revisao
   "document.review", // Aprovar/rejeitar documento do processo (docs/11 §14)
+  // Desfazer uma revisao ja feita, devolvendo o documento para conferencia
+  // (docs/50 §5). Permissao PROPRIA pelo mesmo criterio de `extraction.run`:
+  // reusar `document.review` daria "desfazer decisao de outro" a quem so pediu
+  // para conferir, e a matriz deixaria de responder "quem pode reabrir?".
+  "document.review.reopen",
   "process.assign", // Atribuir/trocar responsavel pelo processo (docs/11 §4)
   "process.priority", // Alterar prioridade operacional (docs/11 §4)
   "process.operationalStatus", // Mover o status operacional da fila
@@ -54,6 +59,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "sinarm.execute": "Registrar execucao manual assistida (fora do app)",
   "review.checklist": "Aplicar checklist de revisao",
   "document.review": "Aprovar/rejeitar documento do processo",
+  "document.review.reopen": "Reabrir conferencia de documento ja revisado",
   "process.assign": "Atribuir responsavel pelo processo",
   "process.priority": "Alterar prioridade do processo",
   "process.operationalStatus": "Mover status operacional",
@@ -92,6 +98,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "sinarm.execute",
     "review.checklist",
     "document.review",
+    // `document.review.reopen` NAO entra: OPERADOR confere documento, mas
+    // desfazer a conferencia (inclusive a de outra pessoa) fica com ADMIN.
+    // Se OPERADOR recebesse as duas, a permissao propria teria o mesmo alcance
+    // de `document.review` e a matriz voltaria a nao distinguir os dois atos.
     "process.assign",
     "process.priority",
     "process.operationalStatus",

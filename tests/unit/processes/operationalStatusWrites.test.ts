@@ -79,6 +79,12 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
     why: "docs/46 §3.2 — JA MIGRADO na Fase 5e (docs/47 §6.1): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_RECEBIDO_PARA_ANALISE`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`.",
   },
   {
+    file: "src/server/services/reopenDocumentReview.ts",
+    sink: "alsoSet",
+    value: '"DOCUMENTO_ENVIADO"',
+    why: "docs/50 §5 — acao explicita 'reabrir conferencia documental': DESFAZ uma revisao, movendo documento e processo juntos. Passa pela porta canonica `transitionInternalStatus`, internalStatus volta para `DOCUMENTO_RECEBIDO_PARA_ANALISE`, com evento tipado e o motivo em `note`. Produz o MESMO par que `uploadProcessDocument` — reaberto e recem-enviado ficam indistinguiveis, de proposito. Permissao PROPRIA (`document.review.reopen`), nunca o dropdown generico: mover so o processo era o beco sem saida do docs/50 §3.",
+  },
+  {
     file: "src/server/services/reviewProcessDocument.ts",
     sink: "alsoSet",
     value: '"DOCUMENTO_APROVADO"',
@@ -447,7 +453,7 @@ test("allowlist nao guarda entrada morta", () => {
   );
 });
 
-test("o inventario continua com 5 CAMINHOS de decisao, agora 9 escritas literais + 1 repasse canonico", () => {
+test("o inventario passa a 6 CAMINHOS de decisao, 10 escritas literais + 1 repasse canonico", () => {
   // Trava o NUMERO, nao so o conteudo: docs/46 §2 publica "5 caminhos de
   // escrita" — numero de ARQUIVOS/funcoes de decisao, que NAO muda quando um
   // valor migra (updateProcessOperations continua sendo 1 caminho). O que muda
@@ -463,30 +469,32 @@ test("o inventario continua com 5 CAMINHOS de decisao, agora 9 escritas literais
   ).length;
   assert.equal(
     decisions,
-    9,
-    "docs/46 §2/§3 registra 5 caminhos; updateProcessOperations produz 5 escritas (era 1)",
+    10,
+    "5 caminhos do docs/46 §2/§3 + reopenDocumentReview (docs/50 §5), o primeiro caminho NOVO desde o inventario",
   );
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
 });
 
-test("todo write de BLOQUEADO passa pela porta canonica: 8 migrados (sink alsoSet), 1 ainda legado", () => {
+test("todo write de BLOQUEADO passa pela porta canonica: 9 migrados (sink alsoSet), 1 ainda legado", () => {
   // "Write solto" = decisao de operationalStatus que NAO passa pela porta
   // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
   // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1),
   // `uploadProcessDocument` (Fase 5e), os DOIS lados de
   // `reviewProcessDocument` (aprovacao na 5f; rejeicao na 5f completa, docs/48)
   // e RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA + BLOQUEADO de
-  // `updateProcessOperations` (5g e docs/48). Progressao: 1/4 (antes da 5e) ->
-  // 2/3 (5e) -> 3/2 (5f) -> 6/2 (5g) -> 7/1 (5f completa) -> 8/1 (BLOQUEADO
-  // manual). "Soltos" continua 1 porque a linha dinamica nao sumiu: ela apenas
-  // cobre 5 valores em vez de 6.
+  // `updateProcessOperations` (5g e docs/48) e agora `reopenDocumentReview`
+  // (docs/50 §5). Progressao: 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2
+  // (5g) -> 7/1 (5f completa) -> 8/1 (BLOQUEADO manual) -> 9/1 (reabrir
+  // conferencia). "Soltos" continua 1 porque a linha dinamica nao sumiu: ela
+  // apenas cobre 5 valores em vez de 6. Todo write NOVO desde a Fase 5e nasceu
+  // migrado — e o que a trava existe para garantir.
   const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
   const migrados = decisoes.filter((write) => write.sink === "alsoSet").length;
   const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
   assert.equal(
     migrados,
-    8,
-    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao E rejeicao) + updateProcessOperations (RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA/BLOQUEADO)",
+    9,
+    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao E rejeicao) + updateProcessOperations (4 valores) + reopenDocumentReview",
   );
   assert.equal(soltos, 1, "so updateProcessOperations (os 5 valores legados, 1 linha dinamica)");
   assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");

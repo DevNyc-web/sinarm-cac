@@ -168,6 +168,31 @@ export type ReviewDocumentData = {
   rejectionReason?: string;
 };
 
+/**
+ * Desfaz a revisao do documento: volta para `ENVIADO` e LIMPA os campos que
+ * descrevem a revisao (docs/50 §5).
+ *
+ * Limpar nao e apagar historico: quem revisou e quando continua na trilha
+ * append-only de `ProcessStatusEvent`. Estes campos descrevem a revisao ATUAL —
+ * mante-los depois de desfaze-la faria o documento afirmar uma conferencia que
+ * deixou de valer.
+ *
+ * `rejectionReason` entra na limpeza pelo mesmo motivo: e parte da revisao
+ * desfeita. `updateDocumentReview` ja o anula em toda aprovacao.
+ */
+export function reopenDocumentForReview(documentId: string) {
+  return getPrisma().processDocument.update({
+    where: { id: documentId },
+    data: {
+      status: "ENVIADO",
+      reviewedByMockUserId: null,
+      reviewedByRole: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    },
+  });
+}
+
 export function updateDocumentReview(data: ReviewDocumentData) {
   return getPrisma().processDocument.update({
     where: { id: data.documentId },

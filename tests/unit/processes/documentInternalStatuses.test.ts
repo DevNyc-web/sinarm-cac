@@ -106,19 +106,23 @@ test("todo InternalStatus continua com rotulo apos a migration (Record exaustivo
 
 // ------------------------------------------------- 2. consumidor real de cada estado
 
-test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE um consumidor: uploadProcessDocument", () => {
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE dois consumidores", () => {
+  // `uploadProcessDocument` (Fase 5e) o produz pela primeira vez;
+  // `reopenDocumentReview` (docs/50 §5) o produz de novo ao DESFAZER uma
+  // revisao. Os dois chegam ao mesmo par seguro de proposito: reaberto e
+  // recem-enviado devem ficar indistinguiveis.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
   const consumidores = fluxos
     .filter((caminho) => codeOnly(readFileSync(caminho, "utf8")).includes(RECEBIDO))
-    .map((c) => c.split("\\").join("/"));
+    .map((c) => c.split("\\").join("/"))
+    .sort();
 
-  assert.deepEqual(
-    consumidores,
-    ["src/server/services/uploadProcessDocument.ts"],
-    "DOCUMENTO_RECEBIDO_PARA_ANALISE deveria aparecer so em uploadProcessDocument.ts (Fase 5e)",
-  );
+  assert.deepEqual(consumidores, [
+    "src/server/services/reopenDocumentReview.ts",
+    "src/server/services/uploadProcessDocument.ts",
+  ]);
 });
 
 test("DOCUMENTO_VALIDADO tem EXATAMENTE um consumidor: reviewProcessDocument", () => {
@@ -220,12 +224,13 @@ test("updateProcessOperations chama a porta canonica (Fase 5g), mas nunca com os
   );
 });
 
-test("transitionInternalStatus tem exatamente 4 chamadores reais", () => {
+test("transitionInternalStatus tem exatamente 5 chamadores reais", () => {
   // A porta canonica tinha 1 chamador (docs/46 §5); a Fase 5e somou o
   // segundo (uploadProcessDocument); a Fase 5f somou o terceiro
-  // (reviewProcessDocument, so o lado aprovacao); a Fase 5g soma o quarto
-  // (updateProcessOperations, so RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA).
-  // Nenhum outro arquivo deveria importa-la por causa desta migration.
+  // (reviewProcessDocument, os dois lados); a Fase 5g soma o quarto
+  // (updateProcessOperations); e o docs/50 §5 soma o quinto
+  // (reopenDocumentReview, a acao de desfazer conferencia).
+  // Nenhum outro arquivo deveria importa-la.
   const chamadores = [
     ...arquivosDeFluxo("src/server/services"),
     ...arquivosDeFluxo("src/app"),
@@ -238,6 +243,7 @@ test("transitionInternalStatus tem exatamente 4 chamadores reais", () => {
     relativos.filter((c) => !c.endsWith("transitionInternalStatus.ts")),
     [
       "src/server/services/confirmPixPayment.ts",
+      "src/server/services/reopenDocumentReview.ts",
       "src/server/services/reviewProcessDocument.ts",
       "src/server/services/updateProcessOperations.ts",
       "src/server/services/uploadProcessDocument.ts",
