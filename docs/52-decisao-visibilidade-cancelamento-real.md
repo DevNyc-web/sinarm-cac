@@ -218,6 +218,31 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-02, código, admin read-only).** A visualização admin
+> do cancelamento real (§3.2) ficou mais explícita, **sem criar nenhum botão,
+> formulário, action ou rota**: o detalhe do processo
+> (`src/app/(admin)/admin/processos/[id]/page.tsx`) agora mostra um callout
+> âmbar, somente leitura, quando `internalStatus === "CANCELADO_OPERACIONAL"`
+> ("Cancelado (operacional) — este processo teve cancelamento real
+> registrado..."); a fila do admin
+> (`src/app/(admin)/admin/processos/page.tsx`, via `getAdminQueue.ts`) ganhou
+> um rótulo equivalente por linha (`AdminQueueRow.realCancellation`,
+> calculado a partir de `internalStatus`, sem expor o enum inteiro no DTO).
+> **Correção de registro:** a atualização anterior (§2 da tabela) afirmou que
+> o motivo do cancelamento "não é exibido em lugar nenhum hoje" — isso estava
+> **incorreto**. O "Historico do processo" no detalhe admin já renderizava
+> `ProcessStatusEvent.note` (via `entry.detail` em `getAdminProcessDetail.ts`)
+> para **qualquer** evento de transição com nota, antes mesmo deste PR — o
+> motivo de um cancelamento real já aparecia ali, junto com ator e data. Por
+> isso o callout novo **não repete** o motivo: só aponta, de cara, que o
+> processo está encerrado, e remete ao histórico existente para o detalhe.
+> Cliente continua sem qualquer menção a `CANCELADO_OPERACIONAL`/
+> `internalStatus` (`clientVisibleStatusLabel` intocado). `operationalStatus`,
+> `operationalStatusProjection.ts` e `statusDivergence.ts` continuam
+> intocados. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,

@@ -8,6 +8,7 @@ import { requireAdminRole } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
 import {
   DOCUMENT_STATUS_LABELS,
+  INTERNAL_STATUS_LABELS,
   OPERATIONAL_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   PRIORITY_LABELS,
@@ -211,6 +212,11 @@ export default async function AdminProcessosPage({
                     </td>
                     <td className="px-4 py-3">
                       <Badge>{OPERATIONAL_STATUS_LABELS[row.operationalStatus]}</Badge>
+                      {row.realCancellation ? (
+                        <span className="mt-1 block text-xs font-medium text-amber-700">
+                          {INTERNAL_STATUS_LABELS.CANCELADO_OPERACIONAL} (docs/51)
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <span
