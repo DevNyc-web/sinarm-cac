@@ -291,10 +291,13 @@ test("o rotulo distingue de CANCELADO_DEV e de CANCELADO_REEMBOLSADO", () => {
   assert.doesNotMatch(rotulo, /reembols/i, "nao afirma reembolso — isso e decisao futura, docs/51 §4 item 11");
 });
 
-test("CANCELADO_OPERACIONAL tem EXATAMENTE um consumidor: cancelProcess (docs/51)", () => {
-  // Ate aqui, preparado sem fluxo (PR do docs/51). `cancelProcess` e o
-  // PRIMEIRO e (por ora) UNICO escritor — a acao ainda nao tem UI/botao
-  // (docs/51 §7, PR 6 continua so backend).
+test("CANCELADO_OPERACIONAL aparece EXATAMENTE em quatro arquivos: um escritor + tres leituras (docs/52)", () => {
+  // `cancelProcess` (docs/51) continua o UNICO escritor — nenhuma UI escreve
+  // o valor, so o LE para exibir (docs/52, visualizacao admin read-only):
+  //  - o detalhe admin mostra um callout quando internalStatus bate;
+  //  - a fila admin (pagina + `getAdminQueue.ts`) mostra um rotulo por linha.
+  // Nenhum dos tres cria form/botao/action nova — testes proprios abaixo e em
+  // `adminRealCancellationView.test.ts` provam isso.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
@@ -303,7 +306,12 @@ test("CANCELADO_OPERACIONAL tem EXATAMENTE um consumidor: cancelProcess (docs/51
     .map((c) => c.split("\\").join("/"))
     .sort();
 
-  assert.deepEqual(consumidores, ["src/server/services/cancelProcess.ts"]);
+  assert.deepEqual(consumidores, [
+    "src/app/(admin)/admin/processos/[id]/page.tsx",
+    "src/app/(admin)/admin/processos/page.tsx",
+    "src/server/services/cancelProcess.ts",
+    "src/server/services/getAdminQueue.ts",
+  ]);
 });
 
 test("cancelProcess usa a porta canonica para CANCELADO_OPERACIONAL, sem alsoSet", () => {

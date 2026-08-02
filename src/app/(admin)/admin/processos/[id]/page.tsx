@@ -175,6 +175,20 @@ export default async function AdminProcessoDetalhePage({
         </p>
       ) : null}
 
+      {/*
+        Cancelamento real (docs/51/docs/52) — so LEITURA: nenhum form, botao ou
+        action nesta secao. O motivo ja aparece no Historico do processo
+        abaixo (a nota do evento de transicao), entao nao repetimos o texto
+        aqui — so deixamos claro, de cara, que o processo esta encerrado.
+      */}
+      {detail.internalStatus === "CANCELADO_OPERACIONAL" ? (
+        <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span className="font-medium">{INTERNAL_STATUS_LABELS.CANCELADO_OPERACIONAL}</span> — este
+          processo teve cancelamento real registrado (docs/51). Estado somente leitura: nenhuma acao
+          de cancelamento fica disponivel nesta tela. Motivo e responsavel no historico abaixo.
+        </p>
+      ) : null}
+
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Card className="space-y-1 text-sm">
           <p className="font-medium">Resumo</p>
