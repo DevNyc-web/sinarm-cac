@@ -400,6 +400,16 @@ para o papel residual de `operationalStatus` (§8).
 > proposto**, na mesma lógica de `docs/44 §11`: registro de ordem, não
 > autorização de execução.
 
+> **Atualização (2026-08-02).** PRs 2, 3, 5, 6 e **7 (5h)** desta tabela foram
+> implementados. A 5h entregou a projeção **PARCIAL** prevista no §9 acima —
+> `operationalStatusProjection.ts` (6 pares canônicos) + testes de equivalência
+> (`operationalProjectionEquivalence.test.ts`) — sem tornar `operationalStatus`
+> derivado universal: os 3 valores só-operacionais (`docs/49` categorias B/C)
+> continuam com escrita direta, como esta decisão já previa. `DOCUMENTO_ENVIADO`
+> e `DOCUMENTO_APROVADO` ganharam ações explícitas próprias (`docs/50 §5/§6`) e
+> saíram do dropdown manual. **Execução real continua bloqueada**
+> (`PHASE9_REAL_EXECUTION_ENABLED = false as const`).
+
 ---
 
 ## 13. Checklist de segurança
