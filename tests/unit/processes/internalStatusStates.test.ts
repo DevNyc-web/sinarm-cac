@@ -2,9 +2,10 @@
  * InternalStatus — estados adicionados ao enum SEM consumidor.
  *
  * Cobre os da Fase 2 (`AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`,
- * docs/44 §6) e `BLOQUEADO_OPERACIONAL` (docs/48), que seguem o mesmo padrao:
- * o PR adiciona capacidade ao enum, nao comportamento. Os estados da Fase 5d
- * ja tem consumidor real e sao cobertos por `documentInternalStatuses.test.ts`.
+ * docs/44 §6), `BLOQUEADO_OPERACIONAL` (docs/48) e `CANCELADO_OPERACIONAL`
+ * (docs/51), que seguem o mesmo padrao: o PR adiciona capacidade ao enum, nao
+ * comportamento. Os estados da Fase 5d ja tem consumidor real e sao cobertos
+ * por `documentInternalStatuses.test.ts`.
  *
  * O que estes testes protegem:
  *
@@ -34,16 +35,22 @@ const NOVOS_ESTADOS = ["AGUARDANDO_CONFIRMACAO_HUMANA", "AGUARDANDO_CAPTCHA"] as
 /** docs/48 — ja TEM consumidor: a rejeicao de `reviewProcessDocument`. */
 const BLOQUEIO_HUMANO = "BLOQUEADO_OPERACIONAL" as const;
 
+/** docs/51 — preparado no enum, SEM consumidor: a action `cancelProcess` fica para PR proprio. */
+const CANCELAMENTO_REAL = "CANCELADO_OPERACIONAL" as const;
+
 /**
- * Os que este arquivo cobre como "enum sim, consumidor nao" — hoje so os da
- * Fase 2. `BLOQUEADO_OPERACIONAL` saiu desta lista quando a rejeicao migrou
- * (docs/48); o que sobra dele aqui e a trava de que NENHUM outro fluxo o
- * escreve, logo abaixo.
+ * Os que este arquivo cobre como "enum sim, consumidor nao" — os da Fase 2 e
+ * `CANCELADO_OPERACIONAL`. `BLOQUEADO_OPERACIONAL` saiu desta lista quando a
+ * rejeicao migrou (docs/48); o que sobra dele aqui e a trava de que NENHUM
+ * outro fluxo o escreve, logo abaixo.
  */
-const SEM_CONSUMIDOR = NOVOS_ESTADOS;
+const SEM_CONSUMIDOR = [...NOVOS_ESTADOS, CANCELAMENTO_REAL];
 
 const MIGRATION_BLOQUEIO =
   "prisma/migrations/20260801000000_add_blocked_operational_status/migration.sql";
+
+const MIGRATION_CANCELAMENTO =
+  "prisma/migrations/20260802000000_add_real_cancellation_status/migration.sql";
 
 /** Remove comentarios `--`: aviso em comentario nao e instrucao SQL. */
 function sqlOnly(source: string): string {
@@ -255,4 +262,67 @@ test("a migration avisa sobre db:push e sobre a ausencia de backfill", () => {
   assert.match(sql, /db:migrate|db:deploy/, "aponta o caminho correto");
   assert.match(sql, /SEM BACKFILL/);
   assert.match(sql, /docs\/48/);
+});
+
+// ------------------------------------------- CANCELADO_OPERACIONAL (docs/51)
+
+test("CANCELADO_OPERACIONAL existe no enum e tem rotulo proprio", () => {
+  assert.ok(CANCELAMENTO_REAL in InternalStatus, "CANCELADO_OPERACIONAL ausente do enum");
+  assert.equal(INTERNAL_STATUS_LABELS.CANCELADO_OPERACIONAL, "Cancelado (operacional)");
+});
+
+test("o rotulo distingue de CANCELADO_DEV e de CANCELADO_REEMBOLSADO", () => {
+  const rotulo = INTERNAL_STATUS_LABELS.CANCELADO_OPERACIONAL;
+  // `CANCELADO_REEMBOLSADO` esta na MESMA lista (InternalStatus) e AFIRMA
+  // reembolso — docs/51 decidiu que cancelamento real generico nao reusa esse
+  // rotulo nem esse valor.
+  assert.notEqual(rotulo, INTERNAL_STATUS_LABELS.CANCELADO_REEMBOLSADO);
+  // `OperationalStatus.CANCELADO_DEV` ("Cancelado (dev)") e outro enum, mas o
+  // rotulo nao pode ficar identico ao ponto de confundir tela de diagnostico.
+  assert.notEqual(rotulo, "Cancelado (dev)");
+  assert.doesNotMatch(rotulo, /reembols/i, "nao afirma reembolso — isso e decisao futura, docs/51 §4 item 11");
+});
+
+test("CANCELADO_OPERACIONAL ainda NAO tem consumidor nenhum", () => {
+  // Diferente de BLOQUEADO_OPERACIONAL (que ja tem 2 escritores): este estado
+  // foi preparado pelo docs/51 sem nenhuma action ainda. A action
+  // `cancelProcess` fica para PR proprio (docs/51 §5/§7).
+  const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
+  assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
+
+  const consumidores = fluxos.filter((caminho) =>
+    usaEstado(codeOnly(readFileSync(caminho, "utf8")), CANCELAMENTO_REAL),
+  );
+  assert.deepEqual(consumidores, [], "CANCELADO_OPERACIONAL nao deveria ter consumidor ainda");
+});
+
+test("a migration de CANCELADO_OPERACIONAL e aditiva e nao faz backfill", () => {
+  const sql = readFileSync(MIGRATION_CANCELAMENTO, "utf8");
+  const instrucoes = sqlOnly(sql);
+
+  assert.match(
+    instrucoes,
+    /ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'CANCELADO_OPERACIONAL';/,
+    "a instrucao precisa ser idempotente",
+  );
+  // Uma unica instrucao SQL: nada mais entra de carona.
+  assert.equal(
+    instrucoes.split(";").filter((parte) => parte.trim().length > 0).length,
+    1,
+    "a migration deveria ter exatamente uma instrucao",
+  );
+  for (const proibido of [/\bUPDATE\b/i, /\bINSERT\b/i, /\bDELETE\b/i, /\bDROP\b/i, /\bALTER TABLE\b/i]) {
+    assert.doesNotMatch(instrucoes, proibido, `migration aditiva nao deveria conter ${proibido}`);
+  }
+  // A tabela Process nao e tocada — nem o default de internalStatus.
+  assert.doesNotMatch(instrucoes, /processes/i);
+  assert.doesNotMatch(instrucoes, /operational_status/i);
+});
+
+test("a migration de CANCELADO_OPERACIONAL avisa sobre db:push e sobre a ausencia de backfill", () => {
+  const sql = readFileSync(MIGRATION_CANCELAMENTO, "utf8");
+  assert.match(sql, /db push|db:push/, "o aviso precisa estar onde alguem le");
+  assert.match(sql, /db:migrate|db:deploy/, "aponta o caminho correto");
+  assert.match(sql, /SEM BACKFILL/);
+  assert.match(sql, /docs\/51/);
 });

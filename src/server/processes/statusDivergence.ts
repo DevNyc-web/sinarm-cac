@@ -229,7 +229,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 12 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * Os 13 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
  * §6): nenhum fluxo real os escreve, mas o diagnostico cobre a combinacao
  * mesmo assim - conservador por definicao, nao por observacao.
  *
@@ -237,7 +237,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
  *
- * Nenhum dos 12 tem candidato APROVADO pendente de migracao — os tres que
+ * Nenhum dos 13 tem candidato APROVADO pendente de migracao — os tres que
  * tinham (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e; `DOCUMENTO_VALIDADO`,
  * Fase 5f; `BLOQUEADO_OPERACIONAL`, Fase 5f completa/docs/48) saíram desta
  * tabela quando os fluxos correspondentes migraram, e os pares viraram
@@ -246,7 +246,10 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
  * `PROTOCOLADO_GRU_GERADA` → `PRONTO_PARA_PROTOCOLO_MANUAL`,
  * `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`) sao ARRISCADOS ou FALSOS, nao
- * aprovados — nao tem migracao proposta.
+ * aprovados — nao tem migracao proposta. `CANCELADO_OPERACIONAL` (docs/51) e
+ * o mais novo: preparado no enum sem fluxo nenhum, sem candidato
+ * `operationalStatus` sequer citado — docs/51 decidiu a forma (acao explicita
+ * propria), nao um mapeamento.
  */
 const UNDOCUMENTED_REASON =
   "internalStatus avancou alem dos 3 valores com projecao segura (docs/46 6); " +
@@ -256,6 +259,14 @@ const UNDOCUMENTED_REASON =
 const RISKY_BLOQUEADO_REASON =
   "docs/46 6: mapear para BLOQUEADO perderia a causa especifica e dispararia " +
   "BLOQUEIO_MANUAL em operationalSignals sem que humano tenha bloqueado.";
+
+const CANCELAMENTO_REAL_REASON =
+  "CANCELADO_OPERACIONAL foi preparado no enum pelo docs/51 (cancelamento " +
+  "REAL de cliente) - SEM FLUXO: nenhuma action, permissao ou porta escreve " +
+  "este valor ainda. docs/51 decidiu a FORMA (acao explicita propria " +
+  "'cancelProcess', nunca dropdown), nao um mapeamento para operationalStatus " +
+  "- por isso nao ha candidato documentado, e projetar um aqui inventaria " +
+  "equivalencia que ninguem decidiu.";
 
 type AdvancedInternalStatus = Exclude<InternalStatus, SafeInternalStatus | Phase2InternalStatus>;
 
@@ -318,6 +329,7 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
   },
+  CANCELADO_OPERACIONAL: { severity: "needs_decision", reason: CANCELAMENTO_REAL_REASON },
 };
 
 // ------------------------------------------------------------------- diagnostico

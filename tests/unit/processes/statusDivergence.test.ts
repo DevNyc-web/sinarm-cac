@@ -395,6 +395,7 @@ test("internalStatus avancado sem candidato documentado: needs_decision, sem inv
     "EM_PREENCHIMENTO_SINARM",
     "EM_REVISAO_HUMANA",
     "GRU_PAGA_EMPRESA",
+    "CANCELADO_OPERACIONAL",
   ];
   for (const internalStatus of semCandidato) {
     const result = diagnoseStatusDivergence({ internalStatus, operationalStatus: "RASCUNHO" });
@@ -506,6 +507,7 @@ test("severity sempre e um dos 5 valores declarados", () => {
     "DOCUMENTO_RECEBIDO_PARA_ANALISE",
     "DOCUMENTO_VALIDADO",
     "BLOQUEADO_OPERACIONAL",
+    "CANCELADO_OPERACIONAL",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -520,8 +522,9 @@ test("severity sempre e um dos 5 valores declarados", () => {
   ] as const;
   assert.equal(
     internos.length,
-    20,
-    "17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47) + BLOQUEADO_OPERACIONAL (docs/48)",
+    21,
+    "17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47) + BLOQUEADO_OPERACIONAL " +
+      "(docs/48) + CANCELADO_OPERACIONAL (docs/51)",
   );
   assert.equal(operacionais.length, 9, "os 9 valores de OperationalStatus, docs/46 §2");
 
@@ -561,6 +564,7 @@ test("apenas os pares seguros produzem severity 'none'", () => {
     "DOCUMENTO_RECEBIDO_PARA_ANALISE",
     "DOCUMENTO_VALIDADO",
     "BLOQUEADO_OPERACIONAL",
+    "CANCELADO_OPERACIONAL",
   ] as const;
   const operacionais = [
     "RASCUNHO",
@@ -673,10 +677,12 @@ test("o dropdown e a acao de mudar operationalStatus continuam intactos", () => 
   );
 });
 
-test("os 20 valores de InternalStatus vem do schema, nao de copia", () => {
+test("os 21 valores de InternalStatus vem do schema, nao de copia", () => {
   // 17 de docs/46 §2 + 2 aprovados pela Fase 5d (docs/47, migration
   // 20260731010000_add_document_internal_statuses) + BLOQUEADO_OPERACIONAL
-  // (docs/48, migration 20260801000000_add_blocked_operational_status).
+  // (docs/48, migration 20260801000000_add_blocked_operational_status) +
+  // CANCELADO_OPERACIONAL (docs/51, migration
+  // 20260802000000_add_real_cancellation_status).
   const schema = readFileSync("prisma/schema.prisma", "utf8");
   const bloco = /enum InternalStatus \{([\s\S]*?)\n\}/.exec(schema);
   assert.ok(bloco, "enum InternalStatus nao encontrado em prisma/schema.prisma");
@@ -684,8 +690,9 @@ test("os 20 valores de InternalStatus vem do schema, nao de copia", () => {
     .split("\n")
     .map((line) => line.replace(/\/\/\/.*$/, "").trim())
     .filter((line) => /^[A-Z][A-Z0-9_]*$/.test(line));
-  assert.equal(valores.length, 20);
+  assert.equal(valores.length, 21);
   assert.ok(valores.includes("DOCUMENTO_RECEBIDO_PARA_ANALISE"));
   assert.ok(valores.includes("DOCUMENTO_VALIDADO"));
   assert.ok(valores.includes("BLOQUEADO_OPERACIONAL"));
+  assert.ok(valores.includes("CANCELADO_OPERACIONAL"));
 });

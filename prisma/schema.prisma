@@ -610,6 +610,24 @@ enum InternalStatus {
   /// estado canonico do processo.
   BLOQUEADO_OPERACIONAL
 
+  /// Decidido pelo docs/51 (2026-08-02) para o fluxo de cancelamento REAL de
+  /// cliente. SEM FLUXO neste PR: nenhuma action, permissao ou porta escreve
+  /// este valor ainda — a action explicita `cancelProcess` fica para PR
+  /// proprio (docs/51 §5/§7). So prepara o enum de forma aditiva e segura.
+  ///
+  /// NO FIM DO ENUM pelo mesmo motivo das adicoes anteriores: `ALTER TYPE ...
+  /// ADD VALUE` sem `BEFORE`/`AFTER` anexa ao fim no Postgres.
+  ///
+  /// NAO CONFUNDIR com `OperationalStatus.CANCELADO_DEV`: aquele e estado
+  /// TECNICO/de desenvolvimento (marca processo de teste como morto, sem
+  /// afirmar nada sobre reembolso ou decisao de cliente) e continua existindo
+  /// sem mudanca — docs/51 decidiu explicitamente que `CANCELADO_DEV` NUNCA
+  /// vira cancelamento real por reuso. Tambem NAO reutiliza
+  /// `CANCELADO_REEMBOLSADO`, que AFIRMA reembolso (docs/46 §6, docs/49 §3.5).
+  /// Categoria NOVA de proposito, mesmo criterio que `docs/48` usou para
+  /// `BLOQUEADO_OPERACIONAL` acima.
+  CANCELADO_OPERACIONAL
+
   @@map("internal_status")
 }
 
