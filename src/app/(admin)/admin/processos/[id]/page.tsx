@@ -39,7 +39,10 @@ import { AutomationSubmitPanel } from "@/components/automation/AutomationSubmitP
 import { ProcessRequirementsSummary } from "@/components/processes/ProcessRequirementsSummary";
 import { DOCUMENT_FILE_PERMISSION, documentFileHref } from "@/server/documents/documentAccess";
 import { formatBRL } from "@/server/processes/pricing";
-import { assignableMockUsers } from "@/server/services/updateProcessOperations";
+import {
+  assignableMockUsers,
+  MANUALLY_SELECTABLE_OPERATIONAL_STATUSES,
+} from "@/server/services/updateProcessOperations";
 import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
 import {
@@ -272,9 +275,24 @@ export default async function AdminProcessoDetalhePage({
                     defaultValue={detail.operationalStatus}
                     className={controlClass}
                   >
-                    {Object.entries(OPERATIONAL_STATUS_LABELS).map(([value, label]) => (
+                    {/*
+                      `MANUALLY_SELECTABLE_OPERATIONAL_STATUSES` exclui
+                      `DOCUMENTO_ENVIADO` (docs/50 §3): move-lo por aqui deixaria
+                      o processo aguardando conferencia com o documento ainda
+                      revisado. O status ATUAL entra na lista mesmo quando
+                      bloqueado — senao o `defaultValue` nao casaria com opcao
+                      nenhuma, o navegador mostraria a primeira e o operador
+                      moveria o processo sem querer. Reenviar o proprio valor e
+                      no-op no service, entao inclui-lo e seguro.
+                    */}
+                    {(MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.includes(
+                      detail.operationalStatus,
+                    )
+                      ? MANUALLY_SELECTABLE_OPERATIONAL_STATUSES
+                      : [...MANUALLY_SELECTABLE_OPERATIONAL_STATUSES, detail.operationalStatus]
+                    ).map((value) => (
                       <option key={value} value={value}>
-                        {label}
+                        {OPERATIONAL_STATUS_LABELS[value]}
                       </option>
                     ))}
                   </select>

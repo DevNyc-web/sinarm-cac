@@ -173,12 +173,14 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
   DOCUMENTO_ENVIADO: {
     severity: "expected_legacy",
     reason:
-      "internalStatus fora de DOCUMENTO_RECEBIDO_PARA_ANALISE indica dado " +
-      "ANTERIOR a Fase 5e (docs/47 §6.1) OU escrita do dropdown de " +
-      "updateProcessOperations, que continua legado por decisao do docs/49 " +
-      "(categoria A: so sai por acao explicita, porque no dropdown este valor " +
-      "REABRE a conferencia documental). O uploadProcessDocument novo passa " +
-      "por transitionInternalStatus e produz o par seguro " +
+      "so aparece com internalStatus fora de DOCUMENTO_RECEBIDO_PARA_ANALISE " +
+      "em DADO ANTIGO: ANTERIOR a Fase 5e (docs/47 §6.1), quando " +
+      "uploadProcessDocument escrevia isto sozinho, ou escrito pelo dropdown " +
+      "de updateProcessOperations ANTES de a porta manual passar a recusar " +
+      "este valor (docs/50 §3 — mover para ca deixava o processo aguardando " +
+      "conferencia com o documento ainda revisado). Nenhum escritor vivo " +
+      "produz a combinacao: o uploadProcessDocument novo passa por " +
+      "transitionInternalStatus e produz o par seguro " +
       "DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (severity none).",
   },
   DOCUMENTO_APROVADO: {
