@@ -199,6 +199,25 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-02, código).** A lacuna técnica registrada no §2/§3.10
+> (fila/prontidão/SLA tratando processo cancelado como ativo) **foi
+> corrigida**: `isClosed` em `operationalSignals.ts` agora reconhece
+> `internalStatus === "CANCELADO_OPERACIONAL"`, além de
+> `operationalStatus === "CANCELADO_DEV"` (comportamento anterior preservado).
+> `deriveSignals`/`deriveReadiness`/`deriveSla`/`derivePendings` herdam o
+> fechamento — um processo com cancelamento real não gera mais sinalizadores,
+> prontidão "quase pronta", SLA em atraso nem pendências ativas.
+> `getAdminQueue.ts` também não destaca mais (`highlighted`) um processo
+> cancelado como se estivesse na fila prioritária. **Nada mais mudou**:
+> `operationalStatus` continua intocado (nenhum `alsoSet`), `cancelProcess`
+> continua o mesmo, `operationalStatusProjection.ts`/`statusDivergence.ts`
+> continuam sem projetar `CANCELADO_OPERACIONAL` (`needs_decision` inalterado),
+> `clientVisibleStatusLabel` continua sem ler `internalStatus` — a visibilidade
+> ao **cliente** (§3.1) continua em aberto, exatamente como decidido acima.
+> Nenhuma UI/botão foi criado. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,

@@ -144,6 +144,9 @@ export function listAdminQueue(filters: AdminQueueFilters) {
       userId: true,
       createdAt: true,
       operationalStatus: true,
+      // So para `isClosed` (docs/52) reconhecer cancelamento real na fila —
+      // nenhum filtro/DTO novo le este campo alem do calculo de indicadores.
+      internalStatus: true,
       priority: true,
       assignedToMockUserId: true,
       processType: { select: { name: true } },
