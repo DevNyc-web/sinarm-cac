@@ -125,18 +125,23 @@ test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE dois consumidores", () => {
   ]);
 });
 
-test("DOCUMENTO_VALIDADO tem EXATAMENTE um consumidor: reviewProcessDocument", () => {
+test("DOCUMENTO_VALIDADO tem EXATAMENTE dois consumidores", () => {
+  // `reviewProcessDocument` (Fase 5f, lado aprovacao) o produz pela primeira
+  // vez; `approveDocumentOutOfFlow` (docs/50 §6) o produz de novo ao
+  // REGISTRAR uma aprovacao feita fora do formulario. Os dois chegam ao mesmo
+  // par seguro de proposito: aprovado pelo formulario e aprovado fora do fluxo
+  // devem ficar indistinguiveis para a fila.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
 
   const consumidores = fluxos
     .filter((caminho) => codeOnly(readFileSync(caminho, "utf8")).includes(VALIDADO))
-    .map((c) => c.split("\\").join("/"));
+    .map((c) => c.split("\\").join("/"))
+    .sort();
 
-  assert.deepEqual(
-    consumidores,
-    ["src/server/services/reviewProcessDocument.ts"],
-    "DOCUMENTO_VALIDADO deveria aparecer so em reviewProcessDocument.ts (Fase 5f)",
-  );
+  assert.deepEqual(consumidores, [
+    "src/server/services/approveDocumentOutOfFlow.ts",
+    "src/server/services/reviewProcessDocument.ts",
+  ]);
 });
 
 test("uploadProcessDocument usa a porta canonica, com o novo estado e alsoSet", () => {
@@ -224,13 +229,14 @@ test("updateProcessOperations chama a porta canonica (Fase 5g), mas nunca com os
   );
 });
 
-test("transitionInternalStatus tem exatamente 5 chamadores reais", () => {
+test("transitionInternalStatus tem exatamente 6 chamadores reais", () => {
   // A porta canonica tinha 1 chamador (docs/46 §5); a Fase 5e somou o
   // segundo (uploadProcessDocument); a Fase 5f somou o terceiro
   // (reviewProcessDocument, os dois lados); a Fase 5g soma o quarto
-  // (updateProcessOperations); e o docs/50 §5 soma o quinto
-  // (reopenDocumentReview, a acao de desfazer conferencia).
-  // Nenhum outro arquivo deveria importa-la.
+  // (updateProcessOperations); o docs/50 §5 soma o quinto
+  // (reopenDocumentReview, a acao de desfazer conferencia); e o docs/50 §6
+  // soma o sexto (approveDocumentOutOfFlow, a acao de registrar aprovacao
+  // feita fora do fluxo). Nenhum outro arquivo deveria importa-la.
   const chamadores = [
     ...arquivosDeFluxo("src/server/services"),
     ...arquivosDeFluxo("src/app"),
@@ -242,6 +248,7 @@ test("transitionInternalStatus tem exatamente 5 chamadores reais", () => {
   assert.deepEqual(
     relativos.filter((c) => !c.endsWith("transitionInternalStatus.ts")),
     [
+      "src/server/services/approveDocumentOutOfFlow.ts",
       "src/server/services/confirmPixPayment.ts",
       "src/server/services/reopenDocumentReview.ts",
       "src/server/services/reviewProcessDocument.ts",

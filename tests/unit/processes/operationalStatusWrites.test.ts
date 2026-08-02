@@ -91,6 +91,12 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
     why: "docs/46 §3.3 — JA MIGRADO na Fase 5f, lado aprovacao (docs/47 §6.2): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_VALIDADO`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`/`uploadProcessDocument`. O lado REJEITADO (proxima entrada) migrou depois, pela decisao propria do docs/48.",
   },
   {
+    file: "src/server/services/approveDocumentOutOfFlow.ts",
+    sink: "alsoSet",
+    value: '"DOCUMENTO_APROVADO"',
+    why: "docs/50 §6 — acao explicita 'registrar aprovacao feita fora do fluxo': assume um revisor real que so nao passou pelo formulario de revisao. Passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_VALIDADO`, com evento tipado e o motivo em `note`. Produz o MESMO par que `reviewProcessDocument` (aprovacao) — de proposito. Permissao PROPRIA (`document.review.approveOutOfFlow`), nunca o dropdown generico.",
+  },
+  {
     file: "src/server/services/reviewProcessDocument.ts",
     sink: "alsoSet",
     value: '"BLOQUEADO"',
@@ -453,14 +459,16 @@ test("allowlist nao guarda entrada morta", () => {
   );
 });
 
-test("o inventario passa a 6 CAMINHOS de decisao, 10 escritas literais + 1 repasse canonico", () => {
+test("o inventario passa a 7 CAMINHOS de decisao, 11 escritas literais + 1 repasse canonico", () => {
   // Trava o NUMERO, nao so o conteudo: docs/46 §2 publica "5 caminhos de
   // escrita" — numero de ARQUIVOS/funcoes de decisao, que NAO muda quando um
   // valor migra (updateProcessOperations continua sendo 1 caminho). O que muda
   // e quantas ESCRITAS LITERAIS esse caminho produz: a Fase 5g trocou 1 escrita
   // dinamica (`status`, cobrindo os 9 valores) por 4 (3 literais migrados + 1
   // dinamica remanescente), e a migracao de BLOQUEADO (docs/48) somou a quinta
-  // literal — a dinamica continua, agora cobrindo 5 valores. 8 + 1 = 9.
+  // literal — a dinamica continua, agora cobrindo 5 valores. 8 + 1 = 9. O docs/50
+  // §5 somou o sexto caminho (reopenDocumentReview) e o §6 o setimo
+  // (approveDocumentOutOfFlow): 9 + 1 = 10 + 1 = 11.
   const decisions = DETECTED.filter((write) =>
     ALLOWED_WRITES.some((a) => matches(write, a)),
   ).length;
@@ -469,23 +477,24 @@ test("o inventario passa a 6 CAMINHOS de decisao, 10 escritas literais + 1 repas
   ).length;
   assert.equal(
     decisions,
-    10,
-    "5 caminhos do docs/46 §2/§3 + reopenDocumentReview (docs/50 §5), o primeiro caminho NOVO desde o inventario",
+    11,
+    "5 caminhos do docs/46 §2/§3 + reopenDocumentReview (docs/50 §5) + approveDocumentOutOfFlow (docs/50 §6)",
   );
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
 });
 
-test("todo write de BLOQUEADO passa pela porta canonica: 9 migrados (sink alsoSet), 1 ainda legado", () => {
+test("todo write de BLOQUEADO passa pela porta canonica: 10 migrados (sink alsoSet), 1 ainda legado", () => {
   // "Write solto" = decisao de operationalStatus que NAO passa pela porta
   // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
   // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1),
   // `uploadProcessDocument` (Fase 5e), os DOIS lados de
   // `reviewProcessDocument` (aprovacao na 5f; rejeicao na 5f completa, docs/48)
   // e RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA + BLOQUEADO de
-  // `updateProcessOperations` (5g e docs/48) e agora `reopenDocumentReview`
-  // (docs/50 §5). Progressao: 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2
-  // (5g) -> 7/1 (5f completa) -> 8/1 (BLOQUEADO manual) -> 9/1 (reabrir
-  // conferencia). "Soltos" continua 1 porque a linha dinamica nao sumiu: ela
+  // `updateProcessOperations` (5g e docs/48), `reopenDocumentReview`
+  // (docs/50 §5) e agora `approveDocumentOutOfFlow` (docs/50 §6). Progressao:
+  // 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2 (5g) -> 7/1 (5f completa)
+  // -> 8/1 (BLOQUEADO manual) -> 9/1 (reabrir conferencia) -> 10/1 (aprovar
+  // fora do fluxo). "Soltos" continua 1 porque a linha dinamica nao sumiu: ela
   // apenas cobre 5 valores em vez de 6. Todo write NOVO desde a Fase 5e nasceu
   // migrado — e o que a trava existe para garantir.
   const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
@@ -493,8 +502,8 @@ test("todo write de BLOQUEADO passa pela porta canonica: 9 migrados (sink alsoSe
   const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
   assert.equal(
     migrados,
-    9,
-    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao E rejeicao) + updateProcessOperations (4 valores) + reopenDocumentReview",
+    10,
+    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao E rejeicao) + updateProcessOperations (4 valores) + reopenDocumentReview + approveDocumentOutOfFlow",
   );
   assert.equal(soltos, 1, "so updateProcessOperations (os 5 valores legados, 1 linha dinamica)");
   assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");

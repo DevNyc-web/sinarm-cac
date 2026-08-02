@@ -15,6 +15,7 @@ import {
   registerManualGruPayment,
   registerManualProtocol,
 } from "@/server/services/manualExecution";
+import { approveDocumentOutOfFlow } from "@/server/services/approveDocumentOutOfFlow";
 import { reopenDocumentReview } from "@/server/services/reopenDocumentReview";
 import { reviewProcessDocument, type ReviewDecision } from "@/server/services/reviewProcessDocument";
 import { submitToAutomationQueue } from "@/server/services/submitToAutomationQueue";
@@ -92,6 +93,29 @@ export async function reopenDocumentReviewAction(formData: FormData) {
 
   const base = `/admin/processos/${encodeURIComponent(processId)}`;
   const result = await reopenDocumentReview(actor, documentId, reason);
+  if (!result.ok) {
+    redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath(base);
+  redirect(base);
+}
+
+/**
+ * Registrar aprovacao documental feita FORA do fluxo normal — exige
+ * "document.review.approveOutOfFlow" (docs/50 §6).
+ *
+ * Permissao PROPRIA, nao `document.review`: assinar uma conferencia feita por
+ * outro canal e ato distinto de conferir pelo formulario. Hoje so ADMIN a tem.
+ */
+export async function approveDocumentOutOfFlowAction(formData: FormData) {
+  const actor = await requirePermission("document.review.approveOutOfFlow");
+
+  const processId = String(formData.get("processId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("outOfFlowReason") ?? "");
+
+  const base = `/admin/processos/${encodeURIComponent(processId)}`;
+  const result = await approveDocumentOutOfFlow(actor, documentId, reason);
   if (!result.ok) {
     redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
   }
