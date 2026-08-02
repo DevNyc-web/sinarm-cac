@@ -69,6 +69,11 @@ const SLA_CLASS: Record<SlaStatus, string> = {
 const DIVERGENCE_CLASS: Record<DivergenceSeverity, string> = {
   none: "text-neutral-500",
   expected_legacy: "text-neutral-600",
+  // Mesma cor neutra de `expected_legacy` DE PROPOSITO: `operational_only` e
+  // divergencia decidida (docs/49), nao pendencia — destacar em ambar mandaria
+  // a equipe agir sobre algo que ja tem resposta. O `Record` e exaustivo, entao
+  // esta chave e obrigatoria; e a unica alteracao de UI deste PR.
+  operational_only: "text-neutral-600",
   needs_decision: "font-medium text-amber-700",
   invalid_projection: "font-medium text-red-700",
 };
