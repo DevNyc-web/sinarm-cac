@@ -106,11 +106,18 @@ test("todo InternalStatus continua com rotulo apos a migration (Record exaustivo
 
 // ------------------------------------------------- 2. consumidor real de cada estado
 
-test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE dois consumidores", () => {
+test("DOCUMENTO_RECEBIDO_PARA_ANALISE aparece EXATAMENTE em tres arquivos: dois escritores + uma allowlist", () => {
   // `uploadProcessDocument` (Fase 5e) o produz pela primeira vez;
   // `reopenDocumentReview` (docs/50 §5) o produz de novo ao DESFAZER uma
   // revisao. Os dois chegam ao mesmo par seguro de proposito: reaberto e
   // recem-enviado devem ficar indistinguiveis.
+  //
+  // `cancelProcess` (docs/51) NAO escreve este valor — so o CITA como chave
+  // de um `Record<InternalStatus, boolean>` exaustivo (allowlist de estados
+  // cancelaveis). E MENCAO, nao escrita: nunca aparece como `toStatus` de
+  // `transitionInternalStatus` neste arquivo (teste proprio abaixo prova
+  // isso). A varredura por substring nao distingue os dois casos, por isso
+  // ele entra aqui em vez de sumir da lista.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
@@ -120,17 +127,21 @@ test("DOCUMENTO_RECEBIDO_PARA_ANALISE tem EXATAMENTE dois consumidores", () => {
     .sort();
 
   assert.deepEqual(consumidores, [
+    "src/server/services/cancelProcess.ts",
     "src/server/services/reopenDocumentReview.ts",
     "src/server/services/uploadProcessDocument.ts",
   ]);
 });
 
-test("DOCUMENTO_VALIDADO tem EXATAMENTE dois consumidores", () => {
+test("DOCUMENTO_VALIDADO aparece EXATAMENTE em tres arquivos: dois escritores + uma allowlist", () => {
   // `reviewProcessDocument` (Fase 5f, lado aprovacao) o produz pela primeira
   // vez; `approveDocumentOutOfFlow` (docs/50 §6) o produz de novo ao
   // REGISTRAR uma aprovacao feita fora do formulario. Os dois chegam ao mesmo
   // par seguro de proposito: aprovado pelo formulario e aprovado fora do fluxo
   // devem ficar indistinguiveis para a fila.
+  //
+  // `cancelProcess` (docs/51) NAO escreve este valor pelo mesmo motivo do
+  // teste acima — so o cita como chave da allowlist de cancelamento.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
 
   const consumidores = fluxos
@@ -140,6 +151,7 @@ test("DOCUMENTO_VALIDADO tem EXATAMENTE dois consumidores", () => {
 
   assert.deepEqual(consumidores, [
     "src/server/services/approveDocumentOutOfFlow.ts",
+    "src/server/services/cancelProcess.ts",
     "src/server/services/reviewProcessDocument.ts",
   ]);
 });
@@ -229,14 +241,15 @@ test("updateProcessOperations chama a porta canonica (Fase 5g), mas nunca com os
   );
 });
 
-test("transitionInternalStatus tem exatamente 6 chamadores reais", () => {
+test("transitionInternalStatus tem exatamente 7 chamadores reais", () => {
   // A porta canonica tinha 1 chamador (docs/46 §5); a Fase 5e somou o
   // segundo (uploadProcessDocument); a Fase 5f somou o terceiro
   // (reviewProcessDocument, os dois lados); a Fase 5g soma o quarto
   // (updateProcessOperations); o docs/50 §5 soma o quinto
-  // (reopenDocumentReview, a acao de desfazer conferencia); e o docs/50 §6
+  // (reopenDocumentReview, a acao de desfazer conferencia); o docs/50 §6
   // soma o sexto (approveDocumentOutOfFlow, a acao de registrar aprovacao
-  // feita fora do fluxo). Nenhum outro arquivo deveria importa-la.
+  // feita fora do fluxo); e o docs/51 soma o setimo (cancelProcess, o
+  // cancelamento real). Nenhum outro arquivo deveria importa-la.
   const chamadores = [
     ...arquivosDeFluxo("src/server/services"),
     ...arquivosDeFluxo("src/app"),
@@ -249,6 +262,7 @@ test("transitionInternalStatus tem exatamente 6 chamadores reais", () => {
     relativos.filter((c) => !c.endsWith("transitionInternalStatus.ts")),
     [
       "src/server/services/approveDocumentOutOfFlow.ts",
+      "src/server/services/cancelProcess.ts",
       "src/server/services/confirmPixPayment.ts",
       "src/server/services/reopenDocumentReview.ts",
       "src/server/services/reviewProcessDocument.ts",

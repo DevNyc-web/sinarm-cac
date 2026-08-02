@@ -1,11 +1,11 @@
 /**
- * InternalStatus — estados adicionados ao enum SEM consumidor.
- *
- * Cobre os da Fase 2 (`AGUARDANDO_CONFIRMACAO_HUMANA`, `AGUARDANDO_CAPTCHA`,
- * docs/44 §6), `BLOQUEADO_OPERACIONAL` (docs/48) e `CANCELADO_OPERACIONAL`
- * (docs/51), que seguem o mesmo padrao: o PR adiciona capacidade ao enum, nao
- * comportamento. Os estados da Fase 5d ja tem consumidor real e sao cobertos
- * por `documentInternalStatuses.test.ts`.
+ * InternalStatus — estados adicionados ao enum SEM consumidor (Fase 2) e dois
+ * que ja ganharam consumidor depois: `BLOQUEADO_OPERACIONAL` (docs/48) e
+ * `CANCELADO_OPERACIONAL` (docs/51 — `cancelProcess`). Os tres seguem o mesmo
+ * padrao de origem: o PR que criou o enum adicionou capacidade, nao
+ * comportamento; o comportamento veio depois, em PR proprio. Os estados da
+ * Fase 5d ja tem consumidor real e sao cobertos por
+ * `documentInternalStatuses.test.ts`.
  *
  * O que estes testes protegem:
  *
@@ -35,16 +35,17 @@ const NOVOS_ESTADOS = ["AGUARDANDO_CONFIRMACAO_HUMANA", "AGUARDANDO_CAPTCHA"] as
 /** docs/48 — ja TEM consumidor: a rejeicao de `reviewProcessDocument`. */
 const BLOQUEIO_HUMANO = "BLOQUEADO_OPERACIONAL" as const;
 
-/** docs/51 — preparado no enum, SEM consumidor: a action `cancelProcess` fica para PR proprio. */
+/** docs/51 — ja TEM consumidor: `cancelProcess`. */
 const CANCELAMENTO_REAL = "CANCELADO_OPERACIONAL" as const;
 
 /**
- * Os que este arquivo cobre como "enum sim, consumidor nao" — os da Fase 2 e
- * `CANCELADO_OPERACIONAL`. `BLOQUEADO_OPERACIONAL` saiu desta lista quando a
- * rejeicao migrou (docs/48); o que sobra dele aqui e a trava de que NENHUM
- * outro fluxo o escreve, logo abaixo.
+ * Os que este arquivo cobre como "enum sim, consumidor nao" — hoje so os da
+ * Fase 2. `BLOQUEADO_OPERACIONAL` saiu desta lista quando a rejeicao migrou
+ * (docs/48); `CANCELADO_OPERACIONAL` saiu quando `cancelProcess` chegou
+ * (docs/51). O que sobra deles aqui e a trava de que NENHUM outro fluxo os
+ * escreve, logo abaixo.
  */
-const SEM_CONSUMIDOR = [...NOVOS_ESTADOS, CANCELAMENTO_REAL];
+const SEM_CONSUMIDOR = NOVOS_ESTADOS;
 
 const MIGRATION_BLOQUEIO =
   "prisma/migrations/20260801000000_add_blocked_operational_status/migration.sql";
@@ -178,9 +179,15 @@ test("o rotulo distingue das duas fontes de confusao vizinhas", () => {
   assert.doesNotMatch(rotulo, /instabilidade/i, "nao e pausa por instabilidade do portal");
 });
 
-test("BLOQUEADO_OPERACIONAL tem EXATAMENTE dois consumidores, os dois writers de BLOQUEADO", () => {
+test("BLOQUEADO_OPERACIONAL aparece em EXATAMENTE tres arquivos: os dois writers + uma allowlist", () => {
   // Os dois caminhos que produzem `operationalStatus = BLOQUEADO` (docs/46
-  // §3.4 e §3.5) usam a MESMA categoria canonica — e mais ninguem a escreve.
+  // §3.4 e §3.5) usam a MESMA categoria canonica — e mais ninguem a ESCREVE.
+  //
+  // `cancelProcess` (docs/51) NAO escreve este valor — so o CITA como chave
+  // `true` de um `Record<InternalStatus, boolean>` exaustivo (allowlist de
+  // estados cancelaveis: um processo bloqueado operacionalmente pode ser
+  // cancelado de verdade). E MENCAO, nao escrita: nunca aparece como
+  // `toStatus` de `transitionInternalStatus` neste arquivo.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
@@ -190,6 +197,7 @@ test("BLOQUEADO_OPERACIONAL tem EXATAMENTE dois consumidores, os dois writers de
     .sort();
 
   assert.deepEqual(consumidores, [
+    "src/server/services/cancelProcess.ts",
     "src/server/services/reviewProcessDocument.ts",
     "src/server/services/updateProcessOperations.ts",
   ]);
@@ -283,17 +291,30 @@ test("o rotulo distingue de CANCELADO_DEV e de CANCELADO_REEMBOLSADO", () => {
   assert.doesNotMatch(rotulo, /reembols/i, "nao afirma reembolso — isso e decisao futura, docs/51 §4 item 11");
 });
 
-test("CANCELADO_OPERACIONAL ainda NAO tem consumidor nenhum", () => {
-  // Diferente de BLOQUEADO_OPERACIONAL (que ja tem 2 escritores): este estado
-  // foi preparado pelo docs/51 sem nenhuma action ainda. A action
-  // `cancelProcess` fica para PR proprio (docs/51 §5/§7).
+test("CANCELADO_OPERACIONAL tem EXATAMENTE um consumidor: cancelProcess (docs/51)", () => {
+  // Ate aqui, preparado sem fluxo (PR do docs/51). `cancelProcess` e o
+  // PRIMEIRO e (por ora) UNICO escritor — a acao ainda nao tem UI/botao
+  // (docs/51 §7, PR 6 continua so backend).
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
-  const consumidores = fluxos.filter((caminho) =>
-    usaEstado(codeOnly(readFileSync(caminho, "utf8")), CANCELAMENTO_REAL),
-  );
-  assert.deepEqual(consumidores, [], "CANCELADO_OPERACIONAL nao deveria ter consumidor ainda");
+  const consumidores = fluxos
+    .filter((caminho) => usaEstado(codeOnly(readFileSync(caminho, "utf8")), CANCELAMENTO_REAL))
+    .map((c) => c.split("\\").join("/"))
+    .sort();
+
+  assert.deepEqual(consumidores, ["src/server/services/cancelProcess.ts"]);
+});
+
+test("cancelProcess usa a porta canonica para CANCELADO_OPERACIONAL, sem alsoSet", () => {
+  const code = codeOnly(readFileSync("src/server/services/cancelProcess.ts", "utf8"));
+  assert.match(code, /\btransitionInternalStatus\s*\(/, "deveria chamar transitionInternalStatus");
+  assert.match(code, /toStatus:\s*"CANCELADO_OPERACIONAL"/);
+  // docs/51: operationalStatus fica de fora de proposito — sem candidato
+  // documentado, `alsoSet` aqui inventaria uma equivalencia que ninguem
+  // decidiu (ver operationalProjectionEquivalence.test.ts).
+  assert.doesNotMatch(code, /alsoSet\s*:/);
+  assert.doesNotMatch(code, /updateProcessOperations\s*\(/);
 });
 
 test("a migration de CANCELADO_OPERACIONAL e aditiva e nao faz backfill", () => {
