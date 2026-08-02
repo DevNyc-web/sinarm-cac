@@ -263,15 +263,39 @@ test("CANCELADO_DEV continua proibido de virar cancelamento formal", () => {
 });
 
 test("DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO continuam expected_legacy, nunca none", () => {
-  // Categoria A do docs/49: nao migram automaticamente pela porta manual. A
-  // razao precisa nomear as DUAS origens — dado antigo E o dropdown vivo.
+  // Categoria A do docs/49: nao migram automaticamente pela porta manual.
   for (const operationalStatus of ["DOCUMENTO_ENVIADO", "DOCUMENTO_APROVADO"] as const) {
     const result = diagnoseStatusDivergence({ internalStatus: "RASCUNHO", operationalStatus });
     assert.equal(result.severity, "expected_legacy", operationalStatus);
     assert.notEqual(result.severity, "none", operationalStatus);
-    assert.match(result.reason, /updateProcessOperations/, `${operationalStatus}: dropdown vivo`);
-    assert.match(result.reason, /acao explicita/, `${operationalStatus}: docs/49 categoria A`);
+    assert.match(result.reason, /updateProcessOperations/, `${operationalStatus}: cita a porta manual`);
   }
+});
+
+test("a razao de DOCUMENTO_ENVIADO nao afirma mais dropdown VIVO (docs/50 §3)", () => {
+  // A porta manual passou a RECUSAR este valor, entao a combinacao so pode vir
+  // de dado antigo — inclusive dado escrito pelo dropdown ANTES da recusa. Um
+  // diagnostico que continuasse dizendo "ou escrita do dropdown" mandaria o
+  // leitor procurar um escritor que nao existe mais.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "RASCUNHO",
+    operationalStatus: "DOCUMENTO_ENVIADO",
+  });
+  assert.match(result.reason, /DADO ANTIGO/);
+  assert.match(result.reason, /ANTES/, "precisa datar a escrita do dropdown como passada");
+  assert.match(result.reason, /Nenhum escritor vivo/);
+});
+
+test("a razao de DOCUMENTO_APROVADO CONTINUA citando o dropdown vivo", () => {
+  // Simetria proposital: DOCUMENTO_APROVADO NAO foi bloqueado (docs/50 §6 —
+  // decisao propria), entao o dropdown ainda o escreve hoje e a razao dele
+  // precisa continuar dizendo isso.
+  const result = diagnoseStatusDivergence({
+    internalStatus: "RASCUNHO",
+    operationalStatus: "DOCUMENTO_APROVADO",
+  });
+  assert.match(result.reason, /continua legado/);
+  assert.match(result.reason, /acao explicita/);
 });
 
 // -------------------------------------- 3. internalStatus avancado (§6)
@@ -638,10 +662,13 @@ test("o dropdown e a acao de mudar operationalStatus continuam intactos", () => 
   assert.match(source, /action=\{changeOperationalStatusAction\}/);
   assert.match(source, /name="operationalStatus"/);
   assert.match(source, /defaultValue=\{detail\.operationalStatus\}/);
+  // As opcoes vem da lista de SELECIONAVEIS (docs/50 §3), nao mais de todos os
+  // rotulos: `DOCUMENTO_ENVIADO` saiu do dropdown de acao. A Fase 5c continua
+  // sendo so leitura — quem mudou a lista foi a correcao do beco sem saida.
   assert.match(
     source,
-    /Object\.entries\(OPERATIONAL_STATUS_LABELS\)\.map/,
-    "dropdown continua oferecendo os 9 valores via OPERATIONAL_STATUS_LABELS",
+    /MANUALLY_SELECTABLE_OPERATIONAL_STATUSES/,
+    "dropdown de acao deve usar a lista de selecionaveis",
   );
 });
 

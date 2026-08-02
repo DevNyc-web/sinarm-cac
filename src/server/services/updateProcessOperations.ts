@@ -35,6 +35,32 @@ const OPERATIONAL_STATUSES: readonly OperationalStatus[] = [
   "CANCELADO_DEV",
 ];
 
+/**
+ * Valores que a porta MANUAL/admin NAO pode receber (docs/50 §3).
+ *
+ * `DOCUMENTO_ENVIADO` sai da lista porque escolhe-lo aqui produz um BECO SEM
+ * SAIDA: esta porta move so o PROCESSO, e o documento tem status proprio que
+ * ela nunca toca. `reviewProcessDocument` recusa documento ja `APROVADO`/
+ * `REJEITADO` — entao o processo passa a dizer "aguardando conferencia"
+ * enquanto ninguem consegue conferir.
+ *
+ * NAO e proibicao de dominio: o fluxo NATURAL (`uploadProcessDocument`) segue
+ * produzindo `DOCUMENTO_ENVIADO` pela porta canonica, junto com o status do
+ * documento. O que fica bloqueado e so o atalho manual generico.
+ *
+ * Sai daqui quando a acao explicita "reabrir conferencia documental"
+ * (docs/50 §5) existir — ela move os DOIS lados de uma vez.
+ */
+const MANUAL_PORT_BLOCKED: readonly OperationalStatus[] = ["DOCUMENTO_ENVIADO"];
+
+/**
+ * O que o dropdown do admin pode oferecer. Derivado da lista de bloqueados, e
+ * nao escrito a mao, para que um valor novo do enum nasca SELECIONAVEL e a
+ * decisao de bloquear seja sempre explicita.
+ */
+export const MANUALLY_SELECTABLE_OPERATIONAL_STATUSES: readonly OperationalStatus[] =
+  OPERATIONAL_STATUSES.filter((status) => !MANUAL_PORT_BLOCKED.includes(status));
+
 const PRIORITIES: readonly ProcessPriority[] = ["BAIXA", "NORMAL", "ALTA", "URGENTE"];
 
 /**
@@ -151,6 +177,21 @@ export async function changeOperationalStatus(
     const process = await findProcessByIdForAdmin(processId, false);
     if (!process) return { ok: false, error: "Processo nao encontrado." };
     if (process.operationalStatus === status) return { ok: true };
+
+    // DEPOIS do no-op de proposito: um processo que JA esta em
+    // `DOCUMENTO_ENVIADO` (posto ali pelo fluxo natural de upload) continua
+    // podendo reenviar o mesmo valor sem erro. O que se recusa e MOVER para
+    // ele por esta porta — o beco sem saida do docs/50 §3.
+    if (MANUAL_PORT_BLOCKED.includes(status)) {
+      return {
+        ok: false,
+        error:
+          "Mover para 'Documento enviado' por aqui deixaria o processo aguardando " +
+          "conferencia com o documento ainda revisado — e ninguem conseguiria " +
+          "conferir. Use a revisao do documento; a acao de reabrir conferencia " +
+          "ainda nao existe (docs/50).",
+      };
+    }
 
     // Quatro dos nove valores passam pela porta canonica aqui: os 3 com
     // InternalStatus homonimo (Fase 5g, docs/46 §3.5) e `BLOQUEADO`, que ganhou
