@@ -29,6 +29,12 @@ export const PERMISSIONS = [
   // para conferir, e a matriz deixaria de responder "quem pode registrar
   // aprovacao fora do fluxo?".
   "document.review.approveOutOfFlow",
+  // Registrar CANCELAMENTO REAL do processo (docs/51). Permissao PROPRIA,
+  // mesmo criterio das duas acima: reusar `process.operationalStatus` daria
+  // "cancelar de verdade" a quem so pediu para mover a fila, e a matriz
+  // deixaria de responder "quem pode cancelar processo?". Acao IRREVERSIVEL
+  // (docs/51 regra: nenhum estado pos-cancelamento volta por esta acao).
+  "process.cancel",
   "process.assign", // Atribuir/trocar responsavel pelo processo (docs/11 §4)
   "process.priority", // Alterar prioridade operacional (docs/11 §4)
   "process.operationalStatus", // Mover o status operacional da fila
@@ -67,6 +73,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "document.review": "Aprovar/rejeitar documento do processo",
   "document.review.reopen": "Reabrir conferencia de documento ja revisado",
   "document.review.approveOutOfFlow": "Registrar aprovacao documental feita fora do fluxo",
+  "process.cancel": "Cancelar processo (cancelamento real)",
   "process.assign": "Atribuir responsavel pelo processo",
   "process.priority": "Alterar prioridade do processo",
   "process.operationalStatus": "Mover status operacional",
@@ -112,6 +119,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     //
     // `document.review.approveOutOfFlow` tambem NAO entra, mesmo criterio:
     // assinar uma aprovacao feita fora do formulario de revisao fica com ADMIN.
+    //
+    // `process.cancel` tambem NAO entra: cancelamento real e decisao
+    // IRREVERSIVEL sobre o processo, mais sensivel que mover a fila — fica
+    // com ADMIN ate decisao explicita em contrario.
     "process.assign",
     "process.priority",
     "process.operationalStatus",

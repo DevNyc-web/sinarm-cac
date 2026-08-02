@@ -195,6 +195,29 @@ ordem, não autorização de execução.
 
 ---
 
+> **Atualização (2026-08-02, PR seguinte).** O service backend `cancelProcess`
+> foi implementado (`src/server/services/cancelProcess.ts`), com permissão
+> própria `process.cancel` (ADMIN-only) e motivo obrigatório (mínimo de 10
+> caracteres). **Continua SEM UI/botão** — nenhum arquivo em `src/app` foi
+> tocado; a superfície fica para PR próprio, quando decidida. Usa a porta
+> canônica `transitionInternalStatus` para `CANCELADO_OPERACIONAL`, **sem**
+> `alsoSet`: `operationalStatus` não muda, e a divergência resultante continua
+> `needs_decision` em `statusDivergence.ts`, de propósito — os itens 11–13
+> (reembolso, processo protocolado, reversão) seguem sem resposta, e forçar
+> `operationalStatus` aqui seria decidir por eles de carona. A allowlist de
+> estados canceláveis ficou **mais restrita** que a lista inicial deste
+> documento: cobre só os 6 estados pré-automação/documentais
+> (`RASCUNHO`, `AGUARDANDO_PAGAMENTO`, `PAGO_EM_FILA`,
+> `DOCUMENTO_RECEBIDO_PARA_ANALISE`, `DOCUMENTO_VALIDADO`,
+> `BLOQUEADO_OPERACIONAL`) — os estados de automação Gov.br/SINARM em
+> andamento, exceções, pós-protocolo e os três já-terminais (`CONCLUIDO`,
+> `CANCELADO_REEMBOLSADO`, `CANCELADO_OPERACIONAL`) ficam bloqueados até
+> decisão própria. `CANCELADO_DEV` continua technical/dev, nunca tratado como
+> cancelamento real. Nenhum documento, pagamento ou arquivo de storage é
+> tocado. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**. Não implementa `cancelProcess`,
 > não cria `InternalStatus` novo, não migra `CANCELADO_DEV`, não fecha gate e
 > não autoriza execução real. Regras permanentes (`docs/00 §8`) e bloqueios de
