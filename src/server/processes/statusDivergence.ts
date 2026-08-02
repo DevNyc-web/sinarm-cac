@@ -30,7 +30,8 @@
  *    `PAGO_EM_FILA`, mesmo valor nos dois campos) mais os pares migrados fase
  *    a fase pela porta canonica (`DOCUMENTO_RECEBIDO_PARA_ANALISE` ↔
  *    `DOCUMENTO_ENVIADO`, Fase 5e; `DOCUMENTO_VALIDADO` ↔ `DOCUMENTO_APROVADO`,
- *    Fase 5f — docs/47). Unico caso sem divergencia.
+ *    Fase 5f — docs/47; `BLOQUEADO_OPERACIONAL` ↔ `BLOQUEADO`, Fase 5f
+ *    completa — docs/48). Unico caso sem divergencia.
  *  - `severity: "expected_legacy"` — divergencia CONHECIDA e de baixo risco:
  *    `operationalStatus` avancou via um write legado (docs/46 §3) que ainda
  *    nao tem porta canonica, mas o hop e simples e sem ambiguidade.
@@ -98,8 +99,14 @@ export type StatusDivergenceDiagnosis = {
  * do `OperationalStatus` de origem, por decisao do docs/47 §6.2).
  * `operationalStatus` continua indo para `DOCUMENTO_ENVIADO`/
  * `DOCUMENTO_APROVADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
- * O lado REJEITADO de `reviewProcessDocument` (→ `BLOQUEADO`) NAO migrou:
- * fica em `LEGACY_OPERATIONAL_DRIFT` ate a decisao propria do docs/47 §6.5.
+ *
+ * `BLOQUEADO_OPERACIONAL` fecha a Fase 5f: o lado REJEITADO de
+ * `reviewProcessDocument` passou pela mesma porta (docs/48), com
+ * `operationalStatus` continuando em `BLOQUEADO` via `alsoSet`. ATENCAO — este
+ * par e o unico em que o `operationalStatus` do lado direito AINDA TEM outro
+ * escritor legado vivo: o dropdown de `updateProcessOperations` (Fase 5g,
+ * pendente) escreve `BLOQUEADO` sem tocar `internalStatus`. Por isso o par
+ * seguro nao torna `LEGACY_OPERATIONAL_DRIFT.BLOQUEADO` letra morta.
  */
 const SAFE_PROJECTION = {
   RASCUNHO: "RASCUNHO",
@@ -107,6 +114,7 @@ const SAFE_PROJECTION = {
   PAGO_EM_FILA: "PAGO_EM_FILA",
   DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
   DOCUMENTO_VALIDADO: "DOCUMENTO_APROVADO",
+  BLOQUEADO_OPERACIONAL: "BLOQUEADO",
 } as const satisfies Partial<Record<InternalStatus, OperationalStatus>>;
 
 const SAFE_INTERNAL_VALUES = Object.keys(SAFE_PROJECTION) as (keyof typeof SAFE_PROJECTION)[];
@@ -183,12 +191,21 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
       "So chega via updateProcessOperations (docs/46 3.5).",
   },
   BLOQUEADO: {
+    // Continua `needs_decision`, ao contrario de DOCUMENTO_ENVIADO/
+    // DOCUMENTO_APROVADO acima: aqueles viraram `expected_legacy` porque, apos
+    // 5e/5f, so DADO ANTIGO produz a combinacao. Aqui nao — o dropdown de
+    // updateProcessOperations ainda escreve BLOQUEADO HOJE sem tocar
+    // internalStatus, e a Fase 5g sobre esse write segue aberta. Rebaixar
+    // agora diria "nada a decidir" sobre um write vivo.
     severity: "needs_decision",
     reason:
-      "reviewProcessDocument (rejeicao) escreve isto sozinho (docs/46 3.4). " +
-      "Mapear para BLOQUEADO_INSTABILIDADE ou qualquer EXCECAO_* sem decisao " +
-      "propria e PROIBIDO (docs/46 3.4/6): perderia a causa especifica do " +
-      "bloqueio.",
+      "a rejeicao de reviewProcessDocument MIGROU (docs/48) e agora produz o " +
+      "par seguro BLOQUEADO_OPERACIONAL/BLOQUEADO; esta combinacao restante e " +
+      "dado ANTERIOR a essa migracao OU escrita do dropdown de " +
+      "updateProcessOperations, que continua legado ate a Fase 5g (docs/46 " +
+      "3.5). Mapear para BLOQUEADO_INSTABILIDADE ou qualquer EXCECAO_* " +
+      "continua PROIBIDO (docs/46 3.4/6): afirmaria causa apurada pela " +
+      "automacao onde houve decisao humana.",
   },
   CANCELADO_DEV: {
     severity: "needs_decision",
@@ -202,7 +219,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 13 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * Os 12 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
  * §6): nenhum fluxo real os escreve, mas o diagnostico cobre a combinacao
  * mesmo assim - conservador por definicao, nao por observacao.
  *
@@ -210,13 +227,11 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
  *
- * UM dos 13 tem candidato APROVADO pendente de migracao:
- * `BLOQUEADO_OPERACIONAL` → `BLOQUEADO` (docs/48). Os dois que estavam nessa
- * situacao antes (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e;
- * `DOCUMENTO_VALIDADO`, Fase 5f) saíram desta tabela quando os fluxos
- * correspondentes migraram, e os pares viraram seguros (`SAFE_PROJECTION`
- * acima) — mesmo caminho que `BLOQUEADO_OPERACIONAL` deve seguir quando o lado
- * rejeicao de `reviewProcessDocument` migrar. Os candidatos restantes
+ * Nenhum dos 12 tem candidato APROVADO pendente de migracao — os tres que
+ * tinham (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e; `DOCUMENTO_VALIDADO`,
+ * Fase 5f; `BLOQUEADO_OPERACIONAL`, Fase 5f completa/docs/48) saíram desta
+ * tabela quando os fluxos correspondentes migraram, e os pares viraram
+ * seguros (`SAFE_PROJECTION` acima). Os candidatos restantes
  * (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
  * `PROTOCOLADO_GRU_GERADA` → `PRONTO_PARA_PROTOCOLO_MANUAL`,
  * `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`) sao ARRISCADOS ou FALSOS, nao
@@ -291,23 +306,6 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "docs/46 6: CANCELADO_DEV afirmaria cancelamento de ambiente de " +
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
-  },
-  // Candidato APROVADO (docs/48), nao so citado — mas ainda SEM CONSUMIDOR: a
-  // decisao deu a direcao, nao migrou fluxo nenhum. `severity` continua
-  // `needs_decision` porque nenhum write real produz esta combinacao ainda; o
-  // candidato aprovado nao vira `none` so por existir no enum, teria que
-  // existir tambem um write produzindo o par. Se aparecer hoje, e escrita fora
-  // de banda — mesmo tratamento que `DOCUMENTO_RECEBIDO_PARA_ANALISE` e
-  // `DOCUMENTO_VALIDADO` tiveram entre a migration da 5d e as Fases 5e/5f.
-  BLOQUEADO_OPERACIONAL: {
-    candidateOperationalStatus: "BLOQUEADO",
-    severity: "needs_decision",
-    reason:
-      "docs/48: candidato aprovado para BLOQUEADO, mas o lado rejeicao de " +
-      "reviewProcessDocument (Fase 5f) e o BLOQUEADO da porta manual/admin " +
-      "(Fase 5g) ainda nao migraram - nenhum fluxo escreve " +
-      "BLOQUEADO_OPERACIONAL hoje. Se aparecer, e escrita fora de banda, nao " +
-      "o caminho aprovado.",
   },
 };
 

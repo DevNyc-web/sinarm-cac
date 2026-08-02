@@ -202,9 +202,11 @@ test("os 6 estados sem equivalente canonico (docs/46 §7) tem severidade coerent
   // EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL e CANCELADO_DEV nao
   // tem teste obrigatorio individual no pedido, mas fecham a cobertura dos 6.
   // DOCUMENTO_ENVIADO e DOCUMENTO_APROVADO sao expected_legacy — os dois ja
-  // tem par migrado (Fases 5e/5f); o resto continua needs_decision porque
-  // NENHUM deles tem fluxo migrado ou decisao fechada (BLOQUEADO exige
-  // decisao propria, docs/47 §6.5).
+  // tem par migrado (Fases 5e/5f) e SO dado antigo produz a combinacao.
+  // BLOQUEADO continua needs_decision mesmo tendo par migrado (docs/48): o
+  // dropdown de updateProcessOperations ainda o escreve HOJE sem tocar
+  // internalStatus, e a Fase 5g desse write segue aberta. Os outros tres nao
+  // tem fluxo migrado nem decisao fechada.
   const casos: [import("@prisma/client").OperationalStatus, DivergenceSeverity][] = [
     ["DOCUMENTO_ENVIADO", "expected_legacy"],
     ["DOCUMENTO_APROVADO", "expected_legacy"],
@@ -273,29 +275,40 @@ test("PROTOCOLADO_GRU_GERADA: candidato documentado, mas inverte o tempo", () =>
   assert.match(result.reason, /inverte o tempo/);
 });
 
-test("BLOQUEADO_OPERACIONAL: candidato APROVADO (docs/48), mas continua needs_decision sem fluxo migrado", () => {
-  // A diferenca em relacao ao teste acima: aqui o candidato nao e "arriscado",
-  // e aprovado por decisao propria. Mesmo assim NAO vira `none` — enquanto
-  // nenhum write real produzir o par, a combinacao so pode ter chegado por
-  // escrita fora de banda. Mesmo tratamento que DOCUMENTO_RECEBIDO_PARA_ANALISE
-  // e DOCUMENTO_VALIDADO tiveram entre a migration da 5d e as Fases 5e/5f.
-  const comBloqueado = diagnoseStatusDivergence({
+test("BLOQUEADO_OPERACIONAL + BLOQUEADO: par migrado, sem divergencia (Fase 5f completa)", () => {
+  // O lado REJEICAO de reviewProcessDocument passou pela porta canonica
+  // (docs/48): esta combinacao e agora o resultado ESPERADO de uma rejeicao
+  // nova, nao mais needs_decision. Nomes diferentes nos dois campos, como nos
+  // pares das Fases 5e/5f.
+  const result = diagnoseStatusDivergence({
     internalStatus: "BLOQUEADO_OPERACIONAL",
     operationalStatus: "BLOQUEADO",
   });
-  assert.equal(comBloqueado.hasDivergence, true, "par aprovado ainda nao e par migrado");
-  assert.equal(comBloqueado.severity, "needs_decision");
-  assert.equal(comBloqueado.expectedOperationalStatus, "BLOQUEADO");
-  assert.match(comBloqueado.reason, /docs\/48/);
-  assert.match(comBloqueado.reason, /fora de banda/);
+  assert.equal(result.hasDivergence, false);
+  assert.equal(result.severity, "none");
+  assert.equal(result.expectedOperationalStatus, "BLOQUEADO");
+});
 
-  // E com qualquer outro operationalStatus tambem nao vira `none`.
-  const comRascunho = diagnoseStatusDivergence({
-    internalStatus: "BLOQUEADO_OPERACIONAL",
-    operationalStatus: "RASCUNHO",
-  });
-  assert.equal(comRascunho.severity, "needs_decision");
-  assert.notEqual(comRascunho.severity, "none");
+test("BLOQUEADO_OPERACIONAL com operationalStatus DIFERENTE de BLOQUEADO ainda diverge", () => {
+  // Migrado nao significa "sempre none": so a combinacao ESPERADA e segura.
+  const operacionais = [
+    "RASCUNHO",
+    "DOCUMENTO_ENVIADO",
+    "DOCUMENTO_APROVADO",
+    "AGUARDANDO_PAGAMENTO",
+    "PAGO_EM_FILA",
+    "EM_REVISAO_OPERACIONAL",
+    "PRONTO_PARA_PROTOCOLO_MANUAL",
+    "CANCELADO_DEV",
+  ] as const;
+  for (const operationalStatus of operacionais) {
+    const result = diagnoseStatusDivergence({
+      internalStatus: "BLOQUEADO_OPERACIONAL",
+      operationalStatus,
+    });
+    assert.notEqual(result.severity, "none", `BLOQUEADO_OPERACIONAL + ${operationalStatus}`);
+    assert.equal(result.hasDivergence, true, `BLOQUEADO_OPERACIONAL + ${operationalStatus}`);
+  }
 });
 
 test("internalStatus avancado sem candidato documentado: needs_decision, sem inventar valor", () => {
@@ -470,9 +483,6 @@ test("apenas os pares seguros produzem severity 'none'", () => {
     "AGUARDANDO_CAPTCHA",
     "DOCUMENTO_RECEBIDO_PARA_ANALISE",
     "DOCUMENTO_VALIDADO",
-    // docs/48: candidato APROVADO para BLOQUEADO, mas sem fluxo migrado — entra
-    // nesta varredura justamente para provar que continua FORA de PARES_SEGUROS
-    // abaixo. Estado aprovado no papel nao vira "none" so por existir no enum.
     "BLOQUEADO_OPERACIONAL",
   ] as const;
   const operacionais = [
@@ -488,8 +498,9 @@ test("apenas os pares seguros produzem severity 'none'", () => {
   ] as const;
 
   // Independente da tabela interna do modulo, de proposito: os pares
-  // DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (Fase 5e) e
-  // DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (Fase 5f, docs/47) sao os seguros
+  // DOCUMENTO_RECEBIDO_PARA_ANALISE/DOCUMENTO_ENVIADO (Fase 5e),
+  // DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (Fase 5f, docs/47) e
+  // BLOQUEADO_OPERACIONAL/BLOQUEADO (Fase 5f completa, docs/48) sao os seguros
   // com NOMES DIFERENTES nos dois campos — os 3 originais (docs/46 §6) tem o
   // mesmo nome nos dois lados.
   const PARES_SEGUROS: Record<string, string> = {
@@ -498,6 +509,7 @@ test("apenas os pares seguros produzem severity 'none'", () => {
     PAGO_EM_FILA: "PAGO_EM_FILA",
     DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
     DOCUMENTO_VALIDADO: "DOCUMENTO_APROVADO",
+    BLOQUEADO_OPERACIONAL: "BLOQUEADO",
   };
 
   let semDivergencia = 0;
@@ -519,9 +531,10 @@ test("apenas os pares seguros produzem severity 'none'", () => {
   }
   assert.equal(
     semDivergencia,
-    5,
+    6,
     "RASCUNHO/idem, AGUARDANDO_PAGAMENTO/idem, PAGO_EM_FILA/idem, " +
-      "DOCUMENTO_RECEBIDO_PARA_ANALISE+DOCUMENTO_ENVIADO, DOCUMENTO_VALIDADO+DOCUMENTO_APROVADO",
+      "DOCUMENTO_RECEBIDO_PARA_ANALISE+DOCUMENTO_ENVIADO, DOCUMENTO_VALIDADO+DOCUMENTO_APROVADO, " +
+      "BLOQUEADO_OPERACIONAL+BLOQUEADO",
   );
 });
 

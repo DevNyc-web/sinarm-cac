@@ -31,11 +31,16 @@ import { INTERNAL_STATUS_LABELS } from "../../../src/server/processes/statusLabe
 
 const NOVOS_ESTADOS = ["AGUARDANDO_CONFIRMACAO_HUMANA", "AGUARDANDO_CAPTCHA"] as const;
 
-/** docs/48 — decidido, migrado no enum, mas ainda sem nenhum fluxo escrevendo. */
+/** docs/48 — ja TEM consumidor: a rejeicao de `reviewProcessDocument`. */
 const BLOQUEIO_HUMANO = "BLOQUEADO_OPERACIONAL" as const;
 
-/** Todos os que este arquivo cobre: enum sim, consumidor nao. */
-const SEM_CONSUMIDOR = [...NOVOS_ESTADOS, BLOQUEIO_HUMANO] as const;
+/**
+ * Os que este arquivo cobre como "enum sim, consumidor nao" — hoje so os da
+ * Fase 2. `BLOQUEADO_OPERACIONAL` saiu desta lista quando a rejeicao migrou
+ * (docs/48); o que sobra dele aqui e a trava de que NENHUM outro fluxo o
+ * escreve, logo abaixo.
+ */
+const SEM_CONSUMIDOR = NOVOS_ESTADOS;
 
 const MIGRATION_BLOQUEIO =
   "prisma/migrations/20260801000000_add_blocked_operational_status/migration.sql";
@@ -166,20 +171,24 @@ test("o rotulo distingue das duas fontes de confusao vizinhas", () => {
   assert.doesNotMatch(rotulo, /instabilidade/i, "nao e pausa por instabilidade do portal");
 });
 
-test("BLOQUEADO_OPERACIONAL nao e escrito por reviewProcessDocument — rejeicao continua legada", () => {
-  const code = codeOnly(readFileSync("src/server/services/reviewProcessDocument.ts", "utf8"));
-  assert.ok(!usaEstado(code, BLOQUEIO_HUMANO),"a Fase 5f (lado rejeicao) nao e este PR");
-  // O caminho legado tem que continuar exatamente onde estava.
-  assert.match(
-    code,
-    /updateProcessOperations\s*\(\s*document\.processId,\s*\{\s*operationalStatus:\s*"BLOQUEADO"/,
-    "rejeicao deveria continuar escrevendo BLOQUEADO direto, sem porta canonica",
+test("BLOQUEADO_OPERACIONAL tem EXATAMENTE um consumidor: a rejeicao de reviewProcessDocument", () => {
+  const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
+  assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
+
+  const consumidores = fluxos
+    .filter((caminho) => usaEstado(codeOnly(readFileSync(caminho, "utf8")), BLOQUEIO_HUMANO))
+    .map((c) => c.split("\\").join("/"));
+
+  assert.deepEqual(
+    consumidores,
+    ["src/server/services/reviewProcessDocument.ts"],
+    "BLOQUEADO_OPERACIONAL deveria aparecer so em reviewProcessDocument.ts (docs/48)",
   );
 });
 
 test("BLOQUEADO_OPERACIONAL nao e escrito por updateProcessOperations — dropdown continua legado", () => {
   const code = codeOnly(readFileSync("src/server/services/updateProcessOperations.ts", "utf8"));
-  assert.ok(!usaEstado(code, BLOQUEIO_HUMANO),"a Fase 5g de BLOQUEADO nao e este PR");
+  assert.ok(!usaEstado(code, BLOQUEIO_HUMANO), "a Fase 5g de BLOQUEADO nao e este PR");
   // Os 3 migrados na 5g continuam sendo os unicos com porta canonica; BLOQUEADO
   // nao ganhou bloco proprio de carona.
   assert.doesNotMatch(code, /toStatus:\s*"BLOQUEADO/);

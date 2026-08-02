@@ -82,13 +82,13 @@ const ALLOWED_WRITES: readonly AllowedWrite[] = [
     file: "src/server/services/reviewProcessDocument.ts",
     sink: "alsoSet",
     value: '"DOCUMENTO_APROVADO"',
-    why: "docs/46 §3.3 — JA MIGRADO na Fase 5f, lado aprovacao (docs/47 §6.2): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_VALIDADO`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`/`uploadProcessDocument`. O lado REJEITADO (proxima entrada) NAO foi tocado.",
+    why: "docs/46 §3.3 — JA MIGRADO na Fase 5f, lado aprovacao (docs/47 §6.2): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `DOCUMENTO_VALIDADO`, com evento tipado. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet` — mesmo padrao de `confirmPixPayment`/`uploadProcessDocument`. O lado REJEITADO (proxima entrada) migrou depois, pela decisao propria do docs/48.",
   },
   {
     file: "src/server/services/reviewProcessDocument.ts",
-    sink: "updateProcessOperations(...)",
+    sink: "alsoSet",
     value: '"BLOQUEADO"',
-    why: "docs/46 §3.4 — legado conhecido (rejeicao), permitido temporariamente. PROIBIDO mapear para `BLOQUEADO_INSTABILIDADE` ou `EXCECAO_*` sem decisao propria: inventaria a causa do bloqueio.",
+    why: "docs/46 §3.4 — JA MIGRADO na Fase 5f completa, lado rejeicao (docs/48): passa pela porta canonica `transitionInternalStatus`, internalStatus vai para `BLOQUEADO_OPERACIONAL` (categoria NOVA para bloqueio decidido por HUMANO), com evento tipado e o motivo em `note`. `operationalStatus` continua sendo DECISAO deste fluxo, so que via `alsoSet`. CONTINUA PROIBIDO mapear para `BLOQUEADO_INSTABILIDADE` ou `EXCECAO_*`: aqueles afirmam causa apurada pela automacao.",
   },
   {
     file: "src/server/services/updateProcessOperations.ts",
@@ -464,26 +464,26 @@ test("o inventario continua com 5 CAMINHOS de decisao, agora 8 escritas literais
   assert.equal(passthrough, 1, "o repasse canonico e um: `alsoSet` em transitionInternalStatus");
 });
 
-test("a Fase 5g reduziu os writes soltos: 6 migrados (sink alsoSet), 2 ainda legado", () => {
+test("a Fase 5f completa zerou os writes soltos de fluxo natural: 7 migrados (sink alsoSet), 1 ainda legado", () => {
   // "Write solto" = decisao de operationalStatus que NAO passa pela porta
   // canonica: sink `updateProcessOperations(...)` direto. Migrado = sink
   // `alsoSet`, mesmo padrao de `confirmPixPayment` (docs/46 §3.1),
-  // `uploadProcessDocument` (Fase 5e), o lado aprovacao de
-  // `reviewProcessDocument` (Fase 5f) e agora RASCUNHO/AGUARDANDO_PAGAMENTO/
-  // PAGO_EM_FILA de `updateProcessOperations` (Fase 5g). Progressao: 1/4
-  // (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2 (5g). "Soltos" NAO caiu na
-  // 5g porque a escrita dinamica que sobrou (`status`, os 6 valores sem
-  // InternalStatus homonimo) e UMA linha so, igual antes — o solto que sumiu
-  // foi substituido por 3 escritas migradas, nao por reducao do legado.
+  // `uploadProcessDocument` (Fase 5e), os DOIS lados de
+  // `reviewProcessDocument` (aprovacao na 5f; rejeicao na 5f completa, docs/48)
+  // e RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA de `updateProcessOperations`
+  // (Fase 5g). Progressao: 1/4 (antes da 5e) -> 2/3 (5e) -> 3/2 (5f) -> 6/2
+  // (5g) -> 7/1 (5f completa). O unico solto restante e a linha dinamica da
+  // porta MANUAL/admin: nenhum fluxo NATURAL escreve operationalStatus fora da
+  // porta canonica agora.
   const decisoes = DETECTED.filter((write) => ALLOWED_WRITES.some((a) => matches(write, a)));
   const migrados = decisoes.filter((write) => write.sink === "alsoSet").length;
   const soltos = decisoes.filter((write) => write.sink === "updateProcessOperations(...)").length;
   assert.equal(
     migrados,
-    6,
-    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao) + updateProcessOperations (RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA)",
+    7,
+    "confirmPixPayment + uploadProcessDocument + reviewProcessDocument (aprovacao E rejeicao) + updateProcessOperations (RASCUNHO/AGUARDANDO_PAGAMENTO/PAGO_EM_FILA)",
   );
-  assert.equal(soltos, 2, "reviewProcessDocument (rejeicao) + updateProcessOperations (os 6 valores legados, 1 linha dinamica)");
+  assert.equal(soltos, 1, "so updateProcessOperations (os 6 valores legados, 1 linha dinamica)");
   assert.equal(migrados + soltos, decisoes.length, "todo write de decisao e um dos dois sinks");
 });
 
@@ -508,14 +508,31 @@ test("a Fase 5g migra so 3 dos 9 valores de updateProcessOperations; os outros 6
   );
 });
 
-test("o lado REJEITADO de reviewProcessDocument continua legado (BLOQUEADO, sink solto)", () => {
+test("o lado REJEITADO de reviewProcessDocument migrou (BLOQUEADO, sink alsoSet)", () => {
   // Explicito, alem do teste generico acima: garante que especificamente o
-  // BLOQUEADO de reviewProcessDocument nao migrou junto com a aprovacao.
+  // BLOQUEADO de reviewProcessDocument saiu do sink solto. Era a ultima
+  // escrita de fluxo NATURAL fora da porta canonica (docs/48).
   const rejeicao = DETECTED.find(
     (write) => write.file === "src/server/services/reviewProcessDocument.ts" && write.value === '"BLOQUEADO"',
   );
   assert.ok(rejeicao, "write de BLOQUEADO em reviewProcessDocument nao encontrado");
-  assert.equal(rejeicao!.sink, "updateProcessOperations(...)", "BLOQUEADO ainda deveria ser write solto");
+  assert.equal(rejeicao!.sink, "alsoSet", "BLOQUEADO deveria passar pela porta canonica agora");
+
+  // E o arquivo nao pode mais chamar a porta legada em ramo nenhum.
+  const code = readFileSync("src/server/services/reviewProcessDocument.ts", "utf8");
+  assert.doesNotMatch(
+    codeOnly(code),
+    /updateProcessOperations\s*\(/,
+    "nenhum ramo de reviewProcessDocument deveria mais escrever pela porta legada",
+  );
+});
+
+test("o BLOQUEADO de updateProcessOperations continua legado — a Fase 5g dele nao e este PR", () => {
+  // A rejeicao migrou; o dropdown do admin NAO. Sem esta trava, o proximo PR
+  // poderia migrar os dois de carona e ninguem notaria pela contagem.
+  const code = codeOnly(readFileSync("src/server/services/updateProcessOperations.ts", "utf8"));
+  assert.doesNotMatch(code, /toStatus:\s*"BLOQUEADO_OPERACIONAL"/);
+  assert.doesNotMatch(code, /alsoSet:\s*\{\s*operationalStatus:\s*"BLOQUEADO"/);
 });
 
 test("os 5 writes estao onde docs/46 §3 diz que estao", () => {
