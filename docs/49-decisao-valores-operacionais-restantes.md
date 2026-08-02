@@ -181,6 +181,19 @@ Isto confirma e detalha a consequência que `docs/47 §9` já havia registrado.
 Nenhum destes é pré-requisito de piloto ou divulgação — isso segue dependendo
 das pendências de `docs/23 §5`.
 
+> **Atualização (2026-08-02).** Itens **1** (`b5003d8` — classificação
+> `operational_only`/`expected_legacy` em `statusDivergence`), **2** (`docs/50 §5`
+> — ação "reabrir conferência documental"), **3** (`docs/50 §6` — ação "aprovar
+> fora do fluxo") e **5** (`operationalStatusProjection.ts` + testes de
+> equivalência) **foram implementados**. A 5h é parcial **por construção**, como
+> esta seção previa: cobre os 6 pares canônicos e classifica os 3 valores
+> só-operacionais, sem tentar derivar `operationalStatus` por inteiro.
+> **Item 4 (decisão sobre cancelamento real de `CANCELADO_DEV`, categoria C)
+> continua ABERTO** — nenhum PR fechou essa decisão, e `CANCELADO_DEV` continua
+> fora da projeção canônica. Uso da projeção parcial em relatórios/admin (além
+> do diagnóstico interno) também continua **em aberto**, se algum dia for
+> desejado. **Execução real continua bloqueada.**
+
 ---
 
 ## 8. Proibições

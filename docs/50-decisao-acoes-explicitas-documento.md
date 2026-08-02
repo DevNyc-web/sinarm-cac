@@ -203,6 +203,18 @@ precisão que `BLOQUEADO` exigiu no `docs/48`/#82.
 Nenhum destes é pré-requisito de piloto ou divulgação — isso segue dependendo
 das pendências de `docs/23 §5`.
 
+> **Atualização (2026-08-02).** Os 4 PRs desta tabela foram implementados: **1**
+> `reopenDocumentReview` (ação "reabrir conferência documental", §5); **2**
+> `approveDocumentOutOfFlow` (ação "registrar aprovação fora do fluxo", §6); **3**
+> `DOCUMENTO_ENVIADO` e `DOCUMENTO_APROVADO` saíram de
+> `MANUALLY_SELECTABLE_OPERATIONAL_STATUSES` — a porta manual recusa os dois
+> hoje; **4** as razões de `expected_legacy` em `statusDivergence.ts` foram
+> reescritas para citar só DADO ANTIGO, sem mais afirmar dropdown vivo. O
+> impacto do §8 (dropdown) e do §9 (`statusDivergence`) previstos acima **já
+> aconteceram**. Nenhuma nova permissão substituiu as próprias
+> (`document.review.reopen`, `document.review.approveOutOfFlow`) e nenhuma
+> sobrescreve aprovação/revisão já feita. **Execução real continua bloqueada.**
+
 ---
 
 ## 12. Proibições

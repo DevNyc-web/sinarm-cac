@@ -200,7 +200,7 @@ alcançáveis suficientes para cobrir a fila **sem perda**.
 | **5e** | **Migrar `uploadProcessDocument`** — um gatilho, um valor, guarda clara | código | médio |
 | **5f** | **Migrar `reviewProcessDocument`** — dois caminhos, um deles `BLOQUEADO` | código | médio-alto |
 | **5g** | **Migrar `updateProcessOperations`** — porta do admin, 9 valores | código | **alto** |
-| **5h** | **Só então** avaliar projeção + testes de equivalência de fila | código | **alto** |
+| **5h** | ~~**Só então** avaliar projeção + testes de equivalência de fila~~ — **IMPLEMENTADA (2026-08-02)**: `operationalStatusProjection.ts` centraliza os 6 pares canônicos e classifica os 3 valores só-operacionais; `operationalProjectionEquivalence.test.ts` prova a equivalência exaustiva com `statusDivergence.ts`. Projeção **PARCIAL por desenho** — `docs/49 §5` | código | **alto** |
 
 Ordem de 5e a 5g: do menor para o maior acoplamento, cada uma reversível sozinha.
 
