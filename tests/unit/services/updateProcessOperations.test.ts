@@ -8,7 +8,9 @@
  *    InternalStatus homonimo (docs/46 §6);
  *  - BLOQUEADO — docs/48, via a categoria propria `BLOQUEADO_OPERACIONAL`.
  *
- * Os outros 5 continuam no caminho legado de sempre: so
+ * Dois (DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO) sao RECUSADOS por esta porta —
+ * tem fluxo natural proprio e ficariam sem documento/revisor correspondente
+ * (docs/50 §3/§6). Os tres restantes continuam no caminho legado de sempre: so
  * `operationalStatus`/`userFacingStatus`, sem tocar `internalStatus`, com o
  * evento OPERACIONAL de sempre (kind `STATUS_OPERACIONAL`, rotulo em
  * `fromValue`/`toValue`).
@@ -127,11 +129,10 @@ test("os 3 valores seguros passam a chamar transitionInternalStatus — fromStat
 /* ------------------------------------------------- os 4 valores LEGADOS --- */
 
 // BLOQUEADO saiu desta lista quando migrou (docs/48) — tem bloco proprio
-// abaixo. DOCUMENTO_ENVIADO saiu por outro motivo: deixou de ser aceito nesta
-// porta (docs/50 §3, beco sem saida) e tem bloco proprio tambem. Os quatro
-// restantes continuam na linha dinamica legada.
+// abaixo. DOCUMENTO_ENVIADO e DOCUMENTO_APROVADO sairam por outro motivo:
+// deixaram de ser aceitos nesta porta (docs/50 §3 e §6, beco sem saida) e tem
+// bloco proprio tambem. Os tres restantes continuam na linha dinamica legada.
 const LEGADOS = [
-  "DOCUMENTO_APROVADO",
   "EM_REVISAO_OPERACIONAL",
   "PRONTO_PARA_PROTOCOLO_MANUAL",
   "CANCELADO_DEV",
@@ -215,13 +216,6 @@ test("PRONTO_PARA_PROTOCOLO_MANUAL: preserva a nota de protocolo manual no event
   assert.match(String(evento.note), /MANUAL/);
 });
 
-test("DOCUMENTO_APROVADO: tem candidato canonico mas NAO migra nesta porta (docs/49 categoria A)", async () => {
-  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
-  await changeOperationalStatus(ADMIN, PROCESS_ID, "DOCUMENTO_APROVADO");
-  assert.equal(processo.internalStatus, "RASCUNHO", "nao deveria mover internalStatus nesta fase");
-  assert.equal(processo.operationalStatus, "DOCUMENTO_APROVADO", "efeito operacional inalterado");
-});
-
 /* ------------------ DOCUMENTO_ENVIADO recusado nesta porta (docs/50 §3) --- */
 
 test("DOCUMENTO_ENVIADO: a porta manual RECUSA — evitaria o beco sem saida", async () => {
@@ -253,9 +247,39 @@ test("DOCUMENTO_ENVIADO: reenviar o valor ATUAL continua no-op, nao erro", async
   assert.equal(db.processStatusEvent.rows.length, 0);
 });
 
-test("a lista de selecionaveis exclui DOCUMENTO_ENVIADO e mantem os outros 8", () => {
+/* ----------------- DOCUMENTO_APROVADO recusado nesta porta (docs/50 §6) --- */
+
+test("DOCUMENTO_APROVADO: a porta manual RECUSA — evitaria aprovar sem revisor", async () => {
+  // Mover para ca aprovaria o processo sem revisor, data ou motivo
+  // registrados no documento — exatamente o que approveDocumentOutOfFlow
+  // existe para evitar (docs/50 §6).
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  const result = await changeOperationalStatus(ADMIN, PROCESS_ID, "DOCUMENTO_APROVADO");
+
+  assert.equal(result.ok, false);
+  assert.match(String(result.ok === false && result.error), /revisor/i);
+  assert.equal(processo.operationalStatus, "RASCUNHO", "nada pode ter mudado");
+  assert.equal(processo.internalStatus, "RASCUNHO");
+  assert.equal(db.processStatusEvent.rows.length, 0, "recusa nao grava evento");
+});
+
+test("DOCUMENTO_APROVADO: reenviar o valor ATUAL continua no-op, nao erro", async () => {
+  // Um processo ja aprovado (por reviewProcessDocument ou approveDocumentOutOfFlow)
+  // pode ter a tela reaberta e "Mover" clicado sem trocar nada — a guarda de
+  // no-op vem ANTES da recusa, de proposito.
+  const processo = semearProcesso({
+    operationalStatus: "DOCUMENTO_APROVADO",
+    internalStatus: "DOCUMENTO_VALIDADO",
+  });
+  const result = await changeOperationalStatus(ADMIN, PROCESS_ID, "DOCUMENTO_APROVADO");
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(processo.operationalStatus, "DOCUMENTO_APROVADO");
+  assert.equal(db.processStatusEvent.rows.length, 0);
+});
+
+test("a lista de selecionaveis exclui DOCUMENTO_ENVIADO e DOCUMENTO_APROVADO e mantem os outros 7", () => {
   assert.ok(!MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.includes("DOCUMENTO_ENVIADO"));
-  assert.equal(MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.length, 8);
-  // DOCUMENTO_APROVADO NAO foi bloqueado neste PR — decisao propria (docs/50 §6).
-  assert.ok(MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.includes("DOCUMENTO_APROVADO"));
+  assert.ok(!MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.includes("DOCUMENTO_APROVADO"));
+  assert.equal(MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.length, 7);
 });

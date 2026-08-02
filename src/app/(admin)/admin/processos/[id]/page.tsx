@@ -286,13 +286,15 @@ export default async function AdminProcessoDetalhePage({
                   >
                     {/*
                       `MANUALLY_SELECTABLE_OPERATIONAL_STATUSES` exclui
-                      `DOCUMENTO_ENVIADO` (docs/50 §3): move-lo por aqui deixaria
-                      o processo aguardando conferencia com o documento ainda
-                      revisado. O status ATUAL entra na lista mesmo quando
-                      bloqueado — senao o `defaultValue` nao casaria com opcao
-                      nenhuma, o navegador mostraria a primeira e o operador
-                      moveria o processo sem querer. Reenviar o proprio valor e
-                      no-op no service, entao inclui-lo e seguro.
+                      `DOCUMENTO_ENVIADO` (docs/50 §3) e `DOCUMENTO_APROVADO`
+                      (docs/50 §6): mover para qualquer um deles por aqui
+                      produziria o mesmo processo sem documento/revisor
+                      correspondente. O status ATUAL entra na lista mesmo
+                      quando bloqueado — senao o `defaultValue` nao casaria com
+                      opcao nenhuma, o navegador mostraria a primeira e o
+                      operador moveria o processo sem querer. Reenviar o
+                      proprio valor e no-op no service, entao inclui-lo e
+                      seguro.
                     */}
                     {(MANUALLY_SELECTABLE_OPERATIONAL_STATUSES.includes(
                       detail.operationalStatus,

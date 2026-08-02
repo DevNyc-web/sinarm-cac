@@ -205,10 +205,10 @@ test("expected_legacy: internalStatus RASCUNHO, operationalStatus BLOQUEADO (dad
 
 test("os 6 estados sem equivalente canonico (docs/46 §7) tem severidade coerente", () => {
   // Depois do docs/49, NENHUM dos 6 e `needs_decision`: todos tem disposicao
-  // decidida. Tres sao `expected_legacy` — tem par migrado, e a combinacao vem
-  // de dado antigo ou (nos dois primeiros) do dropdown que so sai por acao
-  // explicita. Tres sao `operational_only` — estado da EQUIPE, decidido como
-  // permanente (categoria B) ou fora da projecao por ora (categoria C).
+  // decidida. Tres sao `expected_legacy` — tem par migrado, e a porta manual
+  // ja recusa os tres hoje, entao a combinacao so vem de dado antigo. Tres sao
+  // `operational_only` — estado da EQUIPE, decidido como permanente
+  // (categoria B) ou fora da projecao por ora (categoria C).
   const casos: [import("@prisma/client").OperationalStatus, DivergenceSeverity][] = [
     ["DOCUMENTO_ENVIADO", "expected_legacy"],
     ["DOCUMENTO_APROVADO", "expected_legacy"],
@@ -286,16 +286,17 @@ test("a razao de DOCUMENTO_ENVIADO nao afirma mais dropdown VIVO (docs/50 §3)",
   assert.match(result.reason, /Nenhum escritor vivo/);
 });
 
-test("a razao de DOCUMENTO_APROVADO CONTINUA citando o dropdown vivo", () => {
-  // Simetria proposital: DOCUMENTO_APROVADO NAO foi bloqueado (docs/50 §6 —
-  // decisao propria), entao o dropdown ainda o escreve hoje e a razao dele
-  // precisa continuar dizendo isso.
+test("a razao de DOCUMENTO_APROVADO nao afirma mais dropdown VIVO (docs/50 §6)", () => {
+  // Simetria com DOCUMENTO_ENVIADO: a porta manual passou a RECUSAR tambem
+  // este valor (PR seguinte ao #88), entao a combinacao so pode vir de dado
+  // antigo — inclusive dado escrito pelo dropdown ANTES da recusa.
   const result = diagnoseStatusDivergence({
     internalStatus: "RASCUNHO",
     operationalStatus: "DOCUMENTO_APROVADO",
   });
-  assert.match(result.reason, /continua legado/);
-  assert.match(result.reason, /acao explicita/);
+  assert.match(result.reason, /DADO ANTIGO/);
+  assert.match(result.reason, /ANTES/, "precisa datar a escrita do dropdown como passada");
+  assert.match(result.reason, /Nenhum escritor vivo/);
 });
 
 // -------------------------------------- 3. internalStatus avancado (§6)

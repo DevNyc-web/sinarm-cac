@@ -518,14 +518,16 @@ test("todo write de BLOQUEADO passa pela porta canonica: 10 migrados (sink alsoS
   }
 });
 
-test("updateProcessOperations migra 4 dos 9 valores; os outros 5 continuam na mesma linha legada", () => {
+test("updateProcessOperations migra 4 dos 9 valores; os outros 5 nao ganham alsoSet, mas so 3 alcancam a linha dinamica", () => {
   // Explicito, alem dos testes gerais acima: garante que especificamente os 3
   // valores com InternalStatus homonimo e o BLOQUEADO saem pelo sink `alsoSet`,
   // e que a linha dinamica remanescente (sink `updateProcessOperations(...)`,
-  // valor `status`) e a UNICA escrita legada que sobra neste arquivo — cobrindo
-  // os 5 valores restantes (inclusive DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO,
-  // que tem candidato nos fluxos naturais mas NAO foram migrados aqui: porta
-  // manual/admin, decisao explicita).
+  // valor `status`) e a UNICA escrita legada que sobra neste arquivo. Ela
+  // continua no CODIGO cobrindo os 5 valores nao-canonicos (nenhum ganhou
+  // ramo `alsoSet`), mas DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO sao recusados
+  // pela guarda MANUAL_PORT_BLOCKED antes de chegar aqui (docs/50 §3/§6) — na
+  // pratica so os outros 3 (EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_
+  // MANUAL, CANCELADO_DEV) alcancam esta escrita em runtime.
   const doArquivo = DETECTED.filter(
     (write) => write.file === "src/server/services/updateProcessOperations.ts",
   );
@@ -540,7 +542,7 @@ test("updateProcessOperations migra 4 dos 9 valores; os outros 5 continuam na me
   assert.deepEqual(
     soltos.map((w) => w.value),
     ["status"],
-    "so deve sobrar UMA escrita dinamica, cobrindo os 5 valores legados",
+    "so deve sobrar UMA escrita dinamica no codigo, mesmo com 2 dos 5 valores nao-canonicos recusados antes dela em runtime",
   );
 });
 

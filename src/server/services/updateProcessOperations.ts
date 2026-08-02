@@ -36,22 +36,46 @@ const OPERATIONAL_STATUSES: readonly OperationalStatus[] = [
 ];
 
 /**
- * Valores que a porta MANUAL/admin NAO pode receber (docs/50 §3).
+ * Valores que a porta MANUAL/admin NAO pode receber (docs/50 §3/§6).
  *
  * `DOCUMENTO_ENVIADO` sai da lista porque escolhe-lo aqui produz um BECO SEM
  * SAIDA: esta porta move so o PROCESSO, e o documento tem status proprio que
  * ela nunca toca. `reviewProcessDocument` recusa documento ja `APROVADO`/
  * `REJEITADO` — entao o processo passa a dizer "aguardando conferencia"
- * enquanto ninguem consegue conferir.
+ * enquanto ninguem consegue conferir. Sai da porta manual desde o docs/50 §5
+ * (PR #86) — a acao explicita "reabrir conferencia documental" e a saida.
  *
- * NAO e proibicao de dominio: o fluxo NATURAL (`uploadProcessDocument`) segue
- * produzindo `DOCUMENTO_ENVIADO` pela porta canonica, junto com o status do
- * documento. O que fica bloqueado e so o atalho manual generico.
+ * `DOCUMENTO_APROVADO` sai pelo mesmo motivo, simetrico: escolhe-lo aqui move
+ * so o PROCESSO, sem revisor, data ou motivo registrados no documento — a
+ * fila passa a dizer "aprovado" para uma conferencia que ninguem assinou
+ * (docs/50 §3, ultimo paragrafo; docs/50 §6). Sai da porta manual desde o
+ * PR #88 — a acao explicita `approveDocumentOutOfFlow` e a saida.
  *
- * Sai daqui quando a acao explicita "reabrir conferencia documental"
- * (docs/50 §5) existir — ela move os DOIS lados de uma vez.
+ * NAO e proibicao de dominio: os fluxos NATURAIS (`uploadProcessDocument`,
+ * `reviewProcessDocument`, `approveDocumentOutOfFlow`) seguem produzindo os
+ * dois valores pela porta canonica, junto com o status do documento. O que
+ * fica bloqueado e so o atalho manual generico.
  */
-const MANUAL_PORT_BLOCKED: readonly OperationalStatus[] = ["DOCUMENTO_ENVIADO"];
+const MANUAL_PORT_BLOCKED: readonly OperationalStatus[] = ["DOCUMENTO_ENVIADO", "DOCUMENTO_APROVADO"];
+
+/**
+ * Motivo de recusa por valor bloqueado. `Record` indexado pelo proprio
+ * `status`, NAO uma cadeia de `if (status === "...")`: aquele padrao e o que
+ * a trava estrutural de `operationalStatusWrites.test.ts` prova ausente (nao
+ * pode nascer um ramo canonico de carona para os valores legados). Isto e so
+ * texto de erro — nao decide destino nenhum.
+ */
+const MANUAL_PORT_BLOCKED_REASON: Record<"DOCUMENTO_ENVIADO" | "DOCUMENTO_APROVADO", string> = {
+  DOCUMENTO_ENVIADO:
+    "Mover para 'Documento enviado' por aqui deixaria o processo aguardando " +
+    "conferencia com o documento ainda revisado — e ninguem conseguiria " +
+    "conferir. Use a revisao do documento; a acao de reabrir conferencia " +
+    "desfaz uma conferencia ja feita (docs/50 §5).",
+  DOCUMENTO_APROVADO:
+    "Mover para 'Documento aprovado' por aqui aprovaria o processo sem " +
+    "revisor, data ou motivo registrados no documento. Use a revisao do " +
+    "documento ou a acao 'aprovar fora do fluxo' (docs/50 §6).",
+};
 
 /**
  * O que o dropdown do admin pode oferecer. Derivado da lista de bloqueados, e
@@ -179,18 +203,11 @@ export async function changeOperationalStatus(
     if (process.operationalStatus === status) return { ok: true };
 
     // DEPOIS do no-op de proposito: um processo que JA esta em
-    // `DOCUMENTO_ENVIADO` (posto ali pelo fluxo natural de upload) continua
-    // podendo reenviar o mesmo valor sem erro. O que se recusa e MOVER para
-    // ele por esta porta — o beco sem saida do docs/50 §3.
+    // `DOCUMENTO_ENVIADO`/`DOCUMENTO_APROVADO` (posto ali pelo fluxo natural de
+    // upload/revisao) continua podendo reenviar o mesmo valor sem erro. O que
+    // se recusa e MOVER para um deles por esta porta.
     if (MANUAL_PORT_BLOCKED.includes(status)) {
-      return {
-        ok: false,
-        error:
-          "Mover para 'Documento enviado' por aqui deixaria o processo aguardando " +
-          "conferencia com o documento ainda revisado — e ninguem conseguiria " +
-          "conferir. Use a revisao do documento; a acao de reabrir conferencia " +
-          "ainda nao existe (docs/50).",
-      };
+      return { ok: false, error: MANUAL_PORT_BLOCKED_REASON[status as "DOCUMENTO_ENVIADO" | "DOCUMENTO_APROVADO"] };
     }
 
     // Quatro dos nove valores passam pela porta canonica aqui: os 3 com
@@ -198,15 +215,11 @@ export async function changeOperationalStatus(
     // categoria propria — `BLOQUEADO_OPERACIONAL`, docs/48 — e ja migrou no
     // fluxo natural (rejeicao de `reviewProcessDocument`).
     //
-    // Os outros 5 continuam no caminho legado abaixo. DOCUMENTO_ENVIADO e
-    // DOCUMENTO_APROVADO TEM candidato canonico nos fluxos naturais
-    // (uploadProcessDocument/reviewProcessDocument), mas esta porta e
-    // MANUAL/admin e sem validacao de maquina de transicoes: mover o
-    // internalStatus aqui poderia retroceder uma jornada ja avancada por um
-    // fluxo real, sem a checagem que so aquele fluxo faz. Os outros tres
-    // (EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL, CANCELADO_DEV)
-    // permanecem so operacionais por decisao do docs/47 §9 — nao ha candidato
-    // para eles, nem havera.
+    // Dois (DOCUMENTO_ENVIADO, DOCUMENTO_APROVADO) nunca chegam aqui: a guarda
+    // acima ja recusou. Os tres restantes (EM_REVISAO_OPERACIONAL,
+    // PRONTO_PARA_PROTOCOLO_MANUAL, CANCELADO_DEV) continuam no caminho
+    // legado abaixo — permanecem so operacionais por decisao do docs/47 §9,
+    // nao ha candidato canonico para eles, nem havera.
     //
     // Ramos LITERAIS de proposito, nao uma tabela `status -> toStatus`: uma
     // tabela seria exatamente o mapa `operationalStatus -> internalStatus` que

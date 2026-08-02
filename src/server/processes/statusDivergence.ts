@@ -165,11 +165,12 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
   Exclude<OperationalStatus, SafeOperationalStatus>,
   { severity: DivergenceSeverity; reason: string }
 > = {
-  // Categoria A do docs/49: TEM candidato canonico e o fluxo natural ja migrou,
-  // mas a porta MANUAL/admin continua escrevendo os dois HOJE — por isso a razao
-  // nomeia as DUAS origens, nao so dado antigo. So saem do legado por acao
-  // explicita propria (reabrir conferencia / aprovar fora do fluxo de revisao),
-  // nunca por migracao automatica daquela linha.
+  // Categoria A do docs/49: TEM candidato canonico e o fluxo natural ja migrou.
+  // A porta MANUAL/admin ja RECUSA os dois hoje (DOCUMENTO_ENVIADO desde o
+  // docs/50 §5/PR #86; DOCUMENTO_APROVADO desde o docs/50 §6/PR #88+seguinte)
+  // — por isso a razao dos dois nomeia so DADO ANTIGO, inclusive o que a porta
+  // escreveu antes de passar a recusar. Nenhum escritor vivo produz nenhuma
+  // das duas combinacoes.
   DOCUMENTO_ENVIADO: {
     severity: "expected_legacy",
     reason:
@@ -186,12 +187,16 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
   DOCUMENTO_APROVADO: {
     severity: "expected_legacy",
     reason:
-      "internalStatus fora de DOCUMENTO_VALIDADO indica dado ANTERIOR a Fase " +
-      "5f (docs/47 §6.2) OU escrita do dropdown de updateProcessOperations, " +
-      "que continua legado por decisao do docs/49 (categoria A: so sai por " +
-      "acao explicita, porque o dropdown nao registra revisor). A aprovacao " +
-      "nova de reviewProcessDocument passa por transitionInternalStatus e " +
-      "produz o par seguro DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO (none).",
+      "so aparece com internalStatus fora de DOCUMENTO_VALIDADO em DADO " +
+      "ANTIGO: ANTERIOR a Fase 5f (docs/47 §6.2), quando reviewProcessDocument " +
+      "ainda nao passava por transitionInternalStatus, ou escrito pelo " +
+      "dropdown de updateProcessOperations ANTES de a porta manual passar a " +
+      "recusar este valor (docs/50 §6 — mover para ca aprovava o processo sem " +
+      "revisor, data ou motivo registrados no documento). Nenhum escritor " +
+      "vivo produz a combinacao: reviewProcessDocument (aprovacao) e " +
+      "approveDocumentOutOfFlow passam por transitionInternalStatus e " +
+      "produzem o par seguro DOCUMENTO_VALIDADO/DOCUMENTO_APROVADO " +
+      "(severity none).",
   },
   // Categoria B do docs/49: estado da EQUIPE, nao da jornada do processo. Nao
   // ha candidato canonico, nem havera — a divergencia e permanente e decidida.
