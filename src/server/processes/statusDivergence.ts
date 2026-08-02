@@ -54,6 +54,11 @@
  * documentado, mas e uma projecao FALSA, nao uma sugestao de uso).
  */
 import { type InternalStatus, type ManualExecutionStatus, type OperationalStatus } from "@prisma/client";
+import {
+  CANONICAL_OPERATIONAL_PROJECTION,
+  hasCanonicalProjection,
+  type CanonicalInternalStatus,
+} from "./operationalStatusProjection";
 
 export const DIVERGENCE_SEVERITIES = [
   "none",
@@ -87,47 +92,15 @@ export type StatusDivergenceDiagnosis = {
 // --------------------------------------------------------- zonas conhecidas
 
 /**
- * Pares com projecao segura — o valor de `internalStatus` (chave) e o
- * `operationalStatus` esperado (valor) quando o processo passou pela porta
- * canonica.
- *
- * Os 3 primeiros vem de docs/46 §6, mesmo nome nos dois campos: so
- * `transitionInternalStatus` escreve `internalStatus`, e por muito tempo o
- * unico chamador real (`confirmPixPayment`) so produzia `RASCUNHO` (default
- * do schema) e `PAGO_EM_FILA` (docs/46 §5). `AGUARDANDO_PAGAMENTO` entrava por
- * completude estrutural, mesmo pouco alcancavel.
- *
- * `DOCUMENTO_RECEBIDO_PARA_ANALISE` e `DOCUMENTO_VALIDADO` sao os pares com
- * NOMES DIFERENTES nos dois campos — a Fase 5e (docs/47 §6.1) migrou
- * `uploadProcessDocument`, e a Fase 5f (docs/47 §6.2) migrou o lado aprovacao
- * de `reviewProcessDocument`, ambos para a porta canonica. Os candidatos
- * aprovados pela 5d tem nome proprio no `InternalStatus` (nao reusam o nome
- * do `OperationalStatus` de origem, por decisao do docs/47 §6.2).
- * `operationalStatus` continua indo para `DOCUMENTO_ENVIADO`/
- * `DOCUMENTO_APROVADO` via `alsoSet` — MESMO efeito final, so a porta mudou.
- *
- * `BLOQUEADO_OPERACIONAL` (docs/48) chegou em duas etapas: primeiro o lado
- * REJEITADO de `reviewProcessDocument`, depois o `BLOQUEADO` do dropdown de
- * `updateProcessOperations`. Com as duas migradas, NENHUM escritor vivo produz
- * `operationalStatus = BLOQUEADO` sem mover o `internalStatus` junto — por isso
- * `LEGACY_OPERATIONAL_DRIFT.BLOQUEADO` passou a `expected_legacy`, como
- * `DOCUMENTO_ENVIADO`/`DOCUMENTO_APROVADO` ja eram.
+ * Os 6 pares com projecao segura vivem em `operationalStatusProjection.ts`
+ * (Fase 5h) — `CANONICAL_OPERATIONAL_PROJECTION`/`hasCanonicalProjection`,
+ * reexportado aqui so como `SafeInternalStatus` para nao mudar o nome que o
+ * resto deste arquivo ja usa. Extraido para modulo proprio porque a
+ * classificacao "par canonico" passou a ser conhecimento reutilizavel por
+ * outros consumidores, nao so por este diagnostico (docs/46 §6, docs/49).
  */
-const SAFE_PROJECTION = {
-  RASCUNHO: "RASCUNHO",
-  AGUARDANDO_PAGAMENTO: "AGUARDANDO_PAGAMENTO",
-  PAGO_EM_FILA: "PAGO_EM_FILA",
-  DOCUMENTO_RECEBIDO_PARA_ANALISE: "DOCUMENTO_ENVIADO",
-  DOCUMENTO_VALIDADO: "DOCUMENTO_APROVADO",
-  BLOQUEADO_OPERACIONAL: "BLOQUEADO",
-} as const satisfies Partial<Record<InternalStatus, OperationalStatus>>;
-
-const SAFE_INTERNAL_VALUES = Object.keys(SAFE_PROJECTION) as (keyof typeof SAFE_PROJECTION)[];
-type SafeInternalStatus = (typeof SAFE_INTERNAL_VALUES)[number];
-
-function isSafeInternalStatus(status: InternalStatus): status is SafeInternalStatus {
-  return (SAFE_INTERNAL_VALUES as readonly InternalStatus[]).includes(status);
-}
+type SafeInternalStatus = CanonicalInternalStatus;
+const isSafeInternalStatus = hasCanonicalProjection;
 
 const SAFE_OPERATIONAL_VALUES = [
   "RASCUNHO",
@@ -268,7 +241,8 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * tinham (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e; `DOCUMENTO_VALIDADO`,
  * Fase 5f; `BLOQUEADO_OPERACIONAL`, Fase 5f completa/docs/48) saíram desta
  * tabela quando os fluxos correspondentes migraram, e os pares viraram
- * seguros (`SAFE_PROJECTION` acima). Os candidatos restantes
+ * seguros (`CANONICAL_OPERATIONAL_PROJECTION`, `operationalStatusProjection.ts`).
+ * Os candidatos restantes
  * (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
  * `PROTOCOLADO_GRU_GERADA` → `PRONTO_PARA_PROTOCOLO_MANUAL`,
  * `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`) sao ARRISCADOS ou FALSOS, nao
@@ -366,7 +340,7 @@ export function diagnoseStatusDivergence(input: StatusDivergenceInput): StatusDi
   }
 
   if (isSafeInternalStatus(internalStatus)) {
-    const expected = SAFE_PROJECTION[internalStatus];
+    const expected = CANONICAL_OPERATIONAL_PROJECTION[internalStatus];
 
     if (operationalStatus === expected) {
       // Mesmo nome nos dois campos (os 3 originais, docs/46 6) ou nomes
