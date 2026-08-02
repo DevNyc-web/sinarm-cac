@@ -147,7 +147,7 @@ test("uploadProcessDocument usa a porta canonica, com o novo estado e alsoSet", 
   assert.doesNotMatch(code, /updateProcessOperations\s*\(/);
 });
 
-test("reviewProcessDocument usa a porta canonica so no lado aprovacao, com alsoSet", () => {
+test("reviewProcessDocument usa a porta canonica no lado aprovacao, com alsoSet", () => {
   const code = codeOnly(readFileSync("src/server/services/reviewProcessDocument.ts", "utf8"));
   assert.match(code, /\btransitionInternalStatus\s*\(/, "deveria chamar transitionInternalStatus");
   assert.match(code, /toStatus:\s*"DOCUMENTO_VALIDADO"/);
@@ -156,26 +156,33 @@ test("reviewProcessDocument usa a porta canonica so no lado aprovacao, com alsoS
     /alsoSet:\s*\{\s*operationalStatus:\s*"DOCUMENTO_APROVADO"\s*\}/,
     "operationalStatus deveria continuar indo para DOCUMENTO_APROVADO, via alsoSet",
   );
-  // O lado rejeicao continua legado — updateProcessOperations tem que
-  // sobreviver no arquivo, so nao pode aparecer perto do lado aprovacao.
-  assert.match(
+  // O lado rejeicao tambem migrou (docs/48), entao a porta LEGADA nao pode mais
+  // aparecer em ramo nenhum deste arquivo.
+  assert.doesNotMatch(
     code,
-    /updateProcessOperations\s*\(\s*document\.processId,\s*\{\s*operationalStatus:\s*"BLOQUEADO"/,
-    "lado rejeicao deveria continuar escrevendo BLOQUEADO via updateProcessOperations",
+    /updateProcessOperations\s*\(/,
+    "nenhum ramo deveria mais escrever pela porta legada",
   );
 });
 
-test("o bloco de rejeicao de reviewProcessDocument nao chama a porta canonica", () => {
+test("o bloco de rejeicao usa a porta canonica, e nunca uma excecao AUTOMATICA", () => {
   const code = codeOnly(readFileSync("src/server/services/reviewProcessDocument.ts", "utf8"));
   const ancora = 'document.process.operationalStatus !== "CANCELADO_DEV"';
   assert.ok(code.includes(ancora), "bloco de rejeicao nao encontrado — ancora desatualizada");
   const ladoRejeicao = code.slice(code.indexOf(ancora));
-  assert.doesNotMatch(ladoRejeicao, /transitionInternalStatus/);
+  assert.match(ladoRejeicao, /transitionInternalStatus/, "rejeicao migrou na Fase 5f completa");
+  assert.match(ladoRejeicao, /toStatus:\s*"BLOQUEADO_OPERACIONAL"/);
+  // A regra 2 continua valendo: categoria NOVA, nunca reuso de excecao que a
+  // automacao decide (docs/46 §3.4, docs/48 §4).
   assert.doesNotMatch(
     ladoRejeicao,
-    /BLOQUEADO_INSTABILIDADE|EXCECAO_DOC_INVALIDO|EXCECAO_ARMA_DIVERGENTE|EXCECAO_DESTINO_INCOMPLETO|BLOQUEADO_OPERACIONAL/,
-    "rejeicao nao pode mapear BLOQUEADO para excecao automatica nem criar categoria nova",
+    /BLOQUEADO_INSTABILIDADE|EXCECAO_DOC_INVALIDO|EXCECAO_ARMA_DIVERGENTE|EXCECAO_DESTINO_INCOMPLETO/,
+    "rejeicao nao pode mapear BLOQUEADO para excecao automatica",
   );
+  // E os dois estados da Fase 5d continuam fora do lado rejeicao.
+  for (const estado of NOVOS_ESTADOS) {
+    assert.ok(!ladoRejeicao.includes(estado), `rejeicao nao deveria usar ${estado}`);
+  }
 });
 
 // ------------------------------------------------- 3. o que continua nao migrado

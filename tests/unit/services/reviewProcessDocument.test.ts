@@ -185,24 +185,53 @@ test("rejeicao NAO mexe em processo cancelado", async () => {
   assert.equal(processo.operationalStatus, "CANCELADO_DEV");
 });
 
-test("rejeicao continua LEGADA: nao toca internalStatus nem gera evento tipado", async () => {
-  // Fase 5f migra so o lado APROVACAO (docs/47 §9). BLOQUEADO exige decisao
-  // propria antes de ganhar porta canonica (docs/47 §6.5) — mapear para
-  // BLOQUEADO_INSTABILIDADE/EXCECAO_* sem essa decisao e PROIBIDO (docs/46
-  // §3.4). Este teste trava que o lado rejeicao NAO foi tocado.
+test("rejeicao MIGROU: internalStatus vai para BLOQUEADO_OPERACIONAL", async () => {
+  // Fase 5f completa (docs/48). BLOQUEADO ganhou categoria canonica propria
+  // para bloqueio decidido por HUMANO — continua PROIBIDO reusar
+  // BLOQUEADO_INSTABILIDADE/EXCECAO_*, que afirmam causa apurada pela
+  // automacao (docs/46 §3.4).
   const { processo } = semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
   await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "ilegivel");
-  assert.equal(
-    processo.internalStatus,
-    "DOCUMENTO_RECEBIDO_PARA_ANALISE",
-    "rejeicao nao deveria mexer em internalStatus",
-  );
-  assert.equal(db.processStatusEvent.rows.length, 0, "rejeicao nao usa a porta canonica");
+  assert.equal(processo.internalStatus, "BLOQUEADO_OPERACIONAL");
 });
 
-test("rejeicao nao referencia transitionInternalStatus no codigo-fonte", () => {
-  // Estrutural: garante que o caminho REJEITADO nao foi tocado por engano —
-  // so o bloco de codigo do lado APROVACAO deveria mencionar a porta canonica.
+test("rejeicao registra evento TIPADO com fromStatus/toStatus e o motivo na nota", async () => {
+  // Era o buraco de auditoria do docs/48 §8: a rejeicao mudava o status do
+  // processo sem gravar evento nenhum na trilha.
+  semear({}, { internalStatus: "DOCUMENTO_RECEBIDO_PARA_ANALISE" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "ilegivel");
+
+  assert.equal(db.processStatusEvent.rows.length, 1, "so um evento por transicao");
+  const [evento] = db.processStatusEvent.rows;
+  assert.equal(evento.fromStatus, "DOCUMENTO_RECEBIDO_PARA_ANALISE", "lido do banco, nao suposto");
+  assert.equal(evento.toStatus, "BLOQUEADO_OPERACIONAL");
+  assert.equal(evento.actorMockUserId, REVISOR.id);
+  assert.equal(evento.actorRole, REVISOR.role);
+  assert.notEqual(evento.kind, "STATUS_OPERACIONAL", "evento tipado nao usa o kind legado");
+  assert.match(String(evento.note), /ilegivel/, "a nota precisa carregar o motivo");
+});
+
+test("a nota usa o motivo JA APARADO, o mesmo gravado no documento", async () => {
+  const { doc } = semear();
+  await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "  documento cortado  ");
+  const [evento] = db.processStatusEvent.rows;
+  assert.equal(doc.rejectionReason, "documento cortado");
+  assert.match(String(evento.note), /documento cortado/);
+  assert.doesNotMatch(String(evento.note), /\s{2,}/, "sem os espacos das pontas");
+});
+
+test("rejeicao em processo cancelado nao grava evento nenhum", async () => {
+  // A guarda vem ANTES da porta canonica: processo cancelado nao gera trilha.
+  const { processo } = semear({}, { operationalStatus: "CANCELADO_DEV" });
+  await reviewProcessDocument(REVISOR, DOC_ID, "REJEITADO", "ilegivel");
+  assert.equal(processo.operationalStatus, "CANCELADO_DEV");
+  assert.equal(processo.internalStatus, "RASCUNHO", "internalStatus tambem nao pode mudar");
+  assert.equal(db.processStatusEvent.rows.length, 0);
+});
+
+test("rejeicao usa a porta canonica e NUNCA uma excecao automatica", () => {
+  // Estrutural: o bloco REJEITADO tem que chamar a porta canonica com a
+  // categoria propria — e nenhum dos quatro estados que a automacao decide.
   const code = readFileSync("src/server/services/reviewProcessDocument.ts", "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -211,16 +240,15 @@ test("rejeicao nao referencia transitionInternalStatus no codigo-fonte", () => {
   const ancora = 'document.process.operationalStatus !== "CANCELADO_DEV"';
   assert.ok(code.includes(ancora), "bloco de rejeicao nao encontrado — ancora do teste ficou desatualizada");
   const ladoRejeicao = code.slice(code.indexOf(ancora));
+  assert.match(ladoRejeicao, /transitionInternalStatus/, "rejeicao deveria usar a porta canonica");
+  assert.match(ladoRejeicao, /toStatus:\s*"BLOQUEADO_OPERACIONAL"/);
   assert.doesNotMatch(
     ladoRejeicao,
-    /transitionInternalStatus/,
-    "o bloco de rejeicao nao deveria chamar a porta canonica",
+    /BLOQUEADO_INSTABILIDADE|EXCECAO_DOC_INVALIDO|EXCECAO_ARMA_DIVERGENTE|EXCECAO_DESTINO_INCOMPLETO/,
+    "rejeicao nao pode mapear BLOQUEADO para excecao automatica",
   );
-  assert.doesNotMatch(
-    ladoRejeicao,
-    /BLOQUEADO_INSTABILIDADE|EXCECAO_DOC_INVALIDO|EXCECAO_ARMA_DIVERGENTE|EXCECAO_DESTINO_INCOMPLETO|BLOQUEADO_OPERACIONAL/,
-    "rejeicao nao pode mapear BLOQUEADO para excecao automatica nem criar categoria nova",
-  );
+  // A porta LEGADA nao pode sobreviver em ramo nenhum do arquivo.
+  assert.doesNotMatch(code, /updateProcessOperations\s*\(/);
 });
 
 /* ------------------------------------------------------------------ guardas --- */
