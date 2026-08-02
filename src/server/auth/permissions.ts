@@ -23,6 +23,12 @@ export const PERMISSIONS = [
   // reusar `document.review` daria "desfazer decisao de outro" a quem so pediu
   // para conferir, e a matriz deixaria de responder "quem pode reabrir?".
   "document.review.reopen",
+  // Registrar aprovacao documental feita FORA do fluxo normal (docs/50 §6).
+  // Permissao PROPRIA, mesmo criterio de `document.review.reopen`: reusar
+  // `document.review` daria "assinar aprovacao sem revisao" a quem so pediu
+  // para conferir, e a matriz deixaria de responder "quem pode registrar
+  // aprovacao fora do fluxo?".
+  "document.review.approveOutOfFlow",
   "process.assign", // Atribuir/trocar responsavel pelo processo (docs/11 §4)
   "process.priority", // Alterar prioridade operacional (docs/11 §4)
   "process.operationalStatus", // Mover o status operacional da fila
@@ -60,6 +66,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "review.checklist": "Aplicar checklist de revisao",
   "document.review": "Aprovar/rejeitar documento do processo",
   "document.review.reopen": "Reabrir conferencia de documento ja revisado",
+  "document.review.approveOutOfFlow": "Registrar aprovacao documental feita fora do fluxo",
   "process.assign": "Atribuir responsavel pelo processo",
   "process.priority": "Alterar prioridade do processo",
   "process.operationalStatus": "Mover status operacional",
@@ -102,6 +109,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     // desfazer a conferencia (inclusive a de outra pessoa) fica com ADMIN.
     // Se OPERADOR recebesse as duas, a permissao propria teria o mesmo alcance
     // de `document.review` e a matriz voltaria a nao distinguir os dois atos.
+    //
+    // `document.review.approveOutOfFlow` tambem NAO entra, mesmo criterio:
+    // assinar uma aprovacao feita fora do formulario de revisao fica com ADMIN.
     "process.assign",
     "process.priority",
     "process.operationalStatus",

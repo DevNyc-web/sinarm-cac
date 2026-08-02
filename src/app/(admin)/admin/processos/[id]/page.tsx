@@ -47,6 +47,7 @@ import { MAX_NOTE_LENGTH } from "@/server/services/createProcessNote";
 import { MAX_OBSERVATION_LENGTH } from "@/server/services/manualExecution";
 import {
   advanceManualExecutionAction,
+  approveDocumentOutOfFlowAction,
   assignProcessAction,
   changeOperationalStatusAction,
   changePriorityAction,
@@ -89,6 +90,7 @@ const DETAIL_PERMISSIONS: readonly Permission[] = [
   "review.checklist",
   "document.review",
   "document.review.reopen",
+  "document.review.approveOutOfFlow",
   "gru.generate",
   "payment.pix.confirm",
   "payment.gru.register",
@@ -132,6 +134,9 @@ export default async function AdminProcessoDetalhePage({
   const canReview = hasPermission(admin, "review.checklist");
   // Permissao PROPRIA (docs/50 §5/§7): so quem pode DESFAZER conferencia ve o botao.
   const canReopenReview = hasPermission(admin, "document.review.reopen");
+  // Permissao PROPRIA (docs/50 §6/§7): so quem pode ASSINAR aprovacao fora do
+  // fluxo ve o botao.
+  const canApproveOutOfFlow = hasPermission(admin, "document.review.approveOutOfFlow");
   // Mesma permissao exigida pela rota do arquivo: o link so aparece para quem
   // a rota deixaria passar, sem prometer um botao que responderia 404.
   const canOpenDocumentFile = hasPermission(admin, DOCUMENT_FILE_PERMISSION);
@@ -456,6 +461,31 @@ export default async function AdminProcessoDetalhePage({
                         </Button>
                       </form>
                     </div>
+                  ) : null}
+                  {/*
+                    Registrar aprovacao fora do fluxo (docs/50 §6) — assume um
+                    revisor real que so nao passou pelo formulario de revisao
+                    (conferencia feita por outro canal). So aparece para
+                    documento AINDA NAO revisado e para quem tem a permissao
+                    PROPRIA. Motivo obrigatorio: precisa dizer onde a
+                    conferencia aconteceu.
+                  */}
+                  {doc.status !== "APROVADO" && doc.status !== "REJEITADO" && canApproveOutOfFlow ? (
+                    <form
+                      action={approveDocumentOutOfFlowAction}
+                      className="mt-2 flex flex-wrap items-center gap-2"
+                    >
+                      <input type="hidden" name="processId" value={detail.id} />
+                      <input type="hidden" name="documentId" value={doc.id} />
+                      <input
+                        name="outOfFlowReason"
+                        placeholder="Onde a conferencia aconteceu (sem dados do doc)"
+                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                      />
+                      <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                        Aprovar fora do fluxo
+                      </Button>
+                    </form>
                   ) : null}
                   {/*
                     Reabrir conferencia (docs/50 §5) — a saida do beco sem saida
