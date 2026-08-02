@@ -202,7 +202,7 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
 // ------------------------------------------- internalStatus fora da zona segura
 
 /**
- * Os 12 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
+ * Os 13 valores de `InternalStatus` que nao sao seguros nem Fase 2 (docs/46
  * §6): nenhum fluxo real os escreve, mas o diagnostico cobre a combinacao
  * mesmo assim - conservador por definicao, nao por observacao.
  *
@@ -210,11 +210,14 @@ const LEGACY_OPERATIONAL_DRIFT: Record<
  * inventamos candidato para o que docs/46 nao nomeou: e mais seguro dizer
  * "decisao necessaria" do que sugerir um mapeamento que ninguem analisou.
  *
- * Nenhum dos 12 tem candidato APROVADO pendente de migracao — os dois que
- * tinham (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e; `DOCUMENTO_VALIDADO`,
- * Fase 5f) saíram desta tabela quando os fluxos correspondentes migraram, e
- * os pares viraram seguros (`SAFE_PROJECTION` acima). Os candidatos restantes
- * aqui (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
+ * UM dos 13 tem candidato APROVADO pendente de migracao:
+ * `BLOQUEADO_OPERACIONAL` → `BLOQUEADO` (docs/48). Os dois que estavam nessa
+ * situacao antes (`DOCUMENTO_RECEBIDO_PARA_ANALISE`, Fase 5e;
+ * `DOCUMENTO_VALIDADO`, Fase 5f) saíram desta tabela quando os fluxos
+ * correspondentes migraram, e os pares viraram seguros (`SAFE_PROJECTION`
+ * acima) — mesmo caminho que `BLOQUEADO_OPERACIONAL` deve seguir quando o lado
+ * rejeicao de `reviewProcessDocument` migrar. Os candidatos restantes
+ * (`BLOQUEADO_INSTABILIDADE`/`EXCECAO_*` → `BLOQUEADO`,
  * `PROTOCOLADO_GRU_GERADA` → `PRONTO_PARA_PROTOCOLO_MANUAL`,
  * `CANCELADO_REEMBOLSADO` → `CANCELADO_DEV`) sao ARRISCADOS ou FALSOS, nao
  * aprovados — nao tem migracao proposta.
@@ -288,6 +291,23 @@ const ADVANCED_INTERNAL_PROJECTION: Record<
       "docs/46 6: CANCELADO_DEV afirmaria cancelamento de ambiente de " +
       "desenvolvimento onde houve reembolso real - projecao falsa, nao so " +
       "arriscada.",
+  },
+  // Candidato APROVADO (docs/48), nao so citado — mas ainda SEM CONSUMIDOR: a
+  // decisao deu a direcao, nao migrou fluxo nenhum. `severity` continua
+  // `needs_decision` porque nenhum write real produz esta combinacao ainda; o
+  // candidato aprovado nao vira `none` so por existir no enum, teria que
+  // existir tambem um write produzindo o par. Se aparecer hoje, e escrita fora
+  // de banda — mesmo tratamento que `DOCUMENTO_RECEBIDO_PARA_ANALISE` e
+  // `DOCUMENTO_VALIDADO` tiveram entre a migration da 5d e as Fases 5e/5f.
+  BLOQUEADO_OPERACIONAL: {
+    candidateOperationalStatus: "BLOQUEADO",
+    severity: "needs_decision",
+    reason:
+      "docs/48: candidato aprovado para BLOQUEADO, mas o lado rejeicao de " +
+      "reviewProcessDocument (Fase 5f) e o BLOQUEADO da porta manual/admin " +
+      "(Fase 5g) ainda nao migraram - nenhum fluxo escreve " +
+      "BLOQUEADO_OPERACIONAL hoje. Se aparecer, e escrita fora de banda, nao " +
+      "o caminho aprovado.",
   },
 };
 

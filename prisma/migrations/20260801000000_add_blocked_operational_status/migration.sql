@@ -1,0 +1,45 @@
+-- Categoria decidida pelo docs/48 no enum `internal_status`.
+--
+-- MIGRATION ADITIVA: `ALTER TYPE ... ADD VALUE` nao reescreve tabela, nao trava
+-- linha e nao altera dado algum. Nenhuma linha existente muda de estado.
+--
+-- SEM CONSUMIDOR NESTE PR: nenhum fluxo escreve este valor. `docs/48` decidiu
+-- que `BLOQUEADO` merece estado canonico proprio, mas a migracao do lado
+-- rejeicao de `reviewProcessDocument` (Fase 5f) e do `BLOQUEADO` da porta
+-- manual/admin (Fase 5g) ficam para PR proprio, mesmo padrao das migrations
+-- `20260731000000_add_assisted_exception_states` (Fase 2) e
+-- `20260731010000_add_document_internal_statuses` (Fase 5d).
+--
+-- CATEGORIA NOVA, NAO REUSO: `BLOQUEADO_INSTABILIDADE` e as `EXCECAO_*` sao
+-- pausas decididas pela AUTOMACAO, com causa ja tipada pelo sistema. Este valor
+-- e bloqueio decidido por um HUMANO, sem causa apurada. Reutilizar um daqueles
+-- afirmaria causa que ninguem verificou (docs/48 §4, docs/46 §3.4).
+--
+-- ORDEM: sem `BEFORE`/`AFTER`, o Postgres anexa ao FIM do tipo. O
+-- `schema.prisma` lista o valor no fim tambem, depois dos estados da Fase 5d —
+-- se um dia divergirem, a ordem do banco e a que vale em `ORDER BY` sobre a
+-- coluna.
+--
+-- `IF NOT EXISTS`: o `prisma migrate dev` nao gera esta clausula, ela foi
+-- adicionada a mao. Como o CI nao tem Postgres, esta migration nunca e
+-- exercitada por teste antes de rodar em ambiente real — idempotencia e a unica
+-- defesa contra reaplicacao parcial.
+--
+-- NAO USAR `db:push`: ele sincroniza o banco com o schema e desconhece o
+-- historico de migrations. Use `npm run db:migrate` (dev) ou `npm run db:deploy`
+-- (aplicar) — mesmo criterio das migrations anteriores.
+--
+-- POSTGRESQL < 12: `ALTER TYPE ... ADD VALUE` NAO podia rodar dentro de bloco de
+-- transacao antes do PG 12, e o Prisma executa cada migration em transacao. Do
+-- PG 12 em diante funciona, com a restricao de que o valor novo nao seja USADO
+-- na mesma transacao — o que este arquivo nao faz. CONFIRMAR a versao do
+-- servidor antes do primeiro deploy; se for < 12, esta migration precisa rodar
+-- fora de transacao.
+--
+-- SEM BACKFILL: nenhuma linha existente e tocada. Nenhum processo hoje em
+-- `operationalStatus = BLOQUEADO` tem o `internalStatus` reescrito por esta
+-- migration — reinterpretar dado antigo exigiria decisao propria, e a Fase 5
+-- proibe backfill implicito. Nenhum default muda: `internalStatus` continua com
+-- default `RASCUNHO` (docs/46 §5).
+
+ALTER TYPE "internal_status" ADD VALUE IF NOT EXISTS 'BLOQUEADO_OPERACIONAL';
