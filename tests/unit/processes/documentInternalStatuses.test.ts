@@ -315,11 +315,15 @@ test("nenhum dos dois pares migrados vira none com operationalStatus DIFERENTE d
   }
 });
 
-test("BLOQUEADO continua needs_decision — lado rejeicao nao migrado, exige decisao propria", () => {
+test("BLOQUEADO virou expected_legacy — os dois writers migraram (docs/48)", () => {
+  // Era `needs_decision` enquanto a rejeicao de reviewProcessDocument e o
+  // dropdown de updateProcessOperations escreviam BLOQUEADO sem tocar
+  // internalStatus. Com os dois migrados, so DADO ANTIGO produz a combinacao —
+  // continua divergencia, mas conhecida, como DOCUMENTO_ENVIADO/APROVADO.
   const result = diagnoseStatusDivergence({
     internalStatus: "RASCUNHO",
     operationalStatus: "BLOQUEADO",
   });
-  assert.equal(result.severity, "needs_decision");
+  assert.equal(result.severity, "expected_legacy");
   assert.equal(result.hasDivergence, true);
 });

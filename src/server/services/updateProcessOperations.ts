@@ -152,14 +152,24 @@ export async function changeOperationalStatus(
     if (!process) return { ok: false, error: "Processo nao encontrado." };
     if (process.operationalStatus === status) return { ok: true };
 
-    // Fase 5g (docs/46 §3.5, docs/48): so os 3 valores com InternalStatus
-    // homonimo (mesmo nome, mesmo significado) passam pela porta canonica
-    // aqui. Os outros 6 — inclusive DOCUMENTO_ENVIADO/DOCUMENTO_APROVADO, que
-    // TEM candidato canonico nos fluxos naturais (uploadProcessDocument/
-    // reviewProcessDocument) — continuam no caminho legado abaixo: esta porta
-    // e MANUAL/admin e sem validacao de maquina de transicoes, entao mover o
+    // Quatro dos nove valores passam pela porta canonica aqui: os 3 com
+    // InternalStatus homonimo (Fase 5g, docs/46 §3.5) e `BLOQUEADO`, que ganhou
+    // categoria propria — `BLOQUEADO_OPERACIONAL`, docs/48 — e ja migrou no
+    // fluxo natural (rejeicao de `reviewProcessDocument`).
+    //
+    // Os outros 5 continuam no caminho legado abaixo. DOCUMENTO_ENVIADO e
+    // DOCUMENTO_APROVADO TEM candidato canonico nos fluxos naturais
+    // (uploadProcessDocument/reviewProcessDocument), mas esta porta e
+    // MANUAL/admin e sem validacao de maquina de transicoes: mover o
     // internalStatus aqui poderia retroceder uma jornada ja avancada por um
-    // fluxo real, sem a checagem que so aquele fluxo faz.
+    // fluxo real, sem a checagem que so aquele fluxo faz. Os outros tres
+    // (EM_REVISAO_OPERACIONAL, PRONTO_PARA_PROTOCOLO_MANUAL, CANCELADO_DEV)
+    // permanecem so operacionais por decisao do docs/47 §9 — nao ha candidato
+    // para eles, nem havera.
+    //
+    // Ramos LITERAIS de proposito, nao uma tabela `status -> toStatus`: uma
+    // tabela seria exatamente o mapa `operationalStatus -> internalStatus` que
+    // docs/46 §11 proibe. A repeticao aqui e o que impede o atalho.
     if (status === "RASCUNHO") {
       const result = await transitionInternalStatus({
         processId,
@@ -187,6 +197,26 @@ export async function changeOperationalStatus(
         actorMockUserId: actor.id,
         actorRole: actor.role,
         alsoSet: { operationalStatus: "PAGO_EM_FILA", userFacingStatus: "PAGAMENTO_CONFIRMADO" },
+      });
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    }
+    if (status === "BLOQUEADO") {
+      // Bloqueio decidido por HUMANO, igual ao da rejeicao de documento — a
+      // causa nao e apurada pelo sistema. CONTINUA PROIBIDO usar
+      // `BLOQUEADO_INSTABILIDADE` ou qualquer `EXCECAO_*` (docs/46 §3.4).
+      //
+      // Sem `note`: o dropdown do admin nao coleta motivo hoje, e inventar um
+      // texto fixo aqui afirmaria mais do que se sabe. Tornar o motivo
+      // obrigatorio nesta porta e decisao de produto, fora deste PR (docs/48 §5).
+      const result = await transitionInternalStatus({
+        processId,
+        toStatus: "BLOQUEADO_OPERACIONAL",
+        actorMockUserId: actor.id,
+        actorRole: actor.role,
+        alsoSet: {
+          operationalStatus: "BLOQUEADO",
+          userFacingStatus: "PRECISAMOS_DE_UM_AJUSTE",
+        },
       });
       return result.ok ? { ok: true } : { ok: false, error: result.error };
     }

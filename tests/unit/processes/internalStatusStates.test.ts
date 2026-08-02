@@ -171,27 +171,39 @@ test("o rotulo distingue das duas fontes de confusao vizinhas", () => {
   assert.doesNotMatch(rotulo, /instabilidade/i, "nao e pausa por instabilidade do portal");
 });
 
-test("BLOQUEADO_OPERACIONAL tem EXATAMENTE um consumidor: a rejeicao de reviewProcessDocument", () => {
+test("BLOQUEADO_OPERACIONAL tem EXATAMENTE dois consumidores, os dois writers de BLOQUEADO", () => {
+  // Os dois caminhos que produzem `operationalStatus = BLOQUEADO` (docs/46
+  // §3.4 e §3.5) usam a MESMA categoria canonica — e mais ninguem a escreve.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
   const consumidores = fluxos
     .filter((caminho) => usaEstado(codeOnly(readFileSync(caminho, "utf8")), BLOQUEIO_HUMANO))
-    .map((c) => c.split("\\").join("/"));
+    .map((c) => c.split("\\").join("/"))
+    .sort();
 
-  assert.deepEqual(
-    consumidores,
-    ["src/server/services/reviewProcessDocument.ts"],
-    "BLOQUEADO_OPERACIONAL deveria aparecer so em reviewProcessDocument.ts (docs/48)",
-  );
+  assert.deepEqual(consumidores, [
+    "src/server/services/reviewProcessDocument.ts",
+    "src/server/services/updateProcessOperations.ts",
+  ]);
 });
 
-test("BLOQUEADO_OPERACIONAL nao e escrito por updateProcessOperations — dropdown continua legado", () => {
-  const code = codeOnly(readFileSync("src/server/services/updateProcessOperations.ts", "utf8"));
-  assert.ok(!usaEstado(code, BLOQUEIO_HUMANO), "a Fase 5g de BLOQUEADO nao e este PR");
-  // Os 3 migrados na 5g continuam sendo os unicos com porta canonica; BLOQUEADO
-  // nao ganhou bloco proprio de carona.
-  assert.doesNotMatch(code, /toStatus:\s*"BLOQUEADO/);
+test("os dois consumidores usam a porta canonica, nunca uma excecao AUTOMATICA", () => {
+  for (const file of [
+    "src/server/services/reviewProcessDocument.ts",
+    "src/server/services/updateProcessOperations.ts",
+  ]) {
+    const code = codeOnly(readFileSync(file, "utf8"));
+    assert.match(code, /toStatus:\s*"BLOQUEADO_OPERACIONAL"/, `${file} deveria usar a categoria propria`);
+    for (const proibido of [
+      "BLOQUEADO_INSTABILIDADE",
+      "EXCECAO_DOC_INVALIDO",
+      "EXCECAO_ARMA_DIVERGENTE",
+      "EXCECAO_DESTINO_INCOMPLETO",
+    ]) {
+      assert.ok(!code.includes(proibido), `${file} usa ${proibido}`);
+    }
+  }
 });
 
 test("nenhum estado de excecao AUTOMATICA foi reusado para o bloqueio humano", () => {

@@ -1,17 +1,21 @@
 /**
  * updateProcessOperations — testes COMPORTAMENTAIS (sem Postgres).
  *
- * Foco: `changeOperationalStatus`, a porta MANUAL/admin (docs/46 §3.5). A
- * Fase 5g migrou 3 dos 9 valores para a porta canonica
- * (`transitionInternalStatus`) — RASCUNHO, AGUARDANDO_PAGAMENTO, PAGO_EM_FILA,
- * os unicos com InternalStatus homonimo (docs/46 §6). Os outros 6 continuam
- * no caminho legado de sempre: so `operationalStatus`/`userFacingStatus`, sem
- * tocar `internalStatus`, com o evento OPERACIONAL de sempre (kind
- * `STATUS_OPERACIONAL`, rotulo em `fromValue`/`toValue`).
+ * Foco: `changeOperationalStatus`, a porta MANUAL/admin (docs/46 §3.5). Hoje
+ * 4 dos 9 valores passam pela porta canonica (`transitionInternalStatus`):
  *
- * `assignProcess`/`changePriority` nao mudaram nesta fase — nao tem teste
- * dedicado aqui de proposito, para o arquivo ficar focado no que a Fase 5g
- * realmente tocou.
+ *  - RASCUNHO, AGUARDANDO_PAGAMENTO, PAGO_EM_FILA — Fase 5g, os unicos com
+ *    InternalStatus homonimo (docs/46 §6);
+ *  - BLOQUEADO — docs/48, via a categoria propria `BLOQUEADO_OPERACIONAL`.
+ *
+ * Os outros 5 continuam no caminho legado de sempre: so
+ * `operationalStatus`/`userFacingStatus`, sem tocar `internalStatus`, com o
+ * evento OPERACIONAL de sempre (kind `STATUS_OPERACIONAL`, rotulo em
+ * `fromValue`/`toValue`).
+ *
+ * `assignProcess`/`changePriority` nunca foram tocados por estas fases — nao
+ * tem teste dedicado aqui de proposito, para o arquivo ficar focado no que
+ * mudou.
  *
  * Banco: fake via `globalThis.prisma` (ver `testPrisma.ts`).
  */
@@ -117,14 +121,15 @@ test("os 3 valores seguros passam a chamar transitionInternalStatus — fromStat
   assert.equal(evento.toStatus, "PAGO_EM_FILA");
 });
 
-/* -------------------------------------------- Fase 5g: os 6 valores LEGADOS --- */
+/* ------------------------------------------------- os 5 valores LEGADOS --- */
 
+// BLOQUEADO saiu desta lista quando migrou (docs/48) — tem bloco proprio
+// abaixo. Os cinco restantes continuam na linha dinamica legada.
 const LEGADOS = [
   "DOCUMENTO_ENVIADO",
   "DOCUMENTO_APROVADO",
   "EM_REVISAO_OPERACIONAL",
   "PRONTO_PARA_PROTOCOLO_MANUAL",
-  "BLOQUEADO",
   "CANCELADO_DEV",
 ] as const;
 
@@ -154,13 +159,49 @@ for (const legado of LEGADOS) {
   });
 }
 
-test("BLOQUEADO: nao mapeia para BLOQUEADO_INSTABILIDADE, EXCECAO_* nem BLOQUEADO_OPERACIONAL — fica fora da porta canonica", async () => {
+/* ---------------------------------------------- BLOQUEADO migrado (docs/48) --- */
+
+test("BLOQUEADO: usa a porta canonica, internalStatus vai para BLOQUEADO_OPERACIONAL", async () => {
+  const processo = semearProcesso({ operationalStatus: "DOCUMENTO_ENVIADO", internalStatus: "RASCUNHO" });
+  const result = await changeOperationalStatus(ADMIN, PROCESS_ID, "BLOQUEADO");
+  assert.equal(result.ok, true);
+  assert.equal(processo.internalStatus, "BLOQUEADO_OPERACIONAL");
+});
+
+test("BLOQUEADO: operationalStatus e userFacingStatus finais sao os mesmos do legado", async () => {
   const processo = semearProcesso({ operationalStatus: "DOCUMENTO_ENVIADO", internalStatus: "RASCUNHO" });
   await changeOperationalStatus(ADMIN, PROCESS_ID, "BLOQUEADO");
   assert.equal(processo.operationalStatus, "BLOQUEADO");
-  assert.equal(processo.internalStatus, "RASCUNHO", "BLOQUEADO nao pode mover internalStatus");
-  assert.equal(db.processStatusEvent.rows.length, 1);
-  assert.equal(db.processStatusEvent.rows[0].kind, "STATUS_OPERACIONAL");
+  // Mesmo valor que `USER_FACING_BY_OPERATIONAL.BLOQUEADO` produzia antes.
+  assert.equal(processo.userFacingStatus, "PRECISAMOS_DE_UM_AJUSTE");
+});
+
+test("BLOQUEADO: registra EXATAMENTE um evento TIPADO (fromStatus/toStatus), sem evento operacional", async () => {
+  semearProcesso({ operationalStatus: "DOCUMENTO_ENVIADO", internalStatus: "DOCUMENTO_VALIDADO" });
+  await changeOperationalStatus(ADMIN, PROCESS_ID, "BLOQUEADO");
+
+  assert.equal(db.processStatusEvent.rows.length, 1, "so um evento por transicao");
+  const [evento] = db.processStatusEvent.rows;
+  assert.equal(evento.fromStatus, "DOCUMENTO_VALIDADO", "fromStatus vem do internalStatus ANTERIOR");
+  assert.equal(evento.toStatus, "BLOQUEADO_OPERACIONAL");
+  assert.equal(evento.actorMockUserId, ADMIN.id);
+  assert.equal(evento.actorRole, ADMIN.role);
+  assert.notEqual(evento.kind, "STATUS_OPERACIONAL", "evento tipado nao usa o kind legado");
+});
+
+test("BLOQUEADO: continua PROIBIDO usar excecao automatica como alvo", async () => {
+  // A regra 2 (docs/46 §3.4) nao afrouxou por causa da migracao: o alvo e a
+  // categoria propria de bloqueio HUMANO, nunca uma causa apurada pelo sistema.
+  const processo = semearProcesso({ operationalStatus: "DOCUMENTO_ENVIADO", internalStatus: "RASCUNHO" });
+  await changeOperationalStatus(ADMIN, PROCESS_ID, "BLOQUEADO");
+  for (const proibido of [
+    "BLOQUEADO_INSTABILIDADE",
+    "EXCECAO_DOC_INVALIDO",
+    "EXCECAO_ARMA_DIVERGENTE",
+    "EXCECAO_DESTINO_INCOMPLETO",
+  ]) {
+    assert.notEqual(processo.internalStatus, proibido);
+  }
 });
 
 test("PRONTO_PARA_PROTOCOLO_MANUAL: preserva a nota de protocolo manual no evento legado", async () => {
