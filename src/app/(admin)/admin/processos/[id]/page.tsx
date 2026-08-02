@@ -51,6 +51,7 @@ import {
   changeOperationalStatusAction,
   changePriorityAction,
   createNoteAction,
+  reopenDocumentReviewAction,
   registerManualGruAction,
   registerManualGruPaymentAction,
   registerManualProtocolAction,
@@ -87,6 +88,7 @@ const DETAIL_PERMISSIONS: readonly Permission[] = [
   "sinarm.execute",
   "review.checklist",
   "document.review",
+  "document.review.reopen",
   "gru.generate",
   "payment.pix.confirm",
   "payment.gru.register",
@@ -128,6 +130,8 @@ export default async function AdminProcessoDetalhePage({
   if (!detail) notFound();
 
   const canReview = hasPermission(admin, "review.checklist");
+  // Permissao PROPRIA (docs/50 §5/§7): so quem pode DESFAZER conferencia ve o botao.
+  const canReopenReview = hasPermission(admin, "document.review.reopen");
   // Mesma permissao exigida pela rota do arquivo: o link so aparece para quem
   // a rota deixaria passar, sem prometer um botao que responderia 404.
   const canOpenDocumentFile = hasPermission(admin, DOCUMENT_FILE_PERMISSION);
@@ -452,6 +456,29 @@ export default async function AdminProcessoDetalhePage({
                         </Button>
                       </form>
                     </div>
+                  ) : null}
+                  {/*
+                    Reabrir conferencia (docs/50 §5) — a saida do beco sem saida
+                    que o dropdown produzia. So aparece para documento JA
+                    revisado (`canBeReviewed` falso) e para quem tem a permissao
+                    PROPRIA. Motivo obrigatorio: esta desfazendo decisao humana.
+                  */}
+                  {!doc.canBeReviewed && canReopenReview ? (
+                    <form
+                      action={reopenDocumentReviewAction}
+                      className="mt-2 flex flex-wrap items-center gap-2"
+                    >
+                      <input type="hidden" name="processId" value={detail.id} />
+                      <input type="hidden" name="documentId" value={doc.id} />
+                      <input
+                        name="reopenReason"
+                        placeholder="Motivo da reabertura (sem dados do doc)"
+                        className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                      />
+                      <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                        Reabrir conferencia
+                      </Button>
+                    </form>
                   ) : null}
                 </li>
               ))}

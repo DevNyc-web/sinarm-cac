@@ -15,6 +15,7 @@ import {
   registerManualGruPayment,
   registerManualProtocol,
 } from "@/server/services/manualExecution";
+import { reopenDocumentReview } from "@/server/services/reopenDocumentReview";
 import { reviewProcessDocument, type ReviewDecision } from "@/server/services/reviewProcessDocument";
 import { submitToAutomationQueue } from "@/server/services/submitToAutomationQueue";
 import { toggleChecklistItem } from "@/server/services/toggleChecklistItem";
@@ -69,6 +70,28 @@ export async function reviewDocumentAction(formData: FormData) {
     decisionRaw as ReviewDecision,
     rejectionReason,
   );
+  if (!result.ok) {
+    redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath(base);
+  redirect(base);
+}
+
+/**
+ * Reabrir conferencia documental — exige "document.review.reopen" (docs/50 §5).
+ *
+ * Permissao PROPRIA, nao `document.review`: desfazer a decisao de outra pessoa
+ * e ato distinto de conferir. Hoje so ADMIN a tem.
+ */
+export async function reopenDocumentReviewAction(formData: FormData) {
+  const actor = await requirePermission("document.review.reopen");
+
+  const processId = String(formData.get("processId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("reopenReason") ?? "");
+
+  const base = `/admin/processos/${encodeURIComponent(processId)}`;
+  const result = await reopenDocumentReview(actor, documentId, reason);
   if (!result.ok) {
     redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
   }
