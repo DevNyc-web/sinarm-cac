@@ -246,6 +246,22 @@ tabela está aprovado por este documento** — mesma lógica de `docs/55 §6`.
 
 ---
 
+> **Atualização (2026-08-03, docs, dashboard).** O adiamento do §3.10 /
+> decisão 2 ("aparece só no detalhe, **não no dashboard, nesta etapa**") foi
+> reavaliado em
+> [`docs/58`](58-decisao-visibilidade-cancelamento-dashboard-cliente.md),
+> agora que o display do detalhe existe (`6ecae7b`) e o bloqueio de ações
+> fechou (`docs/57`). **Decisão nova: o dashboard deve, sim, mostrar um badge
+> curto "Processo cancelado"** — porque hoje a lista exibe o rótulo
+> *desatualizado* do momento do cancelamento ("Aguardando pagamento",
+> "Pagamento confirmado — em fila") e diverge do detalhe. O texto acima
+> registra o estado na data desta decisão, não hoje. Tudo o mais deste
+> documento continua valendo: sem motivo interno, sem financeiro, sem
+> `userFacingStatus`, sem projeção, sem ação nova. **Nada foi implementado**
+> pelo `docs/58`. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a visibilidade ao cliente no papel**:
 > sim, com texto neutro, só no detalhe, lendo `internalStatus` direto, nunca
 > reusando `UserFacingStatus.CANCELADO`. Não implementa, não altera
