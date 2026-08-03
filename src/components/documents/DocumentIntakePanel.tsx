@@ -51,7 +51,13 @@ export function DocumentIntakePanel({
    * componente nao faz I/O: buscar aqui duplicaria a query que a pagina ja fez.
    */
   extractionFields: ExtractionFieldsByDocument;
-  uploadAction: (formData: FormData) => void | Promise<void>;
+  /**
+   * Envio de arquivo; ausente => painel apenas EXIBE o estado de cada documento
+   * esperado (mesmo contrato de `applyAction` abaixo). Usado pelo detalhe do
+   * cliente quando o processo esta encerrado (docs/57 §4.3): o backend ja
+   * recusa o upload, e a UI para de oferecer a acao.
+   */
+  uploadAction?: (formData: FormData) => void | Promise<void>;
   /** Tipo confirmado no ultimo envio (querystring `?ok=`), para feedback no card. */
   sentKind?: DocumentKind;
   error?: string;
@@ -110,23 +116,25 @@ export function DocumentIntakePanel({
                   </p>
                 ) : null}
 
-                <form
-                  action={uploadAction}
-                  className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-200/70 pt-2"
-                >
-                  <input type="hidden" name="processId" value={processId} />
-                  <input type="hidden" name="documentKind" value={req.kind} />
-                  <input
-                    type="file"
-                    name="file"
-                    accept="application/pdf,image/jpeg,image/png"
-                    aria-label={`Arquivo fictício para ${req.title}`}
-                    className="min-w-0 flex-1 text-xs text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-neutral-50"
-                  />
-                  <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                    {pending ? "Anexar documento" : "Substituir"}
-                  </Button>
-                </form>
+                {uploadAction ? (
+                  <form
+                    action={uploadAction}
+                    className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-200/70 pt-2"
+                  >
+                    <input type="hidden" name="processId" value={processId} />
+                    <input type="hidden" name="documentKind" value={req.kind} />
+                    <input
+                      type="file"
+                      name="file"
+                      accept="application/pdf,image/jpeg,image/png"
+                      aria-label={`Arquivo fictício para ${req.title}`}
+                      className="min-w-0 flex-1 text-xs text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-neutral-50"
+                    />
+                    <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                      {pending ? "Anexar documento" : "Substituir"}
+                    </Button>
+                  </form>
+                ) : null}
               </li>
             );
           })}

@@ -253,6 +253,23 @@ tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 > implementados; **o PR 4 (esconder/desabilitar os botões na UI do cliente,
 > reforço de UX) permanece pendente** — o backend já é a autoridade (§4.3).
 
+> **Atualização (2026-08-03, implementação do PR 4 — §6).** Reforço de UX no
+> detalhe do cliente (`src/app/(user)/processos/[id]/page.tsx`): a página
+> deriva `closed = isClosed(process.operationalStatus, process.internalStatus)`
+> — a mesma função dos três guards, sem segunda definição de "encerrado" — e
+> **esconde** as ações que o backend já recusa: gerar cobrança Pix, simular
+> pagamento aprovado, anexar/substituir documento (o painel de intake passa a
+> receber `uploadAction` indefinido, contrato que `applyAction` já tinha) e
+> aplicar sugestão de destino. No lugar, um texto neutro: *"Este processo está
+> encerrado. Novas ações não estão disponíveis."* — que cobre também o
+> fechamento técnico (`CANCELADO_DEV`), não alcançado pelo aviso do `docs/56`.
+> Tudo que é **leitura permanece visível**: status, aviso de cancelamento,
+> destino, mensagens da equipe, documentos enviados com download, e o próprio
+> código Pix já gerado (some apenas o botão de simulação). Nenhum guard
+> server-side foi alterado — a UI é reforço, nunca a barreira (§4.3). Sem
+> menção a motivo interno, revisão financeira, reembolso ou estorno (§3.14).
+> Com isto, os PRs 1–4 do §6 estão **concluídos**.
+
 > **Fecho.** Este documento **audita e decide no papel**: mapeia exatamente
 > quais ações do cliente já bloqueiam processo cancelado (uma) e quais não
 > (três, incluindo um achado de prioridade alta), e recomenda reusar
