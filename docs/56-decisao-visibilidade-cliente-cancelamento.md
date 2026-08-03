@@ -212,6 +212,24 @@ tabela está aprovado por este documento** — mesma lógica de `docs/55 §6`.
 
 ---
 
+> **Atualização (2026-08-03, código, implementação).** O aviso foi
+> implementado exatamente como decidido acima: em
+> `src/app/(user)/processos/[id]/page.tsx`, dentro do card "Status", um
+> parágrafo condicionado a `process.internalStatus === "CANCELADO_OPERACIONAL"`
+> — mesmo padrão de leitura direta já usado por `canCreateCharge` na mesma
+> página, **não tocado** por este PR. Texto exatamente o aprovado: "Processo
+> cancelado." + "Este processo foi encerrado administrativamente. Em caso de
+> dúvidas, entre em contato com o atendimento." **Sem botão, sem link, sem
+> `<form>`** — confirmado pelo tamanho da rota no build (`/processos/[id]`
+> continua 200 B de JS, sem aumento — nenhum Client Component). `userFacingStatus`
+> **não foi lido** (regra de ouro do `docs/45` mantida). `clientVisibleStatusLabel`
+> **não foi alterado** — o aviso é adicional, não substitui o rótulo de
+> status existente. Dashboard do cliente **não foi tocado**. Nenhuma menção
+> a motivo interno, `needsFinanceReview`, "revisão financeira" ou reembolso.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a visibilidade ao cliente no papel**:
 > sim, com texto neutro, só no detalhe, lendo `internalStatus` direto, nunca
 > reusando `UserFacingStatus.CANCELADO`. Não implementa, não altera

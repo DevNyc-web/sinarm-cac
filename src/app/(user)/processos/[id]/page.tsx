@@ -136,6 +136,21 @@ export default async function ProcessoRevisaoPage({
               dependem do órgão competente — <strong>não garantimos deferimento</strong>.
             </p>
           ) : null}
+          {/*
+            Docs/56 — aviso SOMENTE LEITURA de cancelamento real: le
+            internalStatus DIRETO (mesmo padrao ja usado por `canCreateCharge`
+            acima), nunca `userFacingStatus` (docs/45 proibe novo leitor).
+            Sem motivo interno, sem financeiro, sem promessa de reembolso,
+            sem acao/botao/contestacao — so o texto aprovado no docs/56.
+            `clientVisibleStatusLabel` acima NAO muda: este e um aviso a mais,
+            nao uma substituicao do rotulo de status existente.
+          */}
+          {process.internalStatus === "CANCELADO_OPERACIONAL" ? (
+            <p className="mt-2 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+              <strong>Processo cancelado.</strong> Este processo foi encerrado administrativamente.
+              Em caso de dúvidas, entre em contato com o atendimento.
+            </p>
+          ) : null}
         </Card>
 
         <AutomationReadinessPanel readiness={readiness} />
