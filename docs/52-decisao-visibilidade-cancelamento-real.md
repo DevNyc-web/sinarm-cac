@@ -277,6 +277,16 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-03, docs, política financeira).** A política de
+> reembolso/financeiro do cancelamento real — fora do escopo original deste
+> documento (§8 acima) — foi decidida em
+> [`docs/54`](54-decisao-politica-reembolso-cancelamento.md): nenhum
+> reembolso automático, pagamentos preservados, análise financeira a cargo
+> de `refund.approve` (já existente na matriz RBAC). Nada foi implementado.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,

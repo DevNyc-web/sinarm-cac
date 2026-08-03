@@ -254,6 +254,19 @@ ordem, não autorização de execução.
 
 ---
 
+> **Atualização (2026-08-03, docs, política financeira).** O item 11 acima
+> (política de reembolso/financeiro) foi decidido em
+> [`docs/54`](54-decisao-politica-reembolso-cancelamento.md): cancelamento
+> real **nunca** movimenta pagamento, PSP ou reembolso automaticamente;
+> pagamentos ficam preservados exatamente como estavam; a análise financeira
+> fica com quem já tem a permissão `refund.approve` (FINANCEIRO/ADMIN, já
+> existente na matriz RBAC, ainda sem consumidor). **Nada foi implementado**
+> — nenhuma ação, migration ou mudança de `PaymentStatus`. Os itens 12–13
+> (processo já protocolado, reversão/reabertura) continuam sem resposta.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**. Não implementa `cancelProcess`,
 > não cria `InternalStatus` novo, não migra `CANCELADO_DEV`, não fecha gate e
 > não autoriza execução real. Regras permanentes (`docs/00 §8`) e bloqueios de
