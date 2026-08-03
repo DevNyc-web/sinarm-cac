@@ -222,6 +222,23 @@ tabela está aprovado por este documento** — mesma lógica de `docs/53 §9`.
 
 ---
 
+> **Atualização (2026-08-03, código, sinalização).** O item 3 (§3.3/§4 item
+> 10) ganhou uma implementação mínima: `operationalSignals.ts` exporta
+> `deriveNeedsFinanceReview` (`internalStatus === "CANCELADO_OPERACIONAL" &&
+> paymentStatus === "PAGO"`), incluída em `OperationalIndicators` como
+> `needsFinanceReview: boolean` — o mesmo objeto que já alimenta
+> `getAdminQueue`/`getAdminProcessDetail`. **É só sinalização**: nenhum
+> `PaymentStatus` muda, nenhum PSP é chamado, nenhuma ação de reembolso
+> existe. O admin vê um aviso read-only ("Revisão financeira necessária") no
+> detalhe do processo (card de pagamento) e um rótulo equivalente na fila —
+> nunca "Reembolso devido" ou qualquer texto que prometa reembolso. Cliente
+> não recebe o sinal. `registerRefund` (§6 PR 1) **continua não
+> implementado** — este PR só cobre a detecção/exibição (§3.3/§4 item 10),
+> não a ação de aprovar/registrar reembolso. **Execução real continua
+> bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a política no papel**: cancelamento real
 > nunca movimenta dinheiro sozinho, pagamentos ficam preservados, e a análise
 > financeira fica com quem já tem `refund.approve`. Não implementa ação,
