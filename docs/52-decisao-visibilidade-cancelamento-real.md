@@ -287,6 +287,19 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-03, docs, visibilidade cliente).** O item §3.1
+> ("cliente continua sem visualização do cancelamento real") foi decidido em
+> [`docs/56`](56-decisao-visibilidade-cliente-cancelamento.md): o cliente
+> **deve**, no futuro, ver um texto neutro ("Processo cancelado") só no
+> detalhe do processo, lendo `internalStatus` diretamente — **nunca**
+> reusando `UserFacingStatus.CANCELADO` (existe no enum, mas usá-lo violaria
+> a regra de ouro do `docs/45` contra novas leituras de `userFacingStatus`).
+> Sem motivo, sem dado financeiro, sem menção a reembolso. **Nada foi
+> implementado.** `clientVisibleStatusLabel` continua sem ler
+> `internalStatus`. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,
