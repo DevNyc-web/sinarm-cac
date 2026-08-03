@@ -11,6 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { after, beforeEach, test } from "node:test";
@@ -39,6 +40,15 @@ function arquivo(
   type = "application/pdf",
 ): File {
   return new File([bytes], name, { type });
+}
+
+/** Arquivos que este teste ja gravou no storage local (dir pode nem existir). */
+function arquivosNoStorage(): string[] {
+  try {
+    return readdirSync(STORAGE_DIR, { recursive: true }).map(String).sort();
+  } catch {
+    return [];
+  }
 }
 
 function semearProcesso(overrides: Record<string, unknown> = {}) {
@@ -260,6 +270,78 @@ test("status ja avancado NAO gera evento (guarda bloqueia antes da porta canonic
   semearProcesso({ operationalStatus: "PAGO_EM_FILA", internalStatus: "PAGO_EM_FILA" });
   await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
   assert.equal(db.processStatusEvent.rows.length, 0);
+});
+
+/* ---------------------------------------- guarda de processo fechado (docs/57) --- */
+
+test("bloqueia upload quando internalStatus = CANCELADO_OPERACIONAL (cancelamento real)", async () => {
+  const processo = semearProcesso({
+    operationalStatus: "RASCUNHO",
+    internalStatus: "CANCELADO_OPERACIONAL",
+  });
+  const result = await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: "Nao e possivel enviar documento para um processo encerrado.",
+  });
+  assert.equal(db.processDocument.rows.length, 0, "nenhum documento e gravado");
+  assert.equal(db.processStatusEvent.rows.length, 0, "nenhum evento e criado");
+  assert.equal(processo.internalStatus, "CANCELADO_OPERACIONAL", "processo nao reativa");
+  assert.equal(processo.operationalStatus, "RASCUNHO", "a fila nao avanca");
+});
+
+test("bloqueia upload quando operationalStatus = CANCELADO_DEV (fechamento tecnico), mesma guarda isClosed", async () => {
+  const processo = semearProcesso({
+    operationalStatus: "CANCELADO_DEV",
+    internalStatus: "RASCUNHO",
+  });
+  const result = await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+
+  assert.equal(result.ok, false);
+  assert.equal(db.processDocument.rows.length, 0);
+  assert.equal(processo.operationalStatus, "CANCELADO_DEV", "operationalStatus nao muda");
+  assert.equal(processo.internalStatus, "RASCUNHO", "internalStatus nao muda");
+});
+
+test("reenvio/substituicao em processo cancelado tambem e bloqueado (docs/57 §3.3/§3.4)", async () => {
+  // Mesma porta: reenviar documento rejeitado passa por este service. Um envio
+  // valido antes do cancelamento nao abre excecao para o seguinte.
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("primeiro"));
+  assert.equal(db.processDocument.rows.length, 1);
+
+  processo.internalStatus = "CANCELADO_OPERACIONAL";
+  const result = await uploadProcessDocument(DONO, PROCESS_ID, arquivo("segundo"));
+
+  assert.equal(result.ok, false);
+  assert.equal(db.processDocument.rows.length, 1, "o segundo envio nao entra");
+});
+
+test("a guarda roda ANTES do storage: nenhum byte novo e gravado no disco", async () => {
+  // Se a guarda descesse para depois do `put`, sobraria arquivo orfao em
+  // `storage-local/` sem registro nenhum no banco.
+  semearProcesso({ internalStatus: "CANCELADO_OPERACIONAL" });
+  const antes = arquivosNoStorage();
+  await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+
+  assert.equal(db.processDocument.rows.length, 0);
+  assert.deepEqual(arquivosNoStorage(), antes, "nada novo foi escrito em storage-local/");
+});
+
+test("processo ABERTO continua aceitando upload (nao-regressao da guarda nova)", async () => {
+  const processo = semearProcesso({ operationalStatus: "RASCUNHO", internalStatus: "RASCUNHO" });
+  const result = await uploadProcessDocument(DONO, PROCESS_ID, arquivo("x"));
+
+  assert.equal(result.ok, true);
+  assert.equal(db.processDocument.rows.length, 1);
+  assert.equal(processo.operationalStatus, "DOCUMENTO_ENVIADO");
+});
+
+test("reusa isClosed de operationalSignals.ts — nao reescreve a checagem de estado fechado", () => {
+  const code = readFileSync("src/server/services/uploadProcessDocument.ts", "utf8");
+  assert.match(code, /import \{ isClosed \} from "@\/server\/processes\/operationalSignals"/);
+  assert.match(code, /isClosed\(process\.operationalStatus, process\.internalStatus\)/);
 });
 
 /* ------------------------------------------------------------ escopo/limites --- */

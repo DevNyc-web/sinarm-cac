@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { type AuthUser } from "@/server/auth/mockUsers";
 import { type DocumentKind, toPrismaDocumentType } from "@/server/documents";
+import { isClosed } from "@/server/processes/operationalSignals";
 import { createDocument } from "@/server/repositories/processDocumentRepository";
 import { findProcessByIdForUser } from "@/server/repositories/processRepository";
 import { getStorageAdapter } from "@/server/storage";
@@ -49,6 +50,16 @@ export async function uploadProcessDocument(
     // Dono do processo: usuario so anexa no proprio processo.
     const process = await findProcessByIdForUser(processId, actor.id);
     if (!process) return { ok: false, error: "Processo nao encontrado." };
+
+    // docs/57 §3.2/§4.6 — processo fechado (cancelamento real OU tecnico/dev)
+    // nao aceita mais envio, reenvio nem substituicao de documento. Reusa
+    // `isClosed` (operationalSignals.ts, docs/52), mesma funcao do guard de
+    // `confirmPixPayment`, em vez de reescrever a checagem aqui. Roda ANTES do
+    // storage e do `createDocument`: nenhum byte e gravado, nenhuma linha e
+    // criada, nenhum status se move.
+    if (isClosed(process.operationalStatus, process.internalStatus)) {
+      return { ok: false, error: "Nao e possivel enviar documento para um processo encerrado." };
+    }
 
     const data = Buffer.from(await file.arrayBuffer());
     const sha256 = createHash("sha256").update(data).digest("hex");
