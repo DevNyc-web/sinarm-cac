@@ -97,6 +97,14 @@ function matchesValue(rowValue: unknown, expected: unknown): boolean {
 
 function matches(row: Row, where: Where): boolean {
   for (const [key, expected] of Object.entries(where)) {
+    // Prisma de verdade IGNORA chave com valor `undefined` no `where` (filtro
+    // nao setado) — e o padrao que `listAdminQueue` usa para todo filtro
+    // opcional. Sem este `continue`, `Object.entries` ainda enumera a chave
+    // (JS nao remove propriedade so por valor ser `undefined`), e o fake
+    // rejeitaria QUALQUER linha assim que um service passasse um objeto de
+    // filtros esparso — bug descoberto ao testar `getAdminQueue` com filtros
+    // vazios (`{}`), o caso mais comum de todos.
+    if (expected === undefined) continue;
     if (key === "OR") {
       const alternativas = expected as Where[];
       if (!alternativas.some((alt) => matches(row, alt))) return false;

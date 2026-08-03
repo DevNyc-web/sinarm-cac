@@ -48,6 +48,7 @@ export default async function AdminProcessosPage({
     documento?: string;
     codigo?: string;
     ordem?: string;
+    revisaoFinanceira?: string;
   }>;
 }) {
   // Todos os perfis internos veem a fila (docs/11 §3: "Ver fila de processos").
@@ -66,6 +67,11 @@ export default async function AdminProcessosPage({
       : undefined;
   const codeFilter = params.codigo?.trim() || undefined;
   const sort = params.ordem === "oldest" ? "oldest" : "recent";
+  // Docs/55 — filtro read-only sobre o sinal ja existente (docs/54); mesma
+  // superficie/permissao da fila (`queue.view`), sem restringir a
+  // `refund.approve` nesta etapa. Filtrado em memoria por `getAdminQueue`,
+  // nunca no `where` do banco: `needsFinanceReview` nao e coluna.
+  const financeReviewFilter = params.revisaoFinanceira === "1";
 
   let rows: AdminQueueRow[] = [];
   let dbUnavailable = false;
@@ -76,12 +82,15 @@ export default async function AdminProcessosPage({
       documentStatus: documentFilter,
       code: codeFilter,
       sort,
+      needsFinanceReview: financeReviewFilter || undefined,
     });
   } catch {
     dbUnavailable = true;
   }
 
-  const hasFilters = Boolean(statusFilter || paymentFilter || documentFilter || codeFilter);
+  const hasFilters = Boolean(
+    statusFilter || paymentFilter || documentFilter || codeFilter || financeReviewFilter,
+  );
 
   return (
     <Container>
@@ -144,6 +153,20 @@ export default async function AdminProcessosPage({
               <option value="recent">Mais recentes</option>
               <option value="oldest">Mais antigos</option>
             </select>
+          </label>
+          {/*
+            Docs/55 — filtro read-only sobre needsFinanceReview (docs/54).
+            So filtra: nao altera PaymentStatus, nao aciona reembolso, nao
+            chama PSP. Mesma superficie/permissao da fila (queue.view).
+          */}
+          <label className="flex items-center gap-2 text-xs font-medium text-neutral-600">
+            <input
+              type="checkbox"
+              name="revisaoFinanceira"
+              value="1"
+              defaultChecked={financeReviewFilter}
+            />
+            Revisão financeira necessária
           </label>
           <div className="flex items-end gap-2 md:col-span-5">
             <Button type="submit" className="px-3 py-1.5 text-xs">
