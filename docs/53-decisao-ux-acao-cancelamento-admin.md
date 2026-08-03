@@ -238,6 +238,40 @@ tabela está aprovado por este documento** — mesma lógica de `docs/52 §6`.
 
 ---
 
+> **Atualização (2026-08-03, ciclo de implementação encerrado).** Com este
+> PR, o ciclo iniciado em [`docs/51`](51-decisao-cancelamento-real.md) fecha:
+> decisão → `InternalStatus` preparado → service backend → sinais
+> operacionais reconhecendo o encerramento → visibilidade admin read-only →
+> decisão de UX (este documento) → implementação da UX. **Estado final
+> registrado:**
+>
+> | Item | Estado |
+> |---|---|
+> | Ação "Cancelar processo" | Implementada, só no detalhe admin |
+> | Forma | Form server-side simples, sem modal/Client Component |
+> | Permissão | `process.cancel`, ADMIN-only |
+> | Motivo | Obrigatório, piso `MIN_CANCEL_REASON_LENGTH` |
+> | Autoridade | `cancelProcess` continua validando tudo de novo |
+> | Allowlist | Só em `isCancellableInternalStatus`, exportada — nunca duplicada na UI |
+> | `operationalStatus` | Nunca alterado por esta ação |
+> | Projeção canônica | `CANCELADO_OPERACIONAL` continua fora, por decisão |
+> | `statusDivergence` | Continua `needs_decision` |
+> | Documentos/pagamentos/storage | Nunca tocados |
+> | Cliente | Continua sem visualização e sem motivo automático |
+> | Fila/prontidão/SLA | Já tratam o cancelamento como encerrado/inativo |
+> | Callout read-only | Aparece sozinho após o cancelamento, sem duplicar o form |
+>
+> **Pendências futuras, explicitamente fora deste ciclo:** visibilidade do
+> cliente ao cancelamento real; reembolso/financeiro; processo já
+> protocolado; reversão/reabertura (`docs/51 §4` itens 11–13, nunca
+> respondidos); um eventual `OperationalStatus`/projeção próprios para
+> cancelamento real, se algum dia decidido; e eventual refinamento de
+> auditoria/relatório (hoje o motivo só aparece no histórico do processo,
+> sem tela dedicada). Nenhuma UI/decisão futura desta lista está aprovada por
+> este documento. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a forma da UX no papel**. Não implementa
 > botão, form, action ou rota; não altera `cancelProcess`, `operationalStatus`,
 > projeção ou divergência; não fecha gate e não autoriza execução real. Regras
