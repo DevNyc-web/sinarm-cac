@@ -211,6 +211,20 @@ tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 
 ---
 
+> **Atualização (2026-08-03, implementação do PR 1 — §6).** Guard
+> implementado em `confirmPixPayment.ts`: antes de `markPaid`/
+> `transitionInternalStatus`, checa
+> `isClosed(payment.process.operationalStatus, payment.process.internalStatus)`
+> (mesma função de `operationalSignals.ts` já usada em outras superfícies,
+> conforme decisão §4.4) e retorna
+> `{ ok: false, error: "Nao e possivel confirmar pagamento de um processo
+> encerrado." }` sem alterar `PaymentStatus` nem criar evento de transição.
+> `simulatePaymentApprovedAction` não foi alterada — herda a guarda
+> automaticamente por chamar `confirmPixPayment` sem lógica própria. Nenhuma
+> mudança em UI, payment adapter, PSP ou reembolso. PRs 2–4 desta tabela
+> (`uploadProcessDocument.ts`, `applyDestinationSuggestion.ts`, UI)
+> permanecem pendentes.
+
 > **Fecho.** Este documento **audita e decide no papel**: mapeia exatamente
 > quais ações do cliente já bloqueiam processo cancelado (uma) e quais não
 > (três, incluindo um achado de prioridade alta), e recomenda reusar

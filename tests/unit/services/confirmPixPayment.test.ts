@@ -132,6 +132,67 @@ test("pagamento ja PAGO por outro evento vira no-op", async () => {
   assert.equal(db.processStatusEvent.rows.length, 0, "nada de novo no historico");
 });
 
+/* ---------------------------------------- guarda de processo fechado (docs/57) --- */
+
+test("bloqueia confirmacao quando internalStatus = CANCELADO_OPERACIONAL (cancelamento real)", async () => {
+  const { pagamento, processo } = semear(
+    {},
+    { internalStatus: "CANCELADO_OPERACIONAL", operationalStatus: "PAGO_EM_FILA" },
+  );
+  const result = await confirmPixPayment(EVENT_ID, PROVIDER_PAYMENT_ID);
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: "Nao e possivel confirmar pagamento de um processo encerrado.",
+  });
+  assert.equal(pagamento.status, "AGUARDANDO_PAGAMENTO", "PaymentStatus nao muda");
+  assert.equal(processo.internalStatus, "CANCELADO_OPERACIONAL", "processo nao reativa");
+  assert.equal(db.processStatusEvent.rows.length, 0, "nenhum evento de transicao e criado");
+});
+
+test("bloqueia confirmacao quando operationalStatus = CANCELADO_DEV (fechamento tecnico), mesma guarda isClosed", async () => {
+  const { pagamento, processo } = semear(
+    {},
+    { operationalStatus: "CANCELADO_DEV", internalStatus: "AGUARDANDO_PAGAMENTO" },
+  );
+  const result = await confirmPixPayment(EVENT_ID, PROVIDER_PAYMENT_ID);
+
+  assert.equal(result.ok, false);
+  assert.equal(pagamento.status, "AGUARDANDO_PAGAMENTO", "PaymentStatus nao muda");
+  assert.equal(processo.internalStatus, "AGUARDANDO_PAGAMENTO", "internalStatus nao muda");
+  assert.equal(db.processStatusEvent.rows.length, 0, "nenhum evento e criado");
+});
+
+test("processo ABERTO continua confirmando normalmente (nao-regressao da guarda nova)", async () => {
+  const { pagamento, processo } = semear();
+  const result = await confirmPixPayment(EVENT_ID, PROVIDER_PAYMENT_ID);
+
+  assert.equal(result.ok, true);
+  assert.equal(pagamento.status, "PAGO");
+  assert.equal(processo.internalStatus, "PAGO_EM_FILA");
+});
+
+test("a guarda roda ANTES de markPaid: pagamento fica exatamente como estava, nao so 'nao PAGO'", async () => {
+  const { pagamento } = semear(
+    { status: "PENDENTE" },
+    { internalStatus: "CANCELADO_OPERACIONAL" },
+  );
+  await confirmPixPayment(EVENT_ID, PROVIDER_PAYMENT_ID);
+
+  assert.equal(pagamento.status, "PENDENTE", "status original preservado, nao so 'diferente de PAGO'");
+  assert.equal(pagamento.paidAt, null, "paidAt nunca e setado");
+  assert.equal(pagamento.webhookEventId, null, "webhookEventId nunca e gravado — reprocessar continuaria bloqueado");
+});
+
+test("reusa isClosed de operationalSignals.ts — nao reescreve a checagem de estado fechado", () => {
+  const code = readFileSync("src/server/services/confirmPixPayment.ts", "utf8");
+  assert.match(code, /import \{ isClosed \} from "@\/server\/processes\/operationalSignals"/);
+  assert.match(
+    code,
+    /isClosed\(payment\.process\.operationalStatus, payment\.process\.internalStatus\)/,
+  );
+});
+
 /* ------------------------------------------------------------------ guardas --- */
 
 test("eventId ou providerPaymentId vazios sao rejeitados", async () => {
@@ -179,6 +240,11 @@ test("COMPORTAMENTO ATUAL: nao ha conferencia de valor na confirmacao", async ()
 });
 
 /* ------------------------------------------------------------------- escopo --- */
+
+test("simulatePaymentApprovedAction (cliente) continua chamando confirmPixPayment sem alteracao — herda a guarda automaticamente", () => {
+  const code = readFileSync("src/app/(user)/processos/[id]/actions.ts", "utf8");
+  assert.match(code, /confirmPixPayment\(`SIM-\$\{payment\.id\}`, payment\.providerPaymentId\)/);
+});
 
 test("o service nao chama provider, rede nem Gov.br/SINARM", () => {
   const code = readFileSync("src/server/services/confirmPixPayment.ts", "utf8")

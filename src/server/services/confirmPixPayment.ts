@@ -13,6 +13,7 @@ import {
   findPaymentByWebhookEventId,
   markPaid,
 } from "@/server/repositories/paymentRepository";
+import { isClosed } from "@/server/processes/operationalSignals";
 import { transitionInternalStatus } from "./transitionInternalStatus";
 
 export type ConfirmPixPaymentResult =
@@ -39,6 +40,16 @@ export async function confirmPixPayment(
     if (payment.status === "PAGO") return { ok: true, alreadyProcessed: true };
     if (payment.status !== "AGUARDANDO_PAGAMENTO" && payment.status !== "PENDENTE") {
       return { ok: false, error: `Pagamento em estado ${payment.status} nao pode ser confirmado.` };
+    }
+
+    // docs/57 — processo fechado (cancelamento real OU tecnico/dev) nunca pode
+    // ser reativado por uma confirmacao de pagamento atrasada/simulada. Reusa
+    // `isClosed` (operationalSignals.ts, docs/52) — mesma funcao ja usada pela
+    // fila/sinalizadores para "processo encerrado", em vez de reescrever a
+    // checagem aqui. Roda ANTES de `markPaid`/`transitionInternalStatus`: nem
+    // `PaymentStatus` nem `internalStatus` mudam, nenhum evento e criado.
+    if (isClosed(payment.process.operationalStatus, payment.process.internalStatus)) {
+      return { ok: false, error: "Nao e possivel confirmar pagamento de um processo encerrado." };
     }
 
     await markPaid(payment.id, eventId);
