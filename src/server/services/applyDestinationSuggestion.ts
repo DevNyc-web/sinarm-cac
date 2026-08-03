@@ -15,6 +15,7 @@ import {
   buildFieldSuggestions,
   checkSuggestionApplication,
 } from "@/server/documents";
+import { isClosed } from "@/server/processes/operationalSignals";
 import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { listDocumentsForOwner } from "@/server/repositories/processDocumentRepository";
 import { recordOperationalEvent } from "@/server/repositories/processEventRepository";
@@ -48,6 +49,16 @@ export async function applyDestinationSuggestion(
     // Dono do processo: o usuario so aplica no proprio processo.
     const process = await findProcessByIdForUser(processId, actor.id);
     if (!process) return { ok: false, error: "Processo nao encontrado." };
+
+    // docs/57 §3.5/§4.6 — processo fechado (cancelamento real OU tecnico/dev)
+    // nao aceita mais edicao do destino pelo cliente. Reusa `isClosed`
+    // (operationalSignals.ts, docs/52), mesma funcao dos guards de
+    // `confirmPixPayment`/`uploadProcessDocument`. Roda ANTES de
+    // `updateProcessDestination` e de `recordOperationalEvent`: nenhum campo de
+    // destino muda e nada entra na trilha append-only.
+    if (isClosed(process.operationalStatus, process.internalStatus)) {
+      return { ok: false, error: "Nao e possivel alterar destino de um processo encerrado." };
+    }
 
     // Fonte da verdade: documentos conferidos + destino atual, lidos agora.
     const documents = await listDocumentsForOwner(process.id);

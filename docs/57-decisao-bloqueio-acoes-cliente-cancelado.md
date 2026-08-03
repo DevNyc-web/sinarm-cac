@@ -239,6 +239,20 @@ tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 > (§3.7/§3.8). PRs 3–4 (`applyDestinationSuggestion.ts`, UI) permanecem
 > pendentes.
 
+> **Atualização (2026-08-03, implementação do PR 3 — §6).** Guard
+> implementado em `applyDestinationSuggestion.ts`: logo após a checagem de
+> posse (`findProcessByIdForUser`) e **antes** de `updateProcessDestination`
+> e de `recordOperationalEvent`, checa
+> `isClosed(process.operationalStatus, process.internalStatus)` (mesma função
+> de `operationalSignals.ts`, decisão §4.4) e retorna
+> `{ ok: false, error: "Nao e possivel alterar destino de um processo
+> encerrado." }` — nenhum campo de destino muda e nada entra na trilha
+> append-only. Fecha §3.5, o último gap de **código** do §6.
+> `applyDocumentFieldSuggestionAction` não foi alterada — herda a guarda
+> automaticamente. Com isto os três guards de service (PRs 1–3) estão
+> implementados; **o PR 4 (esconder/desabilitar os botões na UI do cliente,
+> reforço de UX) permanece pendente** — o backend já é a autoridade (§4.3).
+
 > **Fecho.** Este documento **audita e decide no papel**: mapeia exatamente
 > quais ações do cliente já bloqueiam processo cancelado (uma) e quais não
 > (três, incluindo um achado de prioridade alta), e recomenda reusar
