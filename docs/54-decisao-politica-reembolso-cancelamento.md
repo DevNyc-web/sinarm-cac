@@ -239,6 +239,19 @@ tabela está aprovado por este documento** — mesma lógica de `docs/53 §9`.
 
 ---
 
+> **Atualização (2026-08-03, docs, fila/relatório).** Como o time
+> financeiro/admin deve **encontrar** processos com `needsFinanceReview` foi
+> decidido em [`docs/55`](55-decisao-fila-revisao-financeira.md): primeiro
+> passo é um filtro simples na listagem admin já existente (mesmo padrão dos
+> filtros de status/pagamento/documento), **sem** gate de permissão novo —
+> continua visível a quem já tem `queue.view` (OPERADOR/FINANCEIRO/SUPORTE/
+> ADMIN), sem restringir a FINANCEIRO/ADMIN nesta etapa. Fila/aba separada,
+> relatório dedicado e exportação CSV ficam como decisões futuras. **Nada
+> disso foi implementado.** `registerRefund` continua fora do escopo.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a política no papel**: cancelamento real
 > nunca movimenta dinheiro sozinho, pagamentos ficam preservados, e a análise
 > financeira fica com quem já tem `refund.approve`. Não implementa ação,
