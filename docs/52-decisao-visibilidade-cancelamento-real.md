@@ -243,6 +243,23 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-02, docs, UX do botão).** A decisão de UX para o
+> botão/ação admin de cancelamento real (mencionada como "próximo PR possível"
+> em §6/§9 acima) foi registrada em
+> [`docs/53`](53-decisao-ux-acao-cancelamento-admin.md): form inline no
+> detalhe admin (mesmo padrão de `reopenDocumentReview`/
+> `approveDocumentOutOfFlow`, **não** um modal em JS — este app não usa
+> nenhum), visível só para `process.cancel`, nunca na fila/listagem nem para
+> cliente, motivo obrigatório com o mesmo piso do backend
+> (`MIN_CANCEL_REASON_LENGTH`), textos de botão/aviso/sucesso/erro definidos,
+> e a elegibilidade visual deve **reusar** uma função exportada de
+> `cancelProcess.ts` (recomendação: exportar `isCancellableInternalStatus`),
+> nunca duplicar a allowlist de estados na UI. **Nada disso foi
+> implementado** — nenhum botão, form ou action existe ainda. **Execução
+> real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,
