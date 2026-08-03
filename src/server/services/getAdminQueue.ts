@@ -19,7 +19,10 @@ import {
   type ReadinessLevel,
   type SlaStatus,
 } from "@/server/processes/operationalSignals";
-import { listAdminQueue, type AdminQueueFilters } from "@/server/repositories/processRepository";
+import {
+  listAdminQueue,
+  type AdminQueueFilters as RepositoryAdminQueueFilters,
+} from "@/server/repositories/processRepository";
 
 export type AdminQueueRow = {
   id: string;
@@ -48,13 +51,21 @@ export type AdminQueueRow = {
   hoursSinceCreated: number | null;
 };
 
-export type { AdminQueueFilters };
+/**
+ * `needsFinanceReview` NAO e coluna do banco (docs/55) — e derivado por
+ * `deriveNeedsFinanceReview` a partir de `internalStatus`/`paymentStatus`,
+ * ja selecionados. Por isso o filtro acontece EM MEMORIA, depois do mapa
+ * abaixo, nunca no `where` de `listAdminQueue` (repositorio nao muda).
+ */
+export type AdminQueueFilters = RepositoryAdminQueueFilters & {
+  needsFinanceReview?: boolean;
+};
 
 export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQueueRow[]> {
   const rows = await listAdminQueue(filters);
   const now = new Date();
 
-  return rows.map((row) => {
+  const mapped = rows.map((row) => {
     const owner = findMockUser(row.userId);
     const assigned = row.assignedToMockUserId ? findMockUser(row.assignedToMockUserId) : null;
     const paymentStatus = row.payments[0]?.status ?? null;
@@ -108,4 +119,6 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
       needsFinanceReview: indicators.needsFinanceReview,
     };
   });
+
+  return filters.needsFinanceReview ? mapped.filter((row) => row.needsFinanceReview) : mapped;
 }

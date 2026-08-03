@@ -203,6 +203,29 @@ tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`.
 
 ---
 
+> **Atualização (2026-08-03, código, implementação).** O filtro "Revisão
+> financeira" foi implementado exatamente como decidido acima:
+> `getAdminQueue.ts` ganhou `needsFinanceReview?: boolean` em
+> `AdminQueueFilters` (tipo estendido localmente, `processRepository.ts` e
+> `listAdminQueue` **não** foram tocados) e filtra o array **em memória**,
+> depois do `.map()` que já calculava o sinal — nenhum novo `where` no banco,
+> porque `needsFinanceReview` não é coluna. Na página da fila, um
+> `<input type="checkbox" name="revisaoFinanceira" value="1">` no mesmo
+> `<form method="get">` dos demais filtros; query param `revisaoFinanceira=1`
+> quando marcado, ausente quando não (comportamento nativo de checkbox em
+> GET). **Sem gate de permissão novo** — continua sob `queue.view`, como
+> decidido. Sem fila/aba nova, sem relatório dedicado, sem export CSV, sem
+> contador/resumo, sem `registerRefund`, sem botão de reembolso. Cliente não
+> ganhou nenhuma menção ao filtro. **Achado durante a implementação:** o fake
+> de Prisma usado pelos testes de service (`tests/unit/services/testPrisma.ts`)
+> tinha uma lacuna real — não tratava chave `undefined` em `where` como
+> "sem filtro" (Prisma de verdade trata), o que fazia `listAdminQueue({})`
+> devolver 0 linhas no fake. Corrigido na raiz (uma linha, `matches()`),
+> sem alterar nenhum service; suíte de services inteira (207 testes)
+> revalidada sem regressão. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a forma no papel**: o próximo passo é um
 > filtro simples na listagem já existente, sem gate de permissão novo, sem
 > relatório dedicado, sem exportação e sem ação de reembolso. Não implementa
