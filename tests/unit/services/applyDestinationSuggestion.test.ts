@@ -10,6 +10,7 @@
  * Banco: fake via `globalThis.prisma`. Sem Postgres, sem OCR, sem rede.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { beforeEach, test } from "node:test";
 import { installFakePrisma, prismaIsFake, type FakePrisma } from "./testPrisma";
 import { applyDestinationSuggestion } from "../../../src/server/services/applyDestinationSuggestion";
@@ -169,6 +170,68 @@ test("a trilha NAO carrega os campos extraidos", async () => {
 
   const evento = JSON.stringify(db.processStatusEvent.rows[0]);
   assert.doesNotMatch(evento, /confidence|"fields"/, "nada de PII estruturada na trilha");
+});
+
+/* ---------------------------------------- guarda de processo fechado (docs/57) --- */
+
+/** Fecha o processo ja semeado, sem depender de `cancelProcess`. */
+function fecharProcesso(overrides: Record<string, unknown>) {
+  Object.assign(db.process.rows[0], overrides);
+}
+
+test("bloqueia aplicacao quando internalStatus = CANCELADO_OPERACIONAL (cancelamento real)", async () => {
+  seedExtracao("Clube Persistido do Banco");
+  fecharProcesso({ internalStatus: "CANCELADO_OPERACIONAL", operationalStatus: "PAGO_EM_FILA" });
+  const antes = destinoAtual()?.eventName;
+
+  const result = await applyDestinationSuggestion(DONO, PROC, SUGESTAO_NOME_LOCAL, true);
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: "Nao e possivel alterar destino de um processo encerrado.",
+  });
+  assert.equal(destinoAtual()?.eventName, antes, "o destino nao pode ter mudado");
+  assert.equal(db.processStatusEvent.rows.length, 0, "nada entra na trilha append-only");
+  assert.equal(db.process.rows[0].internalStatus, "CANCELADO_OPERACIONAL", "processo nao reativa");
+  assert.equal(db.process.rows[0].operationalStatus, "PAGO_EM_FILA", "operationalStatus intacto");
+});
+
+test("bloqueia aplicacao quando operationalStatus = CANCELADO_DEV (fechamento tecnico), mesma guarda isClosed", async () => {
+  seedExtracao("Clube Persistido do Banco");
+  fecharProcesso({ operationalStatus: "CANCELADO_DEV", internalStatus: "RASCUNHO" });
+  const antes = destinoAtual()?.eventName;
+
+  const result = await applyDestinationSuggestion(DONO, PROC, SUGESTAO_NOME_LOCAL, true);
+
+  assert.equal(result.ok, false);
+  assert.equal(destinoAtual()?.eventName, antes);
+  assert.equal(db.processStatusEvent.rows.length, 0);
+  assert.equal(db.process.rows[0].internalStatus, "RASCUNHO", "internalStatus nao muda");
+});
+
+test("o destino permanece campo a campo, nao so o eventName", async () => {
+  seedExtracao("Clube Persistido do Banco");
+  const antes = { ...destinoAtual() };
+  fecharProcesso({ internalStatus: "CANCELADO_OPERACIONAL" });
+
+  await applyDestinationSuggestion(DONO, PROC, SUGESTAO_NOME_LOCAL, true);
+
+  assert.deepEqual({ ...destinoAtual() }, antes, "nenhum campo de destino pode ter mudado");
+});
+
+test("processo ABERTO continua aplicando normalmente (nao-regressao da guarda nova)", async () => {
+  seedExtracao("Clube Persistido do Banco");
+  const result = await applyDestinationSuggestion(DONO, PROC, SUGESTAO_NOME_LOCAL, true);
+
+  assert.ok(result.ok, `esperava sucesso, veio: ${!result.ok && result.error}`);
+  assert.equal(destinoAtual()?.eventName, "Clube Persistido do Banco");
+  assert.equal(db.processStatusEvent.rows.length, 1);
+});
+
+test("reusa isClosed de operationalSignals.ts — nao reescreve a checagem de estado fechado", () => {
+  const code = readFileSync("src/server/services/applyDestinationSuggestion.ts", "utf8");
+  assert.match(code, /import \{ isClosed \} from "@\/server\/processes\/operationalSignals"/);
+  assert.match(code, /isClosed\(process\.operationalStatus, process\.internalStatus\)/);
 });
 
 /* --------------------------------------- fake: relacoes NAO sao inventadas --- */
