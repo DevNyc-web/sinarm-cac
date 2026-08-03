@@ -458,6 +458,17 @@ export default async function AdminProcessoDetalhePage({
             Cobrancas ficticias/sandbox — nenhum Pix real. Confirmacao de Pix e acao do
             Financeiro/Admin (docs/11 §3); nesta fase a confirmacao vem do webhook/simulacao dev.
           </p>
+          {/*
+            Docs/54 — so SINALIZACAO para revisao humana (processo cancelado
+            de verdade com pagamento PAGO): nenhum PaymentStatus muda, nenhum
+            reembolso e disparado. Nunca afirmar que ha reembolso pendente/devido.
+          */}
+          {detail.indicators.needsFinanceReview ? (
+            <p className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+              Revisão financeira necessária — processo cancelado operacionalmente com pagamento
+              confirmado (docs/54). Nenhum reembolso foi feito automaticamente.
+            </p>
+          ) : null}
         </Card>
 
         <Card className="text-sm">

@@ -37,6 +37,8 @@ export type AdminQueueRow = {
   highlighted: boolean;
   /** Cancelamento REAL (docs/51/docs/52) — so leitura, para o rotulo na fila. */
   realCancellation: boolean;
+  /** Docs/54 — so sinalizacao para revisao financeira MANUAL, nunca reembolso automatico. */
+  needsFinanceReview: boolean;
   // Indicadores derivados (Fase 6.5) — nada persistido.
   signals: OperationalSignal[];
   readinessLevel: ReadinessLevel;
@@ -103,6 +105,7 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
         (row.operationalStatus === "PAGO_EM_FILA" ||
           row.operationalStatus === "EM_REVISAO_OPERACIONAL"),
       realCancellation: row.internalStatus === "CANCELADO_OPERACIONAL",
+      needsFinanceReview: indicators.needsFinanceReview,
     };
   });
 }

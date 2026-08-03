@@ -107,6 +107,11 @@ export type OperationalIndicators = {
   readinessTotal: number;
   sla: SlaView | null;
   pendings: PendingAction[];
+  /**
+   * Docs/54 — so SINALIZACAO para revisao humana, nunca reembolso automatico:
+   * nenhum `PaymentStatus` muda, nenhum PSP e chamado. Ver `deriveNeedsFinanceReview`.
+   */
+  needsFinanceReview: boolean;
 };
 
 function hoursBetween(from: Date, to: Date): number {
@@ -244,6 +249,23 @@ export function derivePendings(snapshot: ProcessSnapshot): PendingAction[] {
   return pendings;
 }
 
+/**
+ * Processo cancelado de verdade (`CANCELADO_OPERACIONAL`) com pagamento
+ * `PAGO` — precisa de revisao financeira MANUAL (docs/54, item 11 do
+ * docs/51 §4). NAO e reembolso: nenhum `PaymentStatus` muda, nenhum PSP e
+ * chamado, nenhuma acao e disparada. So sinaliza para quem ja tem
+ * `refund.approve` que este caso existe.
+ *
+ * ponytail: so `PaymentStatus === "PAGO"` conta como "pagamento relevante".
+ * `PENDENTE`/`AGUARDANDO_PAGAMENTO`/`EXPIRADO`/`FALHOU`/`CANCELADO` nunca
+ * chegaram a mover dinheiro de verdade — nada para revisar financeiramente.
+ */
+export function deriveNeedsFinanceReview(
+  snapshot: Pick<ProcessSnapshot, "internalStatus" | "paymentStatus">,
+): boolean {
+  return snapshot.internalStatus === "CANCELADO_OPERACIONAL" && snapshot.paymentStatus === "PAGO";
+}
+
 /** Todos os indicadores de uma vez (usado pela fila e pelo detalhe). */
 export function deriveOperationalIndicators(
   snapshot: ProcessSnapshot,
@@ -258,5 +280,6 @@ export function deriveOperationalIndicators(
     readinessTotal: readiness.criteria.length,
     sla: deriveSla(snapshot, now),
     pendings: derivePendings(snapshot),
+    needsFinanceReview: deriveNeedsFinanceReview(snapshot),
   };
 }

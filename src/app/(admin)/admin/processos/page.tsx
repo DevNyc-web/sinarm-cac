@@ -217,6 +217,15 @@ export default async function AdminProcessosPage({
                           {INTERNAL_STATUS_LABELS.CANCELADO_OPERACIONAL} (docs/51)
                         </span>
                       ) : null}
+                      {/*
+                        Docs/54 — so SINALIZACAO para revisao humana, nunca
+                        promessa de reembolso. Nunca afirmar que ha reembolso pendente/devido.
+                      */}
+                      {row.needsFinanceReview ? (
+                        <span className="mt-1 block text-xs font-medium text-red-700">
+                          Revisão financeira necessária
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <span
