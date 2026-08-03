@@ -260,6 +260,23 @@ Nenhum destes é pré-requisito de piloto ou divulgação — mesma lógica de
 
 ---
 
+> **Atualização (2026-08-03, ciclo de implementação encerrado).** A UX
+> decidida acima **foi implementada**: `isCancellableInternalStatus` foi
+> exportada de `cancelProcess.ts`; `cancelProcessAction` chama `cancelProcess`
+> exigindo `process.cancel`; o form "Cancelar processo" está no detalhe
+> admin, gated por `hasPermission(admin, "process.cancel") &&
+> isCancellableInternalStatus(detail.internalStatus)` — sem allowlist
+> duplicada. A lacuna de fila/prontidão/SLA (§2/§3.10 acima) também **foi
+> corrigida** (`operationalSignals.ts`/`getAdminQueue.ts` já tratam
+> `CANCELADO_OPERACIONAL` como encerrado/inativo). Detalhes completos em
+> [`docs/53`](53-decisao-ux-acao-cancelamento-admin.md). **O que permanece
+> como registrado:** o **cliente continua sem visualização** do cancelamento
+> real (§3.1, não alterado por nenhum PR desta lista) e continua **sem ver o
+> motivo automaticamente**; `CANCELADO_OPERACIONAL` segue sem projeção
+> canônica. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**: confirma a visibilidade
 > admin já existente, mantém a ausência de projeção canônica, deixa
 > visibilidade ao cliente e a lacuna de fila/prontidão como decisões futuras,

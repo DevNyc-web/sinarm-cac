@@ -206,6 +206,22 @@ das pendências de `docs/23 §5`.
 > decisões futuras, fora de `docs/51`. Uso da projeção parcial em
 > relatórios/admin (além do diagnóstico interno) também continua **em
 > aberto**, se algum dia for desejado. **Execução real continua bloqueada.**
+>
+> **Atualização (2026-08-03).** A frase "nada disso foi implementado" acima
+> **não reflete mais o estado atual** — registrado aqui para não deixar a
+> desatualização implícita. O cancelamento real de `CANCELADO_OPERACIONAL`
+> (o `InternalStatus` novo mencionado acima) foi implementado em ciclo
+> completo: service `cancelProcess`, sinais operacionais/fila/SLA
+> reconhecendo o encerramento, visualização admin read-only e a ação
+> "Cancelar processo" no detalhe admin — detalhes em
+> [`docs/51`](51-decisao-cancelamento-real.md),
+> [`docs/52`](52-decisao-visibilidade-cancelamento-real.md) e
+> [`docs/53`](53-decisao-ux-acao-cancelamento-admin.md). O que esta seção
+> disse sobre `CANCELADO_DEV` **continua exatamente igual**: técnico/dev,
+> fora da projeção canônica, nunca reclassificado. Reembolso/financeiro,
+> processo já protocolado e reversão **continuam decisões futuras**, sem
+> resposta em nenhum dos PRs implementados. **Execução real continua
+> bloqueada.**
 
 ---
 

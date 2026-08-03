@@ -232,6 +232,28 @@ ordem, não autorização de execução.
 
 ---
 
+> **Atualização (2026-08-03, ciclo de implementação encerrado).** A lacuna e
+> a UI mencionadas na atualização acima **foram resolvidas** nos PRs
+> seguintes: `operationalSignals.ts`/`getAdminQueue.ts` passaram a tratar
+> `CANCELADO_OPERACIONAL` como encerrado/inativo (fila, prontidão e SLA já não
+> tratam mais o processo cancelado como ativo); o admin ganhou visualização
+> read-only (callout no detalhe + rótulo na fila); e o botão **"Cancelar
+> processo"** foi implementado no detalhe admin — form server-side simples
+> (sem modal/Client Component), restrito a `process.cancel`, motivo
+> obrigatório, `isCancellableInternalStatus` (exportada de `cancelProcess.ts`)
+> como única fonte da allowlist na UI. Todos os detalhes de decisão e
+> implementação estão em [`docs/52`](52-decisao-visibilidade-cancelamento-real.md)
+> e [`docs/53`](53-decisao-ux-acao-cancelamento-admin.md); este blockquote só
+> fecha o ciclo aqui no documento de origem. **O que continua em aberto,
+> sem mudança:** visibilidade do cliente ao cancelamento real; reembolso/
+> financeiro, processo já protocolado e reversão/reabertura (itens 11–13,
+> nunca decididos por nenhum PR desta lista). `CANCELADO_OPERACIONAL`
+> continua fora da projeção canônica e `needs_decision` em
+> `statusDivergence.ts` — por decisão, não por lacuna técnica.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide no papel**. Não implementa `cancelProcess`,
 > não cria `InternalStatus` novo, não migra `CANCELADO_DEV`, não fecha gate e
 > não autoriza execução real. Regras permanentes (`docs/00 §8`) e bloqueios de
