@@ -272,6 +272,16 @@ tabela está aprovado por este documento** — mesma lógica de `docs/52 §6`.
 
 ---
 
+> **Atualização (2026-08-03, docs, política financeira).** O item
+> "reembolso/financeiro" da lista de pendências acima foi decidido em
+> [`docs/54`](54-decisao-politica-reembolso-cancelamento.md): sem reembolso
+> automático, pagamentos preservados, análise financeira a cargo de
+> `refund.approve` (permissão já existente, hoje sem consumidor). Processo já
+> protocolado e reversão/reabertura **continuam** sem resposta. Nada foi
+> implementado. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a forma da UX no papel**. Não implementa
 > botão, form, action ou rota; não altera `cancelProcess`, `operationalStatus`,
 > projeção ou divergência; não fecha gate e não autoriza execução real. Regras
