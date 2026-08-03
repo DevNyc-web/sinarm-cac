@@ -225,6 +225,20 @@ tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 > (`uploadProcessDocument.ts`, `applyDestinationSuggestion.ts`, UI)
 > permanecem pendentes.
 
+> **Atualização (2026-08-03, implementação do PR 2 — §6).** Guard
+> implementado em `uploadProcessDocument.ts`: logo após a checagem de posse
+> (`findProcessByIdForUser`) e **antes** do storage e do `createDocument`,
+> checa `isClosed(process.operationalStatus, process.internalStatus)` (mesma
+> função de `operationalSignals.ts`, decisão §4.4) e retorna
+> `{ ok: false, error: "Nao e possivel enviar documento para um processo
+> encerrado." }` — nenhum byte vai para `storage-local/`, nenhuma linha em
+> `ProcessDocument`, nenhum evento de transição, nenhum status movido. Cobre
+> §3.2/§3.3/§3.4 de uma vez: envio, substituição e reenvio de documento
+> rejeitado passam pelo mesmo service. `uploadDocumentAction` não foi
+> alterada — herda a guarda automaticamente. Leitura/download seguem livres
+> (§3.7/§3.8). PRs 3–4 (`applyDestinationSuggestion.ts`, UI) permanecem
+> pendentes.
+
 > **Fecho.** Este documento **audita e decide no papel**: mapeia exatamente
 > quais ações do cliente já bloqueiam processo cancelado (uma) e quais não
 > (três, incluindo um achado de prioridade alta), e recomenda reusar
