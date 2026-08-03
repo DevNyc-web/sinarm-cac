@@ -230,6 +230,22 @@ tabela está aprovado por este documento** — mesma lógica de `docs/55 §6`.
 
 ---
 
+> **Atualização (2026-08-03, docs, auditoria de ações).** A pendência do §5
+> ("não auditamos se upload/outras ações do cliente já bloqueiam
+> corretamente") foi resolvida em
+> [`docs/57`](57-decisao-bloqueio-acoes-cliente-cancelado.md): das 4 server
+> actions do cliente, só a criação de cobrança Pix já bloqueia processo
+> cancelado hoje (guard existente em `createPixPayment.ts`); upload de
+> documento, edição de destino e — **achado de prioridade alta** — a
+> ferramenta dev de simular pagamento aprovado **não têm guard nenhum**, e
+> esta última pode reativar silenciosamente um processo cancelado. Correção
+> recomendada: reusar `isClosed()` (`operationalSignals.ts`) nos três
+> pontos. **Nada foi implementado.** Leitura/visualização de documentos e
+> histórico continuam permitidas, sem bloqueio. **Execução real continua
+> bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a visibilidade ao cliente no papel**:
 > sim, com texto neutro, só no detalhe, lendo `internalStatus` direto, nunca
 > reusando `UserFacingStatus.CANCELADO`. Não implementa, não altera
