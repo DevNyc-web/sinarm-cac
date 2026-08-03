@@ -191,6 +191,10 @@ existe hoje, §3.6).
 Nenhum destes é pré-requisito de piloto ou divulgação. **Nenhum PR desta
 tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 
+> **Situação em 2026-08-03:** os quatro PRs acima foram aprovados
+> separadamente e já estão na `main`. Ver §8 (fechamento) ao fim deste
+> documento — a frase acima registra o estado na data da decisão, não hoje.
+
 ---
 
 ## 7. Proibições
@@ -269,6 +273,53 @@ tabela está aprovado por este documento** — mesma lógica de `docs/56 §6`.
 > server-side foi alterado — a UI é reforço, nunca a barreira (§4.3). Sem
 > menção a motivo interno, revisão financeira, reembolso ou estorno (§3.14).
 > Com isto, os PRs 1–4 do §6 estão **concluídos**.
+
+---
+
+## 8. Fechamento — bloco implementado (2026-08-03)
+
+O bloco de **bloqueio de ações do cliente em processo encerrado/cancelado
+está concluído**. Os quatro PRs do §6 foram implementados, revisados e
+mergeados na `main`:
+
+| PR | O que | Onde | Commit |
+|----|-------|------|--------|
+| 1 | Guard server-side de pagamento | `confirmPixPayment.ts` | `d3a6f19` |
+| 2 | Guard server-side de documento | `uploadProcessDocument.ts` | `508ff89` |
+| 3 | Guard server-side de destino | `applyDestinationSuggestion.ts` | `c9446a3` |
+| 4 | Reforço de UI/UX no detalhe do cliente | `processos/[id]/page.tsx`, `DocumentIntakePanel.tsx` | `5f61ec0` |
+
+Os três guards reusam a **mesma** `isClosed(operationalStatus, internalStatus)`
+de `operationalSignals.ts` (§4.4) — não existe uma segunda definição de
+"processo fechado" no código.
+
+**O que fica valendo:**
+
+- Processo fechado/cancelado **não avança** por confirmação de pagamento, por
+  envio/substituição/reenvio de documento, nem por aplicação de sugestão de
+  destino. Cada tentativa para antes de qualquer escrita: nenhum
+  `PaymentStatus` muda, nenhum byte vai para o storage, nenhuma linha entra na
+  trilha append-only.
+- **O backend é a autoridade** (§4.3). O PR 4 apenas deixa de oferecer as
+  ações na tela; remover o reforço visual não reabre nenhuma delas.
+- **Ações de leitura continuam permitidas** (§3.7/§3.8/§3.9): ver o detalhe e
+  o status, ver o aviso de cancelamento, ver e baixar documentos já enviados,
+  ler mensagens da equipe, procurar o atendimento.
+- **Não há reembolso automático** — nada aqui move dinheiro, chama PSP ou
+  altera `PaymentStatus`. A revisão financeira de processo cancelado com
+  pagamento `PAGO` continua **manual**, na fila do admin (`docs/54`).
+- **O cliente não vê financeiro**: nem `needsFinanceReview`, nem "revisão
+  financeira", nem motivo interno, nem promessa de reembolso ou estorno
+  (§3.14).
+- **Execução real segue bloqueada**: `PHASE9_REAL_EXECUTION_ENABLED`
+  permanece `false`, o gate do `docs/26 §19` segue fechado e nada aqui toca
+  Gov.br/SINARM/PF.
+
+**Pendências:** nenhuma decorrente deste documento. O §6 está encerrado; as
+proibições do §7 continuam valendo permanentemente, inclusive para quem
+mexer nestes arquivos depois.
+
+---
 
 > **Fecho.** Este documento **audita e decide no papel**: mapeia exatamente
 > quais ações do cliente já bloqueiam processo cancelado (uma) e quais não
