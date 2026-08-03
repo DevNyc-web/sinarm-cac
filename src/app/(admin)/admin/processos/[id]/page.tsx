@@ -31,6 +31,7 @@ import {
   type DivergenceSeverity,
 } from "@/server/processes/statusDivergence";
 import { getAdminProcessDetail, type AdminProcessDetail } from "@/server/services/getAdminProcessDetail";
+import { isCancellableInternalStatus, MIN_CANCEL_REASON_LENGTH } from "@/server/services/cancelProcess";
 import {
   getProcessReadinessState,
   type ProcessReadinessState,
@@ -49,6 +50,7 @@ import {
   advanceManualExecutionAction,
   approveDocumentOutOfFlowAction,
   assignProcessAction,
+  cancelProcessAction,
   changeOperationalStatusAction,
   changePriorityAction,
   createNoteAction,
@@ -114,11 +116,11 @@ export default async function AdminProcessoDetalhePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ erro?: string }>;
+  searchParams: Promise<{ erro?: string; sucesso?: string }>;
 }) {
   const admin = await requireAdminRole();
   const { id } = await params;
-  const { erro } = await searchParams;
+  const { erro, sucesso } = await searchParams;
 
   let detail: AdminProcessDetail | null = null;
   let readinessState: ProcessReadinessState = { found: false };
@@ -145,6 +147,13 @@ export default async function AdminProcessoDetalhePage({
     hasPermission(admin, "process.assign") ||
     hasPermission(admin, "process.priority") ||
     hasPermission(admin, "process.operationalStatus");
+  // Permissao PROPRIA (docs/51/docs/53), independente de `canOperate`: so
+  // aparece para quem tem "process.cancel" E para o mesmo estado que o
+  // backend aceita — `isCancellableInternalStatus` exportado de
+  // `cancelProcess.ts`, nunca uma lista reescrita aqui (docs/53 §6). Ja
+  // exclui `CANCELADO_OPERACIONAL` por construcao: nao esta na allowlist.
+  const canCancelProcess =
+    hasPermission(admin, "process.cancel") && isCancellableInternalStatus(detail.internalStatus);
   const canWriteInternalNote = hasPermission(admin, "note.internal");
   const canMessageUser = hasPermission(admin, "message.send");
   const assignees = assignableMockUsers();
@@ -172,6 +181,12 @@ export default async function AdminProcessoDetalhePage({
       {erro ? (
         <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {erro}
+        </p>
+      ) : null}
+
+      {sucesso ? (
+        <p className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {sucesso}
         </p>
       ) : null}
 
@@ -332,6 +347,41 @@ export default async function AdminProcessoDetalhePage({
               </p>
             </>
           )}
+          {/*
+            Cancelar processo (cancelamento REAL — docs/51/docs/52/docs/53).
+            Form inline, mesmo padrao de reopenDocumentReview/
+            approveDocumentOutOfFlow: motivo obrigatorio, sem modal JS. So
+            aparece com "process.cancel" E para os estados que o backend
+            aceita (`canCancelProcess`, calculado com `isCancellableInternalStatus`
+            exportado de cancelProcess.ts — nunca uma allowlist reescrita
+            aqui). O backend continua a autoridade final: esta checagem e so
+            UX, `cancelProcess` valida de novo (permissao, motivo, estado).
+          */}
+          {canCancelProcess ? (
+            <form
+              action={cancelProcessAction}
+              className="flex flex-wrap items-end gap-2 border-t border-neutral-200 pt-3"
+            >
+              <input type="hidden" name="processId" value={detail.id} />
+              <label className="block w-full text-xs text-neutral-600">
+                Motivo do cancelamento
+                <input
+                  name="cancelReason"
+                  required
+                  minLength={MIN_CANCEL_REASON_LENGTH}
+                  placeholder={`Minimo ${MIN_CANCEL_REASON_LENGTH} caracteres`}
+                  className={controlClass}
+                />
+              </label>
+              <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                Cancelar processo
+              </Button>
+              <p className="w-full text-xs text-neutral-500">
+                Esta acao encerra o processo operacionalmente. Documentos e pagamentos nao sao
+                apagados. O cliente nao vera o motivo automaticamente.
+              </p>
+            </form>
+          ) : null}
         </Card>
 
         <Card className="space-y-1 text-sm">

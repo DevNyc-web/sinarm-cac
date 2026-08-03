@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminRole, requirePermission } from "@/server/auth/guards";
+import { cancelProcess } from "@/server/services/cancelProcess";
 import { createProcessNote } from "@/server/services/createProcessNote";
 import {
   advanceManualExecution,
@@ -234,6 +235,32 @@ export async function registerManualGruPaymentAction(formData: FormData) {
     String(formData.get("observation") ?? ""),
   );
   backTo(processId, result.ok ? undefined : result.error);
+}
+
+/**
+ * Cancelar processo (cancelamento REAL) — exige "process.cancel" (ADMIN-only,
+ * docs/51/docs/53). `cancelProcess` ja checa a mesma permissao internamente
+ * (decisao do proprio service, docs/51) — chamar `requirePermission` aqui e
+ * so para manter o mesmo padrao de erro/redirect das demais actions;
+ * `hasPermission` e idempotente, checar duas vezes nao muda o resultado.
+ *
+ * Redireciona com `?sucesso=` em vez de so `revalidatePath` (diferente das
+ * demais acoes desta pagina) porque docs/53 pede uma mensagem de sucesso
+ * explicita para esta acao especifica — cancelamento e mais serio que mover
+ * prioridade/responsavel, que nunca tiveram esse requisito.
+ */
+export async function cancelProcessAction(formData: FormData) {
+  const actor = await requirePermission("process.cancel");
+  const processId = String(formData.get("processId") ?? "");
+  const reason = String(formData.get("cancelReason") ?? "");
+
+  const base = `/admin/processos/${encodeURIComponent(processId)}`;
+  const result = await cancelProcess(actor, processId, reason);
+  if (!result.ok) {
+    redirect(`${base}?erro=${encodeURIComponent(result.error)}`);
+  }
+  revalidatePath(base);
+  redirect(`${base}?sucesso=${encodeURIComponent("Processo cancelado operacionalmente.")}`);
 }
 
 /**

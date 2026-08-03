@@ -211,6 +211,33 @@ tabela está aprovado por este documento** — mesma lógica de `docs/52 §6`.
 
 ---
 
+> **Atualização (2026-08-02, código, implementação).** O botão foi
+> implementado exatamente como decidido acima: `isCancellableInternalStatus`
+> foi **exportada** de `cancelProcess.ts` (§6/PR 1); a server action
+> `cancelProcessAction` foi criada em `actions.ts`, exigindo
+> `requirePermission("process.cancel")` e chamando `cancelProcess(actor,
+> processId, reason)` — o service continua validando permissão, motivo e
+> estado de novo, sem duplicação de autoridade (§6, regra 11); o form inline
+> foi adicionado ao card "Operacao" do detalhe admin (PR 2+3 combinados),
+> gated por `canCancelProcess = hasPermission(admin, "process.cancel") &&
+> isCancellableInternalStatus(detail.internalStatus)` — nenhuma allowlist
+> reescrita na página. Textos usados: botão "Cancelar processo", campo
+> "Motivo do cancelamento" (com `required`/`minLength={MIN_CANCEL_REASON_LENGTH}`),
+> aviso "Esta ação encerra o processo operacionalmente. Documentos e
+> pagamentos não são apagados. O cliente não verá o motivo automaticamente.",
+> erro por `?erro=` (mesmo padrão das demais ações) e sucesso "Processo
+> cancelado operacionalmente." por `?sucesso=` — banner novo, simétrico ao de
+> erro já existente (nenhuma outra ação desta página tinha mensagem de
+> sucesso; esta ganhou por ser mais séria, decisão explícita do §4 acima).
+> **Sem modal, sem Client Component** — confirmado pelo tamanho da rota no
+> build (`/admin/processos/[id]` continua 200 B de JS, sem aumento). O
+> callout read-only (PR anterior) continua aparecendo sozinho após o
+> cancelamento, sem duplicação. Cliente, `operationalStatus`,
+> `operationalStatusProjection.ts` e `statusDivergence.ts` **não foram
+> tocados**. **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a forma da UX no papel**. Não implementa
 > botão, form, action ou rota; não altera `cancelProcess`, `operationalStatus`,
 > projeção ou divergência; não fecha gate e não autoriza execução real. Regras

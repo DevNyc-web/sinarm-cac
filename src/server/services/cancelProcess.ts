@@ -69,7 +69,12 @@ const CANCELLABLE_INTERNAL_STATUS: readonly InternalStatus[] = [
   "BLOQUEADO_OPERACIONAL",
 ];
 
-function isCancellableInternalStatus(status: InternalStatus): boolean {
+/**
+ * Exportada para a UI admin decidir se mostra o botao (docs/53) — SEM
+ * reescrever a lista de estados na pagina. O backend continua a autoridade:
+ * esconder o botao com esta funcao e so UX, `cancelProcess` valida de novo.
+ */
+export function isCancellableInternalStatus(status: InternalStatus): boolean {
   return CANCELLABLE_INTERNAL_STATUS.includes(status);
 }
 
