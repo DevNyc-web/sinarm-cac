@@ -15,6 +15,7 @@ import {
 } from "@/server/documents";
 import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { deriveAutomationReadiness } from "@/server/automation/automationReadiness";
+import { isClosed } from "@/server/processes/operationalSignals";
 import {
   clientVisibleStatusLabel,
   DOCUMENT_STATUS_LABELS,
@@ -84,6 +85,13 @@ export default async function ProcessoRevisaoPage({
     !paidPayment &&
     (process.internalStatus === "RASCUNHO" || process.internalStatus === "AGUARDANDO_PAGAMENTO");
 
+  // Docs/57 §4.3 (PR 4) — processo encerrado: a UI PARA DE OFERECER as acoes que
+  // os services ja recusam (`confirmPixPayment`, `uploadProcessDocument`,
+  // `applyDestinationSuggestion`). Reforco visual apenas; a autoridade continua
+  // sendo o backend. Mesma `isClosed` dos guards, para nao existir uma segunda
+  // definicao de "processo fechado". Tudo que e LEITURA continua na tela.
+  const closed = isClosed(process.operationalStatus, process.internalStatus);
+
   // Campos extraidos ja persistidos, lidos UMA vez e compartilhados com o painel
   // — evita N+1 e garante que conferencia e sugestoes vejam o mesmo estado. O
   // dono le os proprios campos por POSSE: `documents` so existe porque
@@ -151,6 +159,17 @@ export default async function ProcessoRevisaoPage({
               Em caso de dúvidas, entre em contato com o atendimento.
             </p>
           ) : null}
+          {/*
+            Docs/57 PR 4 — texto neutro que substitui as acoes escondidas
+            abaixo. Cobre tambem o fechamento tecnico (`CANCELADO_DEV`), que o
+            aviso do docs/56 acima nao cobre. Sem financeiro, sem estorno, sem
+            valores, sem contestacao: so diz que nao ha o que fazer aqui.
+          */}
+          {closed ? (
+            <p className="mt-2 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+              Este processo está encerrado. Novas ações não estão disponíveis.
+            </p>
+          ) : null}
         </Card>
 
         <AutomationReadinessPanel readiness={readiness} />
@@ -212,13 +231,17 @@ export default async function ProcessoRevisaoPage({
           documents={documents}
           // Mapa ja carregado acima: o painel NAO le banco (componente nao faz I/O).
           extractionFields={extractionFields}
-          uploadAction={uploadDocumentAction}
+          // Encerrado: painel vira somente leitura — os cards de documento
+          // esperado continuam visiveis, sem o formulario de anexar/substituir.
+          uploadAction={closed ? undefined : uploadDocumentAction}
           sentKind={sentKind}
           error={erro}
           // Destino e o unico grupo com campo no modelo atual — o resto das
           // sugestoes aparece como "campo futuro", sem valor atual para comparar.
           currentValues={{ destination: process.destination }}
-          applyAction={applyDocumentFieldSuggestionAction}
+          // Idem para a sugestao de destino: sem `applyAction` o painel so
+          // EXIBE o que foi conferido (contrato que ja existia).
+          applyAction={closed ? undefined : applyDocumentFieldSuggestionAction}
           appliedTarget={aplicado}
         />
 
@@ -325,13 +348,20 @@ export default async function ProcessoRevisaoPage({
                           Expira em {payment.expiresAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       ) : null}
-                      <form action={simulatePaymentApprovedAction} className="mt-2">
-                        <input type="hidden" name="processId" value={process.id} />
-                        <input type="hidden" name="paymentId" value={payment.id} />
-                        <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
-                          Simular pagamento aprovado (demonstração)
-                        </Button>
-                      </form>
+                      {/*
+                        Encerrado: o codigo Pix continua VISIVEL (leitura), mas
+                        a simulacao some — e a acao que `confirmPixPayment` ja
+                        recusa no servidor.
+                      */}
+                      {closed ? null : (
+                        <form action={simulatePaymentApprovedAction} className="mt-2">
+                          <input type="hidden" name="processId" value={process.id} />
+                          <input type="hidden" name="paymentId" value={payment.id} />
+                          <Button type="submit" variant="secondary" className="px-3 py-1 text-xs">
+                            Simular pagamento aprovado (demonstração)
+                          </Button>
+                        </form>
+                      )}
                     </>
                   ) : null}
                   {payment.status === "PAGO" && payment.paidAt ? (
@@ -347,7 +377,8 @@ export default async function ProcessoRevisaoPage({
             <p className="mt-3 text-neutral-500">Nenhuma cobranca gerada ainda.</p>
           )}
 
-          {canCreateCharge ? (
+          {/* `canCreateCharge` inalterado; encerrado apenas some com o botao. */}
+          {canCreateCharge && !closed ? (
             <form action={createPixPaymentAction} className="mt-3">
               <input type="hidden" name="processId" value={process.id} />
               <Button type="submit">Gerar cobrança Pix</Button>
