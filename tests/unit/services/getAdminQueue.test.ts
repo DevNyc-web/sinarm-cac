@@ -93,6 +93,28 @@ test("processo ativo com pagamento PAGO nao aparece no filtro (needsFinanceRevie
   assert.equal(rows.length, 0);
 });
 
+test("docs/59: expoe valor pago e data de pagamento — mesma fonte ja usada no detalhe admin", async () => {
+  const paidAt = new Date("2026-02-01T12:00:00Z");
+  seedProcess({
+    code: "GT-CANCELADO-PAGO",
+    internalStatus: "CANCELADO_OPERACIONAL",
+    payments: [{ status: "PAGO", amountCents: 10_000, paidAt, createdAt: new Date() }],
+  });
+
+  const rows = await getAdminQueue({ needsFinanceReview: true });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].paymentAmountCents, 10_000);
+  assert.equal(rows[0].paymentPaidAt?.toISOString(), paidAt.toISOString());
+});
+
+test("docs/59: valor/data de pagamento ficam null quando o processo nao tem pagamento", async () => {
+  seedProcess({ code: "GT-SEM-PAGAMENTO", payments: [] });
+
+  const rows = await getAdminQueue({});
+  assert.equal(rows[0].paymentAmountCents, null);
+  assert.equal(rows[0].paymentPaidAt, null);
+});
+
 test("o filtro nao altera PaymentStatus nem cria nenhuma linha nova", async () => {
   const seeded = seedProcess({
     code: "GT-CANCELADO-PAGO",

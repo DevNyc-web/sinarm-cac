@@ -291,16 +291,19 @@ test("o rotulo distingue de CANCELADO_DEV e de CANCELADO_REEMBOLSADO", () => {
   assert.doesNotMatch(rotulo, /reembols/i, "nao afirma reembolso — isso e decisao futura, docs/51 §4 item 11");
 });
 
-test("CANCELADO_OPERACIONAL aparece EXATAMENTE em seis arquivos: um escritor + cinco leituras (docs/52/docs/56/docs/58)", () => {
+test("CANCELADO_OPERACIONAL aparece EXATAMENTE em sete arquivos: um escritor + seis leituras (docs/52/docs/56/docs/58/docs/59)", () => {
   // `cancelProcess` (docs/51) continua o UNICO escritor — nenhuma UI escreve
   // o valor, so o LE para exibir:
   //  - o detalhe admin mostra um callout quando internalStatus bate (docs/52);
   //  - a fila admin (pagina + `getAdminQueue.ts`) mostra um rotulo por linha (docs/52);
   //  - o detalhe do CLIENTE mostra um aviso read-only equivalente (docs/56);
-  //  - o dashboard/listagem do CLIENTE troca o badge da linha (docs/58 §6).
-  // Nenhum dos cinco cria form/botao/action nova — testes proprios abaixo,
-  // em `adminRealCancellationView.test.ts` e em `clientCancellationNotice.test.ts`
-  // provam isso.
+  //  - o dashboard/listagem do CLIENTE troca o badge da linha (docs/58 §6);
+  //  - o relatorio financeiro dedicado mostra o status interno por linha
+  //    (docs/59 §6 PR 1 — todo processo listado ali JA E CANCELADO_OPERACIONAL
+  //    por definicao de `needsFinanceReview`, entao o rotulo e sempre o mesmo).
+  // Nenhum dos seis cria form/botao/action nova — testes proprios abaixo, em
+  // `adminRealCancellationView.test.ts`, `clientCancellationNotice.test.ts` e
+  // `adminFinancialReport.test.ts` provam isso.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
   assert.ok(fluxos.length > 0, "varredura nao encontrou arquivo — caminho errado");
 
@@ -310,6 +313,7 @@ test("CANCELADO_OPERACIONAL aparece EXATAMENTE em seis arquivos: um escritor + c
     .sort();
 
   assert.deepEqual(consumidores, [
+    "src/app/(admin)/admin/financeiro/page.tsx",
     "src/app/(admin)/admin/processos/[id]/page.tsx",
     "src/app/(admin)/admin/processos/page.tsx",
     "src/app/(user)/dashboard/page.tsx",

@@ -34,6 +34,9 @@ export type AdminQueueRow = {
   priority: ProcessPriority;
   assignedToLabel: string | null;
   paymentStatus: PaymentStatus | null;
+  /** Docs/59 — fonte segura ja existente, so para o relatorio financeiro dedicado. */
+  paymentAmountCents: number | null;
+  paymentPaidAt: Date | null;
   documentStatus: DocumentStatus | null;
   destinationLabel: string | null;
   /** Destaque na fila: pago e aguardando operacao (docs/11 §4). */
@@ -69,6 +72,8 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
     const owner = findMockUser(row.userId);
     const assigned = row.assignedToMockUserId ? findMockUser(row.assignedToMockUserId) : null;
     const paymentStatus = row.payments[0]?.status ?? null;
+    const paymentAmountCents = row.payments[0]?.amountCents ?? null;
+    const paymentPaidAt = row.payments[0]?.paidAt ?? null;
 
     const indicators = deriveOperationalIndicators(
       {
@@ -102,6 +107,8 @@ export async function getAdminQueue(filters: AdminQueueFilters): Promise<AdminQu
       priority: row.priority,
       assignedToLabel: assigned ? assigned.name : (row.assignedToMockUserId ?? null),
       paymentStatus,
+      paymentAmountCents,
+      paymentPaidAt,
       documentStatus: row.documents[0]?.status ?? null,
       destinationLabel: row.destination
         ? `${row.destination.eventName} — ${row.destination.city}/${row.destination.uf}`

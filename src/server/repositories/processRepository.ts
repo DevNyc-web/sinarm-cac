@@ -151,7 +151,15 @@ export function listAdminQueue(filters: AdminQueueFilters) {
       assignedToMockUserId: true,
       processType: { select: { name: true } },
       destination: { select: { eventName: true, city: true, uf: true } },
-      payments: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      // amountCents/paidAt: docs/59 — fonte segura ja existente, so para o
+      // relatorio financeiro dedicado (needsFinanceReview) exibir valor/data
+      // de pagamento sem query propria. Ambos ja sao exibidos ao admin no
+      // detalhe do processo hoje.
+      payments: {
+        select: { status: true, amountCents: true, paidAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
       documents: { select: { status: true }, orderBy: { createdAt: "desc" }, take: 1 },
       // Base dos indicadores derivados (Fase 6.5): ultimo evento para o SLA e
       // itens marcados para prontidao. So chaves/grupo — nada sensivel.
