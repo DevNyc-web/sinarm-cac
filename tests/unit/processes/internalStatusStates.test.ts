@@ -291,13 +291,14 @@ test("o rotulo distingue de CANCELADO_DEV e de CANCELADO_REEMBOLSADO", () => {
   assert.doesNotMatch(rotulo, /reembols/i, "nao afirma reembolso — isso e decisao futura, docs/51 §4 item 11");
 });
 
-test("CANCELADO_OPERACIONAL aparece EXATAMENTE em cinco arquivos: um escritor + quatro leituras (docs/52/docs/56)", () => {
+test("CANCELADO_OPERACIONAL aparece EXATAMENTE em seis arquivos: um escritor + cinco leituras (docs/52/docs/56/docs/58)", () => {
   // `cancelProcess` (docs/51) continua o UNICO escritor — nenhuma UI escreve
   // o valor, so o LE para exibir:
   //  - o detalhe admin mostra um callout quando internalStatus bate (docs/52);
   //  - a fila admin (pagina + `getAdminQueue.ts`) mostra um rotulo por linha (docs/52);
-  //  - o detalhe do CLIENTE mostra um aviso read-only equivalente (docs/56).
-  // Nenhum dos quatro cria form/botao/action nova — testes proprios abaixo,
+  //  - o detalhe do CLIENTE mostra um aviso read-only equivalente (docs/56);
+  //  - o dashboard/listagem do CLIENTE troca o badge da linha (docs/58 §6).
+  // Nenhum dos cinco cria form/botao/action nova — testes proprios abaixo,
   // em `adminRealCancellationView.test.ts` e em `clientCancellationNotice.test.ts`
   // provam isso.
   const fluxos = [...arquivosDeFluxo("src/server/services"), ...arquivosDeFluxo("src/app")];
@@ -311,6 +312,7 @@ test("CANCELADO_OPERACIONAL aparece EXATAMENTE em cinco arquivos: um escritor + 
   assert.deepEqual(consumidores, [
     "src/app/(admin)/admin/processos/[id]/page.tsx",
     "src/app/(admin)/admin/processos/page.tsx",
+    "src/app/(user)/dashboard/page.tsx",
     "src/app/(user)/processos/[id]/page.tsx",
     "src/server/services/cancelProcess.ts",
     "src/server/services/getAdminQueue.ts",
