@@ -228,10 +228,12 @@ Nenhum destes é pré-requisito de piloto ou divulgação. **Nenhum PR desta
 tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`/
 `docs/55 §6`.
 
-> **Situação em 2026-08-04:** o **PR 1** acima foi implementado e mergeado
-> (`a9f21b6`). Ver atualização (2026-08-04, código, implementação parcial)
-> ao fim deste documento — o bloco **não está totalmente fechado**: a data
-> de cancelamento continua pendente, registrada ali como **PR técnico 2**.
+> **Situação em 2026-08-04:** o **PR 1** (`a9f21b6`) e o **PR 2** (`626f407`,
+> data de cancelamento) acima foram implementados e mergeados. Ver
+> atualização (2026-08-04, código, fechamento do bloco read-only) ao fim
+> deste documento — **o bloco read-only está fechado**. Export CSV e
+> `registerRefund` continuam fora do escopo, como decisões futuras
+> separadas.
 
 ---
 
@@ -367,6 +369,62 @@ tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`/
 >   posição relativa). Nenhuma outra pendência nova é criada aqui.
 >
 > **Execução real continua bloqueada.**
+
+---
+
+> **Atualização (2026-08-04, código, fechamento do bloco read-only).** O
+> **PR 2** do `§6` foi implementado e mergeado na `main`: **`626f407`** —
+> *feat: show cancellation date on financial report*. Com ele, **o bloco
+> read-only deste documento está fechado**.
+>
+> **Histórico dos commits deste bloco:**
+>
+> | Commit | O que |
+> |---|---|
+> | `918709d` | Decisão inicial — relatório dedicado, `docs/59` original |
+> | `def609b` | Permissão final decidida — `audit.view.financial` |
+> | `a9f21b6` | PR 1 — rota/tela `/admin/financeiro` read-only |
+> | `bf435fe` | Fechamento parcial do PR 1 (pendência: data de cancelamento) |
+> | `626f407` | PR 2 — data de cancelamento via `ProcessStatusEvent` |
+>
+> **Estado final do bloco read-only:**
+>
+> - **`/admin/financeiro` está implementado.**
+> - Gate: **`requirePermission("audit.view.financial")`**. **`queue.view`
+>   e `refund.approve` NÃO são gate** desta tela.
+> - Relatório **interno**, **estritamente read-only** — cliente **nunca**
+>   vê, em nenhuma superfície.
+> - Lista `needsFinanceReview`, reusando `getAdminQueue`, sem regra
+>   duplicada.
+> - Campos, todos com **fonte segura já existente**: processo, cliente,
+>   status interno, `paymentStatus`, valor pago (`Payment.amountCents`),
+>   data de pagamento (`Payment.paidAt`), data de cancelamento e link para
+>   o detalhe admin.
+> - **Data de cancelamento** vem de `ProcessStatusEvent.createdAt` onde
+>   `toStatus = "CANCELADO_OPERACIONAL"` — busca em **lote**
+>   (`processId IN (...)`), **sem N+1**, ordenada `createdAt ASC`, primeiro
+>   evento cronológico quando houver mais de um. **Nunca** `Payment.paidAt`
+>   nem `Process.updatedAt` como fallback — fallback neutro (`"—"`) quando
+>   não há evento.
+> - **Sem** reembolso automático, **sem** `registerRefund`, **sem** chamada
+>   a PSP, **sem** alteração de `PaymentStatus`.
+> - **Sem** migration, **sem** mudança de schema — todos os campos usados
+>   já eram colunas reais.
+> - **Execução real continua bloqueada.**
+>
+> **O que continua fora do escopo — decisões futuras separadas, não
+> pendências deste bloco:**
+>
+> - Exportação **CSV** do relatório (`§6` PR 3 renumerado — antigo PR 2).
+> - Ação `registerRefund` (`docs/54 §6` PR 1) e qualquer aprovação/registro
+>   de reembolso.
+> - Crédito interno (`docs/54 §5`).
+> - Processo já protocolado e reversão/reabertura (`docs/51 §4` itens
+>   12–13).
+>
+> Nenhum desses itens é pendência **deste** bloco read-only — são
+> possibilidades futuras que exigem decisão própria, não tarefas em aberto
+> aqui.
 
 ---
 
