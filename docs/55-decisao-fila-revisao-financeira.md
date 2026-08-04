@@ -226,6 +226,18 @@ tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`.
 
 ---
 
+> **Atualização (2026-08-04, docs, relatório dedicado).** O PR 2 deste `§6`
+> ("Relatório financeiro dedicado... decidir se é aba nova e se é restrito a
+> `refund.approve`/`audit.view.financial`") foi decidido em
+> [`docs/59`](59-decisao-relatorio-financeiro-cancelados-pagos.md): sim, tela
+> dedicada é recomendada, restrita a `refund.approve`/`audit.view.financial`
+> — diferente **deste** filtro simples, que continua sob `queue.view`, sem
+> gate novo. **Nada foi implementado ainda** — fica para o PR técnico que o
+> `docs/59 §6` registra. `registerRefund` continua fora do escopo.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a forma no papel**: o próximo passo é um
 > filtro simples na listagem já existente, sem gate de permissão novo, sem
 > relatório dedicado, sem exportação e sem ação de reembolso. Não implementa

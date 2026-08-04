@@ -252,6 +252,19 @@ tabela está aprovado por este documento** — mesma lógica de `docs/53 §9`.
 
 ---
 
+> **Atualização (2026-08-04, docs, relatório dedicado).** A pergunta "deve
+> existir relatório/tela financeira dedicada" (§3.10/§4 item 10, e o PR 2 do
+> `docs/55 §6`) foi respondida em
+> [`docs/59`](59-decisao-relatorio-financeiro-cancelados-pagos.md): sim,
+> recomendado como próximo PR técnico, restrito a `refund.approve`/
+> `audit.view.financial` (não `queue.view`), read-only, mostrando valor pago
+> e data de pagamento (fonte já segura hoje) mais data de cancelamento
+> (exige query nova) — sem export CSV e sem `registerRefund` nesta etapa.
+> **Nada foi implementado.** `registerRefund` continua fora do escopo.
+> **Execução real continua bloqueada.**
+
+---
+
 > **Fecho.** Este documento **decide a política no papel**: cancelamento real
 > nunca movimenta dinheiro sozinho, pagamentos ficam preservados, e a análise
 > financeira fica com quem já tem `refund.approve`. Não implementa ação,
