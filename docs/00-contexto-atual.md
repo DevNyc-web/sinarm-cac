@@ -206,6 +206,20 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   a um documento próprio, posterior. **Docs-only:** **NÃO encerra a Fase 1**,
   **NÃO abre a Fase 2** como execução real, não altera código/UI/rotas/auth/
   banco/testes; `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/62-decisao-formato-numero-interno-processo.md` — **decisão do formato
+  do número interno** (`Process.code`): **`CAC-YYYY-NNNNNN`** (ex.:
+  `CAC-2026-000001`), com **sequência global monotônica** — o ano é rótulo de
+  criação e a sequência **não reinicia por ano**. Códigos antigos `GT-DEV-…`
+  ficam **preservados**: sem renomeação, sem backfill, sem migration de
+  histórico; busca/suporte aceitam os dois formatos (já funciona hoje, filtro
+  `contains` case-insensitive). Registra que a **implementação** exigirá fonte
+  de sequência concorrente-segura (sequence do Postgres; `count() + 1` é
+  *racy*) e **provavelmente migration** — refinando o `docs/60 §8.1`, que
+  previa "sem migration" apenas para a coluna. Resolve **A.1–A.3** do
+  `docs/61` e satisfaz a condição `docs/61 §5.6`; **A.4–A.6 seguem
+  pendentes**. **Docs-only:** **NÃO encerra a Fase 1**, **NÃO abre a Fase 2**,
+  não altera código/Prisma/migration/UI/rotas/auth/testes;
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
