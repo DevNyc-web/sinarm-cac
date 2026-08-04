@@ -113,16 +113,31 @@ que o resolva explicitamente.
 - [x] A.1 — Decidir o **formato amigável futuro** do `Process.code`. → **`CAC-YYYY-NNNNNN`** ([`docs/62 §3`](62-decisao-formato-numero-interno-processo.md))
 - [x] A.2 — Exemplo aceitável de formato: `CAC-2026-000001` (`docs/60 §8.4`). → **adotado**, com sequência **global monotônica** que não reinicia por ano (`docs/62 §4`)
 - [x] A.3 — Decidir o **tratamento dos códigos antigos** `GT-DEV-…` (manter como estão vs. renumerar). → **preservar como estão**, sem backfill e sem migration de reescrita (`docs/62 §5`)
-- [ ] A.4 — Implementar o ajuste técnico em **PR separado**, se decidido.
-- [ ] A.5 — Garantir **exibição para cliente e admin**.
-- [ ] A.6 — Garantir **consulta admin por número interno**.
+- [x] A.4 — Implementar o ajuste técnico em **PR separado**, se decidido. → **implementado**: sequence `process_code_seq` + `generateProcessCode()`
+- [x] A.5 — Garantir **exibição para cliente e admin**. → **verificado, sem mudança** (não regressão)
+- [x] A.6 — Garantir **consulta admin por número interno**. → **verificado, sem mudança** (não regressão)
 
 > **Decidido em 2026-08-04 pelo [`docs/62`](62-decisao-formato-numero-interno-processo.md):**
-> A.1–A.3 estão **resolvidos**. **A.4–A.6 continuam pendentes** — a
-> implementação do gerador é PR técnico próprio, ainda não aprovado. Com isso,
-> a condição **§5.6** ("número interno amigável estiver decidido") passa a
-> estar satisfeita; **a Fase 1 continua NÃO encerrada**, pois as demais
-> pendências (B–H) e A.4–A.6 seguem abertas.
+> A.1–A.3 estão **resolvidos**. Com isso, a condição **§5.6** ("número interno
+> amigável estiver decidido") passa a estar satisfeita.
+>
+> **Implementado em 2026-08-04 (PR técnico `feat/process-code-friendly-format`):**
+> A.4 está **feito** — migration `20260804000000_add_process_code_sequence`
+> (`CREATE SEQUENCE process_code_seq`) e `src/server/processes/processCode.ts`
+> geram `CAC-YYYY-NNNNNN` via `nextval`, só para processos **novos**. **Sem
+> backfill**, sem renomear `GT-DEV-…`/`GT-DEMO-001`, sem mudança em
+> `schema.prisma`.
+>
+> **A.5 e A.6 foram verificados, não alterados** — as 6 telas que exibem o
+> código (3 do cliente, 3 do admin) renderizam a string crua, sem parsing nem
+> validação, e a busca admin segue `contains` + `mode: "insensitive"`, sem
+> regex de formato. Códigos antigos e novos continuam exibíveis e
+> encontráveis; há teste travando essa ausência de validação. Marcados `[x]`
+> como **não regressão**, conforme a nota de escopo abaixo.
+>
+> **O bloco A está fechado. A Fase 1 continua NÃO encerrada** — os blocos
+> **B–H seguem integralmente abertos**, e das 9 condições do §5 apenas a §5.6
+> está satisfeita.
 >
 > **Nota de escopo (verificado em `docs/60 §2`/`§8.1`):** A.5 e A.6 **já estão
 > atendidos hoje** — o cliente vê o código no dashboard e no detalhe, e o admin

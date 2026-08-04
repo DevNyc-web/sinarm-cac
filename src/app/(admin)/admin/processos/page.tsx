@@ -110,7 +110,7 @@ export default async function AdminProcessosPage({
             <input
               name="codigo"
               defaultValue={codeFilter ?? ""}
-              placeholder="GT-DEV-"
+              placeholder="Buscar por codigo"
               className={selectClass}
             />
           </label>

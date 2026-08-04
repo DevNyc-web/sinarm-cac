@@ -5,11 +5,12 @@
  * catalogo MOCK e delega a persistencia ao repositorio. Nao conhece HTTP/form.
  *
  * Restricoes da fase: SEM PII, SEM pagamento, SEM upload, SEM protocolo real.
- * O `code` gerado e claramente de desenvolvimento (prefixo GT-DEV-).
+ * O `code` gerado e o numero interno do site (`CAC-YYYY-NNNNNN`, docs/62) —
+ * NAO e protocolo Gov.br/SINARM/PF.
  */
-import { randomUUID } from "node:crypto";
 import { guiaTrafegoDraftSchema, type GuiaTrafegoDraftInput } from "@/server/processes/guiaTrafegoSchema";
 import { findMockFirearm } from "@/server/processes/mockFirearms";
+import { generateProcessCode } from "@/server/processes/processCode";
 import { createDraftProcess } from "@/server/repositories/processRepository";
 
 export const GUIA_TRAFEGO_TYPE_CODE = "GUIA_TRAFEGO_PF_CAC";
@@ -18,11 +19,6 @@ export type CreateDraftResult =
   | { ok: true; code: string }
   | { ok: false; fieldErrors: Partial<Record<keyof GuiaTrafegoDraftInput, string>> }
   | { ok: false; error: string };
-
-/** Codigo de rascunho de desenvolvimento — NAO e protocolo (docs/10 §8). */
-function generateDraftCode(): string {
-  return `GT-DEV-${randomUUID().slice(0, 8).toUpperCase()}`;
-}
 
 export async function createGuiaTrafegoDraft(
   userId: string,
@@ -45,7 +41,7 @@ export async function createGuiaTrafegoDraft(
 
   try {
     const process = await createDraftProcess({
-      code: generateDraftCode(),
+      code: await generateProcessCode(),
       userId,
       processTypeCode: GUIA_TRAFEGO_TYPE_CODE,
       justification: parsed.data.justification,

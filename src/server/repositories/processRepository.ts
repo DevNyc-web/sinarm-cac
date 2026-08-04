@@ -118,7 +118,8 @@ export type AdminQueueFilters = {
   operationalStatus?: OperationalStatus;
   paymentStatus?: PaymentStatus;
   documentStatus?: DocumentStatus;
-  /** Busca por codigo interno (ex.: GT-DEV-ABC). */
+  /** Busca por codigo interno — aceita o novo (`CAC-2026-000001`, docs/62) e
+   *  os antigos (`GT-DEV-...`, `GT-DEMO-001`). Sem validacao de formato. */
   code?: string;
   assignedToMockUserId?: string;
   sort?: "recent" | "oldest";
