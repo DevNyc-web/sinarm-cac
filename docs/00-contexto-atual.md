@@ -194,6 +194,18 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   UI, rotas, auth, banco ou testes; **Fase 1 no final, mas NÃO encerrada**;
   **Fase 2 NÃO abre execução real**; `PHASE9_REAL_EXECUTION_ENABLED` segue
   `false`.
+- `docs/61-checklist-encerramento-fase-1-base-do-saas.md` — **checklist
+  objetivo de encerramento da Fase 1 oficial (Base do SaaS)**, derivado do
+  `docs/60 §15`. Registra o que já está pronto (cancelamento, financeiro
+  read-only, `Process.code`, execução real bloqueada) e as **pendências
+  obrigatórias A–H, todas em aberto**: formato amigável do código interno e
+  destino dos `GT-DEV-…`, entrada do cliente novo por escolha de processo,
+  nomes amigáveis, separação cliente/admin, estrutura da ajuda, revisão de
+  segurança/PII/logs, confirmação de pagamentos base e documentação. Define
+  as **9 condições conjuntivas** do §5 e reserva a declaração de encerramento
+  a um documento próprio, posterior. **Docs-only:** **NÃO encerra a Fase 1**,
+  **NÃO abre a Fase 2** como execução real, não altera código/UI/rotas/auth/
+  banco/testes; `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
