@@ -118,6 +118,33 @@ Arquivos existentes:
 - `docs/37-fase-8d-log-seguro-e-relatorio.md`
 - `docs/legal/analise-termos-de-uso.md`
 
+**Nota (2026-08-04):** lista atualizada com os documentos mais recentes de
+cancelamento real, visibilidade ao cliente e relatório financeiro
+(`docs/54`–`docs/59`). `docs/38` a `docs/53` existem no repositório mas
+seguem fora desta lista — gap anterior a este PR, fora do escopo desta
+atualização (docs-only).
+
+- `docs/54-decisao-politica-reembolso-cancelamento.md` — política de
+  reembolso/financeiro do cancelamento real: nunca automático, revisão
+  manual via `refund.approve`.
+- `docs/55-decisao-fila-revisao-financeira.md` — filtro de revisão
+  financeira na fila admin existente, sob `queue.view`.
+- `docs/56-decisao-visibilidade-cliente-cancelamento.md` — aviso read-only
+  "Processo cancelado" no detalhe do cliente.
+- `docs/57-decisao-bloqueio-acoes-cliente-cancelado.md` — bloqueio de
+  ações do cliente (pagamento/documento/destino) em processo cancelado.
+  **Fechado** — os 4 PRs do §6 implementados e mergeados.
+- `docs/58-decisao-visibilidade-cancelamento-dashboard-cliente.md` — badge
+  "Processo cancelado" na listagem/dashboard do cliente. **Fechado** — PR
+  técnico implementado e mergeado.
+- `docs/59-decisao-relatorio-financeiro-cancelados-pagos.md` — relatório
+  financeiro dedicado (`/admin/financeiro`), gate `audit.view.financial`,
+  incluindo data de cancelamento via `ProcessStatusEvent`. **Fechado no
+  escopo read-only** — PR 1 e PR 2 implementados e mergeados. Export CSV,
+  `registerRefund`, crédito interno, processo já protocolado e
+  reversão/reabertura continuam **fora do escopo**, como decisões futuras
+  separadas.
+
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
 fictícios** (`docs/18`, `docs/19`, `docs/20` e `docs/22`). Roda com **Postgres
