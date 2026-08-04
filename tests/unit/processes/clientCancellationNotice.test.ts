@@ -101,10 +101,62 @@ test("clientVisibleStatusLabel continua chamado do mesmo jeito — aviso e ADICI
 
 /* ------------------------------------------------- 3. nao-regressao */
 
-test("dashboard do cliente nao ganhou nenhuma mencao a CANCELADO_OPERACIONAL/internalStatus", () => {
+test("dashboard do cliente usa internalStatus para CANCELADO_OPERACIONAL (docs/58 §6)", () => {
   const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
-  assert.doesNotMatch(source, /CANCELADO_OPERACIONAL/);
-  assert.doesNotMatch(source, /internalStatus/);
+  assert.match(
+    source,
+    /process\.internalStatus === "CANCELADO_OPERACIONAL"/,
+    "listagem deveria checar internalStatus diretamente",
+  );
+});
+
+test("dashboard do cliente renderiza 'Processo cancelado' no badge da listagem", () => {
+  const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
+  assert.match(source, /"Processo cancelado"/);
+});
+
+test("dashboard do cliente nao renderiza dois badges — o novo rotulo substitui o antigo", () => {
+  const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
+  const idx = source.indexOf('process.internalStatus === "CANCELADO_OPERACIONAL"');
+  assert.ok(idx > -1, "condicao do badge nao encontrada");
+  const badgeOpen = source.lastIndexOf("<Badge>", idx);
+  const badgeClose = source.indexOf("</Badge>", idx);
+  assert.ok(badgeOpen > -1 && badgeClose > -1, "badge nao encontrado ao redor da condicao");
+  const badgeBlock = source.slice(badgeOpen, badgeClose);
+  assert.match(badgeBlock, /clientVisibleStatusLabel\(process\)/, "rotulo antigo deveria continuar so no else");
+  const cardOpen = source.lastIndexOf("<Card", badgeOpen);
+  const cardClose = source.indexOf("</Card>", badgeClose);
+  const cardWindow = source.slice(cardOpen, cardClose);
+  assert.equal((cardWindow.match(/<Badge/g) || []).length, 1, "so pode existir um Badge por processo listado");
+});
+
+test("dashboard do cliente mantem o processo na lista e o link do detalhe", () => {
+  const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
+  assert.match(source, /processes\.map\(\(process\)/, "listagem deveria continuar mapeando todos os processos");
+  assert.match(
+    source,
+    /href=\{`\/processos\/\$\{process\.id\}`\}/,
+    "link para o detalhe deveria continuar presente",
+  );
+});
+
+test("dashboard do cliente nao mostra financeiro/reembolso/motivo interno/needsFinanceReview", () => {
+  const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
+  const idx = source.indexOf('process.internalStatus === "CANCELADO_OPERACIONAL"');
+  assert.ok(idx > -1);
+  const window = source.slice(idx, idx + 300);
+  assert.doesNotMatch(window, /[Mm]otivo/);
+  assert.doesNotMatch(window, /needsFinanceReview/i);
+  assert.doesNotMatch(window, /[Rr]evis[aã]o financeira/);
+  assert.doesNotMatch(window, /reembolso/i);
+  assert.doesNotMatch(window, /estorno/i);
+});
+
+test("dashboard do cliente nao usa userFacingStatus/projection/statusDivergence", () => {
+  const source = readFileSync(CLIENT_DASHBOARD_PAGE, "utf8");
+  assert.doesNotMatch(source, /userFacingStatus/);
+  assert.doesNotMatch(source, /statusDivergence/i);
+  assert.doesNotMatch(source, /[Pp]rojection/);
 });
 
 test("nenhuma action nova foi criada em actions.ts do cliente", () => {

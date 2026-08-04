@@ -116,8 +116,19 @@ export default async function DashboardPage() {
                           processo com execucao manual em andamento aparecia como
                           "Pagamento confirmado — em fila" aqui e "Em execucao" no
                           detalhe — duas respostas para a mesma pergunta.
+
+                          Excecao: cancelamento real (docs/58 §6). O detalhe ja
+                          mostra "Processo cancelado" lendo `internalStatus`
+                          direto; esta lista ainda lia so `clientVisibleStatusLabel`
+                          (que NAO cobre `CANCELADO_OPERACIONAL` — docs/45), entao
+                          continuava com o rotulo antigo. Mesmo badge, sem
+                          segundo badge ao lado.
                         */}
-                        <Badge>{clientVisibleStatusLabel(process)}</Badge>
+                        <Badge>
+                          {process.internalStatus === "CANCELADO_OPERACIONAL"
+                            ? "Processo cancelado"
+                            : clientVisibleStatusLabel(process)}
+                        </Badge>
                       </div>
                       <p className="mt-1 text-sm text-neutral-600">
                         {process.processType.name}

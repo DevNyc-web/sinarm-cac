@@ -194,8 +194,13 @@ test("cancelProcess so e referenciado pelo detalhe admin (docs/53) — a fila co
   assert.doesNotMatch(queueSource, /cancelProcess/i);
 });
 
-test("cliente (src/app/(user)) nao ganhou nenhuma mencao a CANCELADO_OPERACIONAL", () => {
+test("dashboard do cliente (src/app/(user)) ganhou mencao a CANCELADO_OPERACIONAL so no badge (docs/58 §6)", () => {
+  // Antes (docs/56) so o detalhe do cliente lia CANCELADO_OPERACIONAL; a
+  // listagem/dashboard ficava de fora de proposito. O docs/58 §6 estendeu a
+  // leitura para o badge da listagem — cobertura completa em
+  // `clientCancellationNotice.test.ts`, este teste so registra que a
+  // mencao existe e e o unico lugar novo (sem virar callout/aviso extra).
   const dashboard = readFileSync("src/app/(user)/dashboard/page.tsx", "utf8");
-  assert.doesNotMatch(dashboard, /CANCELADO_OPERACIONAL/);
-  assert.doesNotMatch(dashboard, /internalStatus/);
+  assert.match(dashboard, /CANCELADO_OPERACIONAL/);
+  assert.match(dashboard, /internalStatus/);
 });
