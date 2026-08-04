@@ -202,6 +202,10 @@ que algo quebrou.
 Não é pré-requisito de piloto ou divulgação. **Este PR não está aprovado por
 este documento** — mesma lógica de `docs/56 §6`.
 
+> **Situação em 2026-08-04:** o PR acima foi aprovado separadamente e já está
+> na `main`. Ver §8 (fechamento) ao fim deste documento — a frase acima
+> registra o estado na data da decisão, não hoje.
+
 ---
 
 ## 7. Proibições
@@ -220,6 +224,59 @@ este documento** — mesma lógica de `docs/56 §6`.
 - ❌ Fechar gate de `docs/26 §19`.
 - ❌ Ativar ou depender da Fase 9.
 - ❌ Tocar Gov.br/SINARM/PF.
+
+---
+
+## 8. Fechamento — bloco implementado (2026-08-04)
+
+O PR técnico do §6 foi implementado, revisado e mergeado na `main`:
+
+| PR | O que | Onde | Commit |
+|----|-------|------|--------|
+| 1 | Badge "Processo cancelado" no dashboard do cliente, lendo `internalStatus` direto | `src/app/(user)/dashboard/page.tsx` | `e00a7cf` |
+
+**O que fica valendo:**
+
+- O dashboard do cliente mostra **"Processo cancelado"** quando
+  `internalStatus === "CANCELADO_OPERACIONAL"`, exatamente como o detalhe já
+  mostra (`docs/56`) — **as duas telas agora contam a mesma história**.
+- O badge **substitui** o rótulo desatualizado (decisão 5) — não aparece ao
+  lado dele. Não existem dois badges conflitantes na mesma linha.
+- O processo cancelado **continua listado**, na mesma posição, sem
+  filtro/agrupamento novo (§3.11/decisão 8). O link para o detalhe permanece
+  o mesmo.
+- **A explicação completa continua exclusiva do detalhe** (§3.2/decisão 3): o
+  dashboard só tem o rótulo curto, o parágrafo do `docs/56` não foi duplicado
+  para a lista.
+- **O backend não mudou**: `listProcessesByUser`, `cancelProcess`,
+  `clientVisibleStatusLabel`, `statusDivergence.ts` e
+  `operationalStatusProjection.ts` seguem exatamente como estavam (§2,
+  decisão 10) — o dado já chegava ao dashboard, só a leitura na UI mudou.
+- **Nenhum leitor novo de `userFacingStatus`**, nenhuma projeção nova
+  (decisão 4).
+- **O cliente não vê financeiro**: nem `needsFinanceReview`, nem "revisão
+  financeira", nem motivo interno, nem promessa de reembolso ou estorno
+  (decisão 6). Nenhuma ação, botão ou contestação nova (decisão 7).
+- **Nada em pagamento**: `PaymentStatus`, payment adapter e PSP seguem
+  intocados; nenhum reembolso, nenhum `registerRefund`, nenhuma migration —
+  a leitura é de uma coluna que já existia.
+- **Execução real segue bloqueada**: `PHASE9_REAL_EXECUTION_ENABLED`
+  permanece `false`, o gate do `docs/26 §19` segue fechado e nada aqui toca
+  Gov.br/SINARM/PF.
+
+**Testes:** `tests/unit/processes/clientCancellationNotice.test.ts` teve a
+asserção de ausência (§4.1) invertida deliberadamente para presença, mais
+cobertura nova para badge único, ausência do rótulo antigo no caso
+cancelado, processo continuar listado, link do detalhe e ausência de
+financeiro/reembolso/motivo interno/`needsFinanceReview`.
+`internalStatusStates.test.ts` e `adminRealCancellationView.test.ts` tiveram
+suas allowlists de source-scanning atualizadas para permitir o dashboard
+como sexto leitor de `CANCELADO_OPERACIONAL` — nenhuma outra proteção foi
+relaxada.
+
+**Pendências:** nenhuma decorrente deste documento. O §6 está encerrado; as
+proibições do §7 continuam valendo permanentemente, inclusive para quem
+mexer nestes arquivos depois.
 
 ---
 
