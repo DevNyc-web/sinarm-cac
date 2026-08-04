@@ -7,11 +7,12 @@ import { requirePermission } from "@/server/auth/guards";
 import { ROLE_LABELS } from "@/server/auth/roles";
 import { formatBRL } from "@/server/processes/pricing";
 import { INTERNAL_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/server/processes/statusLabels";
+import { findEarliestCancellationEventsForProcesses } from "@/server/repositories/processRepository";
 import { getAdminQueue } from "@/server/services/getAdminQueue";
 
 /**
  * Relatorio financeiro dedicado — docs/59 (decisao) + atualizacao de
- * 2026-08-04 (permissao final).
+ * 2026-08-04 (permissao final + PR 2, data de cancelamento).
  *
  * A ROTA e protegida pela permissao, nao so a acao (mesmo criterio de
  * `admin/extracao/page.tsx`): sem isso, um perfil sem `audit.view.financial`
@@ -26,20 +27,28 @@ import { getAdminQueue } from "@/server/services/getAdminQueue";
  * derivacao da fila (`deriveNeedsFinanceReview`), nenhuma regra nova,
  * nenhuma query separada para decidir quem entra na lista.
  *
- * Escopo desta fase (docs/59 §6 PR 1): sem data de cancelamento (exige
- * query propria sobre `ProcessStatusEvent`, nao implementada aqui — docs/59
- * §2/§3.14), sem motivo interno, sem export CSV, sem acao de reembolso/
- * `registerRefund`/PSP/`PaymentStatus`. Cliente nunca acessa esta rota.
+ * Data de cancelamento (docs/59 §6 PR 2): UMA busca em lote, depois de ter
+ * a lista filtrada — `findEarliestCancellationEventsForProcesses` faz uma
+ * unica query `processId IN (...)` para todos os ids da pagina, nunca uma
+ * consulta por linha (evita N+1). Fonte e o evento de transicao para
+ * `CANCELADO_OPERACIONAL`, NUNCA `Process.updatedAt` nem `Payment.paidAt`.
+ *
+ * Escopo desta fase (docs/59 §6 PR 1+2): sem motivo interno, sem export
+ * CSV, sem acao de reembolso/`registerRefund`/PSP/`PaymentStatus`. Cliente
+ * nunca acessa esta rota.
  */
 export default async function AdminFinanceiroPage() {
   const admin = await requirePermission("audit.view.financial");
 
   let rows: Awaited<ReturnType<typeof getAdminQueue>> = [];
+  let cancellationDates = new Map<string, Date>();
   let dbUnavailable = false;
   try {
     rows = await getAdminQueue({ needsFinanceReview: true });
+    cancellationDates = await findEarliestCancellationEventsForProcesses(rows.map((row) => row.id));
   } catch {
     dbUnavailable = true;
+    rows = [];
   }
 
   return (
@@ -76,6 +85,7 @@ export default async function AdminFinanceiroPage() {
                   <th className="px-4 py-3">Pagamento</th>
                   <th className="px-4 py-3">Valor pago</th>
                   <th className="px-4 py-3">Data de pagamento</th>
+                  <th className="px-4 py-3">Data de cancelamento</th>
                   <th className="px-4 py-3">Revisão financeira</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -96,6 +106,11 @@ export default async function AdminFinanceiroPage() {
                     </td>
                     <td className="px-4 py-3 text-neutral-600">
                       {row.paymentPaidAt ? row.paymentPaidAt.toLocaleDateString("pt-BR") : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600">
+                      {cancellationDates.has(row.id)
+                        ? cancellationDates.get(row.id)!.toLocaleDateString("pt-BR")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       {row.needsFinanceReview ? (
