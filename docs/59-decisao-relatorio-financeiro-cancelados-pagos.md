@@ -220,7 +220,7 @@ sobre processo já protocolado ou reversão/reabertura (`docs/51 §4` itens
 
 | Ordem | PR | Natureza | Depende de |
 |-------|----|----------|------------|
-| 1 | Tela/relatório financeiro dedicado (read-only), gate `refund.approve`/`audit.view.financial`. Campos: processo (código + link para o detalhe admin), cliente, `internalStatus`, `paymentStatus`, valor pago (`Payment.amountCents`), data de pagamento (`Payment.paidAt`), data de cancelamento (query nova sobre `ProcessStatusEvent`), `needsFinanceReview` | código | este documento |
+| 1 | Tela/relatório financeiro dedicado (read-only), gate **`audit.view.financial`** (permissão final — ver atualização de 2026-08-04 abaixo). Campos: processo (código + link para o detalhe admin), cliente, `internalStatus`, `paymentStatus`, valor pago (`Payment.amountCents`), data de pagamento (`Payment.paidAt`), data de cancelamento (query nova sobre `ProcessStatusEvent`), `needsFinanceReview` | código | este documento |
 | 2 | Exportação CSV do relatório, se o PR 1 existir | código | PR 1 |
 | 3 | Ação `registerRefund` (`docs/54 §6` PR 1) | código | `docs/54`, decisão de produto separada |
 
@@ -249,6 +249,70 @@ tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`/
 - ❌ Fechar gate de `docs/26 §19`.
 - ❌ Ativar ou depender da Fase 9.
 - ❌ Tocar Gov.br/SINARM/PF.
+
+---
+
+> **Atualização (2026-08-04, docs, permissão final).** A permissão final do
+> relatório dedicado read-only (§3.3/§3.4/§3.17, deixada como
+> `refund.approve` **OU** `audit.view.financial` na decisão original) fica
+> resolvida: **`audit.view.financial`**, não `refund.approve`.
+>
+> **1. Qual permissão final governa o relatório read-only?**
+> `audit.view.financial`.
+>
+> **2. Por que não `refund.approve`?** `refund.approve` é a permissão de
+> **agir** — aprovar/registrar um reembolso, quando essa ação existir
+> (`docs/54 §6` PR 1, `registerRefund`, ainda não implementado). Usá-la
+> também para **ver** uma listagem read-only mistura autorização de ação com
+> autorização de leitura: quem só precisa **auditar** os casos (contar
+> quantos há, checar valor e data) não deveria precisar da permissão que
+> autoriza mexer em dinheiro. `audit.view.financial` já existe exatamente
+> para esse papel — "ver logs/auditoria (financeiros)" — e é a leitura mais
+> próxima do que o relatório faz. `refund.approve` fica **reservado** para
+> quando (e se) uma ação de aprovar/registrar reembolso for decidida e
+> implementada; nesse PR futuro, é a **ação** (não a visualização) que exige
+> `refund.approve`.
+>
+> **3. Por que não `queue.view`?** `queue.view` já é a permissão do filtro
+> simples (`docs/55`) — mais ampla, concedida também a OPERADOR e SUPORTE
+> (`docs/55 §2`). O relatório dedicado concentra valor pago e datas lado a
+> lado, informação mais sensível em massa do que o rótulo binário já visível
+> na fila hoje; usar `queue.view` para a tela dedicada apagaria a distinção
+> que motivou criar uma tela própria (§3.3 original). **O filtro simples
+> continua sob `queue.view`, sem mudança** — só a tela nova usa a permissão
+> diferente.
+>
+> **4. Quais perfis devem ter a permissão?** FINANCEIRO (concedida
+> diretamente) e ADMIN (por herdar todas as permissões) — os mesmos dois
+> perfis já cobertos por `refund.approve` hoje, então nenhum perfil ganha ou
+> perde acesso na prática; a mudança é **qual permissão** o PR técnico deve
+> checar, não **quem** tem acesso.
+>
+> **5. Essa decisão cria a permissão agora?** Não. `audit.view.financial`
+> **já existe** em `src/server/auth/permissions.ts`, concedida a
+> FINANCEIRO/ADMIN, sem nenhum consumidor hoje (mesmo achado do `§2`).
+> Nenhum RBAC muda no código; nenhum seed; nenhuma migration.
+>
+> **6. Essa decisão implementa relatório agora?** Não. Fica para o PR
+> técnico do `§6` PR 1, que agora deve usar `audit.view.financial` como
+> gate — não mais "refund.approve OU audit.view.financial".
+>
+> **7. Essa decisão cria ação de reembolso?** Não. Relatório continua
+> estritamente read-only; `registerRefund` continua fora do escopo
+> (`docs/54 §6` PR 1).
+>
+> **8. Essa decisão expõe algo ao cliente?** Não. Nenhuma decisão anterior
+> deste documento muda: cliente nunca vê (§3.6/§4 item 7).
+>
+> **9. O que fica fora do escopo?** Implementação do relatório; criação da
+> permissão (já existe); `registerRefund`; export CSV; qualquer mudança em
+> `PaymentStatus`, PSP, Prisma ou RBAC no código; qualquer decisão sobre o
+> filtro simples do `docs/55` (continua sob `queue.view`, intocado).
+>
+> Nada além da escolha da permissão muda: relatório continua read-only, sem
+> export CSV, sem reembolso, sem `registerRefund`, sem PSP, sem
+> `PaymentStatus`, nunca exposto ao cliente. **Execução real continua
+> bloqueada.**
 
 ---
 
