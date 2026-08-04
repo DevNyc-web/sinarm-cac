@@ -171,6 +171,40 @@ export function listAdminQueue(filters: AdminQueueFilters) {
 }
 
 /**
+ * Docs/59 §6 PR 2 — data de cancelamento REAL de um lote de processos, para o
+ * relatorio financeiro dedicado (`/admin/financeiro`). Fonte: o evento de
+ * transicao para `CANCELADO_OPERACIONAL` (gravado por `cancelProcess` via
+ * `transitionInternalStatus`) — nao `Process.updatedAt`, nao `Payment.paidAt`.
+ *
+ * `cancelProcess` bloqueia recancelar um processo ja `CANCELADO_OPERACIONAL`
+ * (docs/51 regras 5/7), entao so deveria existir UM evento assim por
+ * processo — mesmo assim, com mais de um, fica o PRIMEIRO cronologicamente
+ * (`orderBy: asc`, so a primeira ocorrencia por `processId` entra no mapa).
+ *
+ * Batch/`in`, mesmo padrao de `findLatestExtractionsWithFieldsForDocuments`
+ * (`documentExtractionRepository.ts`): uma unica ida ao banco para o lote
+ * inteiro de processIds, nunca uma consulta por linha (evita N+1). Lista
+ * vazia nao consulta o banco.
+ */
+export async function findEarliestCancellationEventsForProcesses(
+  processIds: readonly string[],
+): Promise<Map<string, Date>> {
+  if (processIds.length === 0) return new Map();
+
+  const rows = await getPrisma().processStatusEvent.findMany({
+    where: { processId: { in: [...processIds] }, toStatus: "CANCELADO_OPERACIONAL" },
+    orderBy: { createdAt: "asc" },
+    select: { processId: true, createdAt: true },
+  });
+
+  const earliestByProcess = new Map<string, Date>();
+  for (const row of rows) {
+    if (!earliestByProcess.has(row.processId)) earliestByProcess.set(row.processId, row.createdAt);
+  }
+  return earliestByProcess;
+}
+
+/**
  * Fila de AUTOMACAO (checklist pre-execucao): so o necessario para derivar a
  * prontidao. `select` restrito por need-to-know (docs/11 §3/§19):
  *  - destino: os 5 campos que o checklist avalia (sem ids/timestamps);
