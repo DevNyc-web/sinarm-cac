@@ -181,6 +181,19 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   `registerRefund`, crédito interno, processo já protocolado e
   reversão/reabertura continuam **fora do escopo**, como decisões futuras
   separadas.
+- `docs/60-decisao-estrategia-automated-first-e-ux-cliente.md` — **decisão
+  estratégica oficial**: o produto é um **SaaS automatizado-first** (não MVP
+  assistido permanente), com suporte humano só por **exceção**; cliente comum
+  e admin/equipe interna são **perfis distintos, com entradas distintas**;
+  cliente novo é guiado por uma **tela de escolha de processo** em linguagem
+  simples, e "Meus processos" só vira destaque **depois do primeiro processo**;
+  cada processo tem **número interno próprio do site** (a coluna
+  `Process.code` já existe e é única — falta só o formato estável). Define as
+  **Fases oficiais de produto 1–5** e o mapeamento delas com a numeração
+  técnica 1–9 já usada nestes documentos. **Docs-only:** não altera código,
+  UI, rotas, auth, banco ou testes; **Fase 1 no final, mas NÃO encerrada**;
+  **Fase 2 NÃO abre execução real**; `PHASE9_REAL_EXECUTION_ENABLED` segue
+  `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
