@@ -228,6 +228,11 @@ Nenhum destes é pré-requisito de piloto ou divulgação. **Nenhum PR desta
 tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`/
 `docs/55 §6`.
 
+> **Situação em 2026-08-04:** o **PR 1** acima foi implementado e mergeado
+> (`a9f21b6`). Ver atualização (2026-08-04, código, implementação parcial)
+> ao fim deste documento — o bloco **não está totalmente fechado**: a data
+> de cancelamento continua pendente, registrada ali como **PR técnico 2**.
+
 ---
 
 ## 7. Proibições
@@ -313,6 +318,55 @@ tabela está aprovado por este documento** — mesma lógica de `docs/54 §6`/
 > export CSV, sem reembolso, sem `registerRefund`, sem PSP, sem
 > `PaymentStatus`, nunca exposto ao cliente. **Execução real continua
 > bloqueada.**
+
+---
+
+> **Atualização (2026-08-04, código, implementação parcial).** O **PR 1**
+> do `§6` foi implementado e mergeado na `main`: **`a9f21b6`** — *feat: add
+> paid cancelled financial report*.
+>
+> **O que foi implementado:**
+>
+> - Primeira tela **read-only** do relatório financeiro dedicado, na rota
+>   **`/admin/financeiro`**.
+> - Gate: **`requirePermission("audit.view.financial")`** no topo da rota —
+>   a permissão final decidida na atualização anterior (2026-08-04,
+>   permissão final). **`queue.view` e `refund.approve` NÃO são gate** desta
+>   tela.
+> - Link a partir do admin home, visível **só** para quem tem
+>   `audit.view.financial`.
+> - Listagem reusa **`needsFinanceReview`** via
+>   `getAdminQueue({ needsFinanceReview: true })` — nenhuma regra nova,
+>   nenhuma query separada para decidir quem entra na lista.
+> - Campos exibidos, todos com **fonte segura já existente**: processo
+>   (código + link para o detalhe admin), cliente, status interno,
+>   `paymentStatus`, valor pago (`Payment.amountCents`) e data de pagamento
+>   (`Payment.paidAt`) — os dois últimos passaram a ser selecionados por
+>   `listAdminQueue` (antes só `status`), sem query própria nova.
+>
+> **O que continua fora, como decidido:**
+>
+> - **Sem** motivo interno.
+> - **Sem** reembolso, estorno ou qualquer promessa de devolução — só as
+>   negações já aprovadas (`docs/54`).
+> - **Sem** ação financeira nova: nenhum botão, form ou `action`; sem
+>   `registerRefund`; sem chamada a PSP; sem alteração de `PaymentStatus`.
+> - **Sem** exposição ao cliente, em nenhuma superfície.
+> - **Sem** migration nem mudança de schema — os dois campos novos já eram
+>   colunas reais do `Payment`.
+>
+> **O que fica pendente — bloco AINDA NÃO fechado:**
+>
+> - **Data de cancelamento continua fora** (§2/§3.14/§4 item 10). Fonte
+>   permanece a mesma já identificada: `ProcessStatusEvent.createdAt` onde
+>   `toStatus = "CANCELADO_OPERACIONAL"`, já gravado por `cancelProcess` via
+>   `transitionInternalStatus`. Falta uma query própria para isolar esse
+>   evento — é a única pendência técnica restante deste bloco.
+> - Registrada como **PR técnico 2** (renumerando a tabela do `§6`: o antigo
+>   PR 2/PR 3 — CSV/`registerRefund` — seguem depois deste, sem mudança de
+>   posição relativa). Nenhuma outra pendência nova é criada aqui.
+>
+> **Execução real continua bloqueada.**
 
 ---
 
