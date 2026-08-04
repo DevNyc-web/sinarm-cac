@@ -119,11 +119,48 @@ Arquivos existentes:
 - `docs/legal/analise-termos-de-uso.md`
 
 **Nota (2026-08-04):** lista atualizada com os documentos mais recentes de
-cancelamento real, visibilidade ao cliente e relatório financeiro
-(`docs/54`–`docs/59`). `docs/38` a `docs/53` existem no repositório mas
-seguem fora desta lista — gap anterior a este PR, fora do escopo desta
-atualização (docs-only).
+cancelamento real, visibilidade ao cliente, relatório financeiro e o gap
+anterior de `docs/38` a `docs/53` — todos já existiam no repositório e
+ficavam fora desta lista; preenchido nesta atualização (docs-only).
 
+- `docs/38-estado-atual-automacao-e-fase-9.md` — retrato do estado da
+  automação após os merges recentes; não libera execução real, não fecha
+  gate.
+- `docs/39-diagnostico-validacao-real-futura.md` — diagnóstico do que
+  falta antes de qualquer validação real futura da Fase 9.
+- `docs/40-revisao-gates-validacao-real.md` — revisão dos gates que travam
+  automação real: o que cada um exige, o que falta, quem aprova.
+- `docs/41-gate-seguranca-credenciais.md` — auditoria de risco de
+  credencial/sessão/log sensível antes de qualquer automação real; achados
+  reportados, não corrigidos.
+- `docs/42-plano-tecnico-ensaio-controlado-futuro.md` — plano técnico de
+  como seria um ensaio controlado da Fase 9, se os gates forem aprovados.
+- `docs/43-checkpoint-extracao-47d.md` — retrato do estado da extração de
+  documentos após a série #47D; insumo da decisão da máquina de estados
+  (`docs/44`).
+- `docs/44-decisao-maquina-de-estados.md` — decisão arquitetural sobre
+  qual campo de status é canônico no `Process`.
+- `docs/45-decisao-user-facing-status.md` — decisão sobre o destino da
+  coluna `userFacingStatus` (não lida por nenhuma tela do cliente).
+- `docs/46-inventario-operational-status.md` — inventário de
+  `operationalStatus` e decisão de reordenar a Fase 5 (projeção prematura).
+- `docs/47-decisao-estados-workflow-humano.md` — decisão sobre os 6
+  estados operacionais sem equivalente canônico (Fase 5d).
+- `docs/48-decisao-bloqueado-operacional.md` — decisão sobre se
+  `BLOQUEADO_OPERACIONAL` vira `InternalStatus` e como o motivo do
+  bloqueio é registrado.
+- `docs/49-decisao-valores-operacionais-restantes.md` — decisão sobre os
+  5 valores operacionais que ainda passam pela linha legada.
+- `docs/50-decisao-acoes-explicitas-documento.md` — decisão sobre o que
+  substitui o uso bruto de `DOCUMENTO_ENVIADO`/`DOCUMENTO_APROVADO` no
+  dropdown manual/admin.
+- `docs/51-decisao-cancelamento-real.md` — decisão sobre o fluxo de
+  cancelamento real de cliente, distinto de `CANCELADO_DEV`.
+- `docs/52-decisao-visibilidade-cancelamento-real.md` — decisão sobre
+  como `CANCELADO_OPERACIONAL` aparece para admin e cliente, antes de
+  qualquer UI/botão.
+- `docs/53-decisao-ux-acao-cancelamento-admin.md` — decisão de UX para o
+  botão/ação admin de cancelamento real.
 - `docs/54-decisao-politica-reembolso-cancelamento.md` — política de
   reembolso/financeiro do cancelamento real: nunca automático, revisão
   manual via `refund.approve`.
