@@ -65,6 +65,11 @@ export default async function AdminPage() {
             <Button variant="secondary">Laboratório sintético (Fase 8A)</Button>
           </Link>
         ) : null}
+        {hasPermission(user, "audit.view.financial") ? (
+          <Link href="/admin/financeiro">
+            <Button variant="secondary">Revisão financeira (docs/59)</Button>
+          </Link>
+        ) : null}
       </div>
     </Container>
   );
