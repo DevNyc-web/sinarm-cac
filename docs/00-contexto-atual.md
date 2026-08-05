@@ -336,6 +336,32 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   H**, **NÃO encerra a Fase 1** (segue aberta até D/F/H), **NÃO abre a Fase 2**,
   não altera código/auth/login/banco/Prisma/migration/rotas/UI/testes; **Fase 9
   segue bloqueada** e `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/69-decisao-escopo-auditoria-fase-1.md` — **decisão de escopo da
+  auditoria**, resolvendo o **F.8** que o `docs/68` deixou aberto. **Não cria
+  auditoria ampla**: `audit.view.financial` **permanece aplicado e válido**
+  (protege `/admin/financeiro`), enquanto `audit.view.all` e `audit.view.own`
+  passam a ser lidos como **reserva de vocabulário** — nomeiam capacidade ainda
+  não construída e **não concedem acesso a nada**. A **Fase 1 não precisa
+  construir auditoria ampla dedicada**; a lacuna é **aceita como escopo
+  futuro**, e a condição para aceitá-la é justamente estar documentada.
+  **Nenhuma permissão é removida** e nenhum código é alterado. Registra a
+  leitura oficial das três permissões, o que a trilha atual **cobre**
+  (`ProcessStatusEvent`: status interno/operacional, prioridade, responsável,
+  nota, execução manual, protocolo, GRU e pagamento da GRU — append-only, por
+  processo, com ator e papel, sem PII) e o que **não cobre** (acesso a arquivo,
+  eventos de autenticação, mudança de permissão, acesso ao relatório
+  financeiro, visão consolidada, retenção). Define **8 requisitos** para a
+  auditoria ampla futura, que exige decisão e PR próprios. **Achado adicional
+  registrado:** a rota de arquivo de documento **não registra acesso algum**, e
+  o `docs/05 §11b` exige **log de acesso a PII separado** — item mantido aberto
+  como **pré-condição de produção**, não de Fase 1 (hoje o impacto é baixo: sem
+  cliente real e sem CPF no schema). **Fecha F.8 e com ele o Bloco F**
+  (F.1–F.8), por **revisão + decisão de escopo**; a condição `docs/61 §5.7`
+  passa a estar satisfeita. **Docs-only:** **NÃO cria modelo nem tela de
+  auditoria**, **NÃO altera permissões/RBAC**, **NÃO fecha D nem H**, **NÃO
+  encerra a Fase 1** (segue aberta por D e H), **NÃO abre a Fase 2**, não altera
+  código/banco/Prisma/migration/rotas/UI/testes; **Fase 9 segue bloqueada** e
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados

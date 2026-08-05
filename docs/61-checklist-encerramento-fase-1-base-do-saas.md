@@ -327,7 +327,7 @@ que o resolva explicitamente.
 - [x] F.5 — Revisar **`storageKey` fora da UI**. → **revisado**: **zero ocorrência em `.tsx`**; rota de arquivo não o expõe
 - [x] F.6 — Revisar **permissões financeiras**. → **revisado**: `/admin/financeiro` sob `audit.view.financial`; payload cru do PSP não chega à UI
 - [x] F.7 — Revisar **permissões de cancelamento**. → **revisado**: `process.cancel` é permissão própria, só ADMIN
-- [ ] F.8 — Revisar **auditoria**.
+- [x] F.8 — Revisar **auditoria**. → **revisado + escopo decidido** ([`docs/69`](69-decisao-escopo-auditoria-fase-1.md)): trilha atual confirmada, lacuna registrada, auditoria ampla vira escopo futuro com requisitos escritos
 
 > Item F é uma **revisão**, não uma reescrita: espera-se confirmar o que já está
 > correto e registrar achados, no espírito do `docs/41` (achados reportados, não
@@ -377,6 +377,30 @@ que o resolva explicitamente.
 > satisfeitas apenas **§5.4 e §5.6**; a condição **§5.7** ("segurança /
 > permissions / PII / logs revisados") **passa a estar substancialmente
 > atendida**, mas só é declarável no fechamento com F.8 resolvido.
+
+> **F.8 resolvido em 2026-08-05 pelo
+> [`docs/69`](69-decisao-escopo-auditoria-fase-1.md):** decisão de **escopo**,
+> não de construção. `audit.view.financial` **permanece aplicado e válido**;
+> `audit.view.all` e `audit.view.own` passam a ser lidos como **reserva de
+> vocabulário** — nomeiam capacidade ainda não construída e **não concedem
+> acesso a nada**. A **Fase 1 não constrói auditoria ampla**: a lacuna é
+> **aceita e documentada**, e a auditoria futura tem **8 requisitos escritos**
+> (modelo, tela, retenção, filtro por permissão, redação/PII, eventos cobertos,
+> append-only e log de acesso a PII). **Nenhuma permissão foi removida** e
+> nenhum código foi alterado.
+>
+> **O bloco F está fechado — F.1–F.8 marcados** —, por **revisão + decisão de
+> escopo**, que é o que o próprio bloco pede. Com isso a condição **§5.7 passa a
+> estar satisfeita**.
+>
+> **A Fase 1 continua NÃO encerrada** — os blocos **D e H seguem abertos**, e
+> das 9 condições do §5 passam a estar satisfeitas **§5.4, §5.6 e §5.7**.
+>
+> **Fica aberto como item de PRODUÇÃO, não de Fase 1:** o **log de acesso a PII**
+> exigido pelo `docs/05 §11b` não está implementado — a rota de arquivo de
+> documento não registra acesso. Hoje o impacto é baixo (sem cliente real, sem
+> CPF no schema), mas vira pré-condição de tráfego real, na mesma família do
+> rate limit distribuído e das 12 pendências do `docs/23 §5`.
 
 ### G. Pagamentos base
 
