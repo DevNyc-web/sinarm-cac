@@ -266,14 +266,44 @@ que o resolva explicitamente.
 
 ### E. Área de ajuda
 
-- [ ] E.1 — Definir a **estrutura mínima** da área de ajuda.
-- [ ] E.2 — Priorizar **vídeos tutoriais**.
-- [ ] E.3 — **Reduzir texto longo**.
-- [ ] E.4 — Conectar a ajuda com os **processos mais comuns**.
-- [ ] E.5 — **Não** transformar a ajuda em atendimento manual obrigatório.
+- [x] E.1 — Definir a **estrutura mínima** da área de ajuda. → **5 seções em ordem de prioridade**, com índice de atalhos e âncoras estáveis, travadas por teste
+- [x] E.2 — Priorizar **vídeos tutoriais**. → vídeos passaram a ser a **primeira seção** e o **primeiro atalho**; teste trava a ordem
+- [x] E.3 — **Reduzir texto longo**. → a página deixou de **abrir** com 8 cards de texto; a abertura virou uma linha ("Comece pelos vídeos")
+- [x] E.4 — Conectar a ajuda com os **processos mais comuns**. → nova seção **"Ajuda por processo"** (`#processos`), lendo as mesmas opções da tela de entrada
+- [x] E.5 — **Não** transformar a ajuda em atendimento manual obrigatório. → suporte é a **última** seção e o **último** atalho, condicionado a "se os vídeos e as dúvidas acima não resolverem"
 
 > A rota `/ajuda` já existe e já é linkada do painel do cliente — a pendência é
 > **conteúdo e estrutura**, não criação de página.
+
+> **Implementado em 2026-08-05 (PR técnico `feat/client-help-structure`):**
+> **E.1–E.5 estão feitos.** A ordem das seções passou a ser
+> **vídeos → ajuda por processo → dúvidas frequentes → guia de status →
+> suporte**, e o índice de atalhos segue a mesma ordem. Ordem **é** prioridade:
+> o cliente encontra o caminho rápido antes do material de referência, e o
+> humano por último.
+>
+> **A estrutura já existia (E.1).** `/ajuda` tinha 4 seções, 4 âncoras e o aviso
+> de não-oficialidade — a pendência era de **conteúdo e hierarquia**, como a
+> nota acima já previa. O que faltava de fato era **E.4**: nada na ajuda
+> mencionava os processos. A nova seção `HelpByProcessSection` lê
+> `clientProcessChoices()` — **a mesma fonte** da tela de entrada (blocos B/C) —,
+> então ajuda e produto não podem divergir, e **CTA falso continua impossível**:
+> processo em preparação aparece com selo, sem link.
+>
+> **Escopo honesto de E.3:** o que mudou foi a **ordem de leitura** e a abertura
+> da página, não o volume total — os 8 tópicos de referência continuam
+> completos, abaixo. **Não** foram colapsados em `<details>`: `/ajuda#gov-br` é
+> linkado do login e é aviso de **segurança** sobre senha do Gov.br; escondê-lo
+> atrás de um clique seria pior do que o texto que economizaria.
+>
+> **E.5 sem criar barreira:** o suporte continua a um clique, sem fila e sem
+> formulário — apenas deixou de ser apresentado como caminho normal
+> (`docs/60 §10.3`).
+>
+> **O bloco E está fechado. A Fase 1 continua NÃO encerrada** — os blocos
+> **D, F, G e H seguem integralmente abertos**, e das 9 condições do §5
+> continuam satisfeitas apenas **§5.4 e §5.6** (E não tem condição própria
+> no §5).
 
 ### F. Segurança e permissões
 

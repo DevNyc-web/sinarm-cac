@@ -21,9 +21,14 @@ export function SupportChannelSection() {
         <h2 id="falar-com-suporte" className="text-lg font-semibold">
           Ainda com dúvida? Fale com a gente
         </h2>
+        {/*
+          Suporte e EXCECAO, nao etapa do fluxo (docs/60 §10.3, docs/61 §4.E
+          item E.5). O texto aponta primeiro para o autoatendimento acima; o
+          canal continua aberto para quem precisar, sem fila e sem formulario.
+        */}
         <p className="mt-1 max-w-2xl text-sm text-neutral-600">
-          Você fala com uma pessoa da nossa equipe pelo WhatsApp, em qualquer etapa do pedido. Se
-          já tiver um pedido aberto, tenha o número dele por perto.
+          Se os vídeos e as dúvidas acima não resolverem, você fala com uma pessoa da nossa equipe
+          pelo WhatsApp. Se já tiver um pedido aberto, tenha o número dele por perto.
         </p>
 
         <div className="mt-4">

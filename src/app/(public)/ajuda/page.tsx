@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { ClientStatusGuideSection } from "@/components/help/ClientStatusGuideSection";
+import { HelpByProcessSection } from "@/components/help/HelpByProcessSection";
 import { HelpTopicsSection } from "@/components/help/HelpTopicsSection";
 import { SupportChannelSection } from "@/components/help/SupportChannelSection";
 import { TutorialVideosSection } from "@/components/help/TutorialVideosSection";
@@ -33,22 +34,31 @@ export default function AjudaPage() {
         </p>
         <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Como podemos ajudar?</h1>
         <p className="mt-4 max-w-2xl text-base text-neutral-600">
-          Respostas curtas para as dúvidas mais comuns sobre a sua conta, o envio de documentos, o
-          acompanhamento do pedido e o que cada status quer dizer.
+          Comece pelos vídeos. O resto está aqui embaixo, se precisar.
         </p>
 
+        {/*
+          Ordem = prioridade (docs/61 §4.E, itens E.2/E.5): vídeo primeiro,
+          suporte por último. Os atalhos seguem a mesma ordem das seções.
+        */}
         <nav aria-label="Atalhos da ajuda" className="mt-6 flex flex-wrap gap-2 text-sm">
-          <Link
-            href="#duvidas-frequentes"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50"
-          >
-            Dúvidas frequentes
-          </Link>
           <Link
             href="#videos"
             className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50"
           >
             Vídeos tutoriais
+          </Link>
+          <Link
+            href="#processos"
+            className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50"
+          >
+            Ajuda por processo
+          </Link>
+          <Link
+            href="#duvidas-frequentes"
+            className="rounded-md border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50"
+          >
+            Dúvidas frequentes
           </Link>
           <Link
             href="#guia-de-status"
@@ -75,8 +85,15 @@ export default function AjudaPage() {
         </Notice>
       </section>
 
-      <HelpTopicsSection />
+      {/*
+        Vídeo antes de texto (docs/63 §7.2): quem está começando assiste, não
+        estuda. "Ajuda por processo" vem logo depois porque responde o que o
+        cliente veio fazer; os tópicos e o guia de status ficam como referência,
+        e o suporte humano fecha a página — é exceção, não fluxo (docs/60 §10.3).
+      */}
       <TutorialVideosSection />
+      <HelpByProcessSection />
+      <HelpTopicsSection />
       <ClientStatusGuideSection />
       <SupportChannelSection />
 
