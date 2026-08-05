@@ -350,15 +350,39 @@ que o resolva explicitamente.
 
 ### G. Pagamentos base
 
-- [ ] G.1 — Confirmar **cobrança / pagamento / status**.
-- [ ] G.2 — Confirmar **relatório financeiro read-only**.
-- [ ] G.3 — Confirmar **processo cancelado pago** entrando em revisão financeira.
-- [ ] G.4 — **Não** criar reembolso ainda.
-- [ ] G.5 — **Não** criar `registerRefund` ainda.
-- [ ] G.6 — **Não** chamar PSP para reembolso.
+- [x] G.1 — Confirmar **cobrança / pagamento / status**. → **confirmado**: `Payment` + `PaymentStatus` (6 estados) + `createPixPayment` + `confirmPixPayment`
+- [x] G.2 — Confirmar **relatório financeiro read-only**. → **confirmado**: `/admin/financeiro` sob `audit.view.financial`
+- [x] G.3 — Confirmar **processo cancelado pago** entrando em revisão financeira. → **confirmado**: `operationalSignals` / `processRepository` / `getAdminQueue`
+- [x] G.4 — **Não** criar reembolso ainda. → **confirmado ausente**
+- [x] G.5 — **Não** criar `registerRefund` ainda. → **confirmado ausente** em `src/` e `prisma/`
+- [x] G.6 — **Não** chamar PSP para reembolso. → **confirmado ausente** no adapter de pagamentos
 
 > G.4–G.6 são **restrições permanentes deste bloco**, não tarefas: um item
 > "confirmado" aqui significa confirmar que **continuam ausentes**.
+
+> **Decidido e confirmado em 2026-08-05 pelo
+> [`docs/67`](67-decisao-pagamentos-gru-admin-mvp.md):** o MVP cobra por **Pix**
+> via **Mercado Pago** — gateway já decidido no `docs/17` e **não reaberto**;
+> **cartão** fica aprovado como meio aceito para a fase próxima, **sem
+> implementação**; **boleto fica fora do MVP**. O cliente paga um preço que **já
+> embute a GRU** e que o sistema **já decompõe** (`pricing.ts`), e **nunca
+> acessa o Banco do Brasil**: a GRU é organizada e **paga pela operação
+> interna**, com estado explícito e comprovante registrado, rumo a uma fila
+> administrativa futura (`/admin/grus`).
+>
+> **G.1–G.6 marcados `[x]`.** Diferente de B e D, o Bloco G pede **confirmação**,
+> não construção — G.1–G.3 confirmam o que existe e G.4–G.6 confirmam
+> **ausências intencionais**, o que um documento pode fazer.
+>
+> **O fechamento de G NÃO significa** implementar cartão, criar `/admin/grus`,
+> criar automação Banco do Brasil, criar reembolso, criar conciliação avançada,
+> alterar o gateway ou alterar código — nada disso foi feito. A decisão de
+> cartão **amplia** o escopo futuro de pagamentos sem invalidar a confirmação de
+> hoje.
+>
+> **O bloco G está fechado. A Fase 1 continua NÃO encerrada** — os blocos
+> **D, F e H seguem integralmente abertos**, e das 9 condições do §5 continuam
+> satisfeitas apenas **§5.4 e §5.6** (G não tem condição própria no §5).
 
 ### H. Documentação final
 
