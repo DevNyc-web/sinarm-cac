@@ -8,16 +8,29 @@ import { getCurrentUser } from "@/server/auth/guards";
 import { isMockAuthForDisplay } from "@/server/auth/config";
 import { MOCK_USERS } from "@/server/auth/mockUsers";
 import { isInternalRole, ROLE_LABELS } from "@/server/auth/roles";
-import { signInMockAction, signInWithPasswordAction, signOutAction } from "./actions";
+import { signInMockAction, signInWithPasswordAction, signOutAction } from "../login/actions";
 
 /**
- * Perfis de DEMONSTRACAO desta tela: apenas o cliente (docs/61 §4.D).
+ * Entrada da EQUIPE INTERNA (docs/61 §4.D, docs/64 §6.1).
  *
- * Os perfis internos vivem em `/equipe`. Antes as duas familias apareciam na
- * mesma caixa, e a entrada do cliente exibia "Operador"/"Financeiro" — que e
- * exatamente a mistura que o bloco D pede para desfazer.
+ * Existe para separar a EXPERIENCIA de entrada, nao o mecanismo: reusa a mesma
+ * Server Action de `/login` (`signInWithPasswordAction`), a mesma sessao e a
+ * mesma politica de `authenticate.ts`. Duplicar o caminho de auth criaria dois
+ * lugares para corrigir a mesma falha.
+ *
+ * O QUE ESTA PAGINA **NAO** FAZ: nao concede acesso. Quem entra por aqui com
+ * perfil de cliente cai em `/dashboard` como sempre (`destinationFor`), e
+ * `/admin` continua barrado por `requireAdminRole`. A separacao e de UX; a
+ * autorizacao segue server-side (docs/68 §3.1).
+ *
+ * Sem cadastro: conta interna nao se cria sozinha (docs/64 §6.3, RBAC interno).
  */
-const CLIENT_MOCK_USERS = MOCK_USERS.filter((mockUser) => !isInternalRole(mockUser.role));
+export const metadata: Metadata = {
+  title: "Acesso da equipe — Assistente CAC",
+  description: "Entrada da equipe interna.",
+  // Porta de servico: nao deve ser indexada nem sugerida a cliente.
+  robots: { index: false, follow: false },
+};
 
 const MOTIVOS: Record<string, string> = {
   sessao: "Entre para acessar esta área.",
@@ -27,13 +40,10 @@ const MOTIVOS: Record<string, string> = {
   modo: "Esta forma de entrada não está disponível.",
 };
 
-export const metadata: Metadata = {
-  title: "Entrar — Assistente CAC",
-  description:
-    "Entre na sua conta do nosso sistema para acompanhar pedidos, documentos, pagamentos e status.",
-};
+/** Perfis internos do atalho de desenvolvimento — o cliente fica em `/login`. */
+const INTERNAL_MOCK_USERS = MOCK_USERS.filter((mockUser) => isInternalRole(mockUser.role));
 
-export default async function LoginPage({
+export default async function EquipeLoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ motivo?: string; erro?: string; email?: string }>;
@@ -46,23 +56,14 @@ export default async function LoginPage({
   return (
     <Container>
       <div className="mx-auto max-w-md">
-        <h1 className="text-2xl font-semibold">Entrar na sua conta</h1>
+        <h1 className="text-2xl font-semibold">Acesso da equipe</h1>
         <p className="mt-2 text-sm text-neutral-600">
-          Sua conta permite acompanhar seus pedidos em um só lugar: documentos enviados,
-          pagamentos e o status de cada etapa.
-        </p>
-        <p className="mt-2 text-xs text-neutral-500">
-          A senha desta tela é <strong>do nosso sistema</strong>. Não somos órgão público.
+          Entrada da equipe interna. O que você vê depois de entrar depende das permissões do
+          seu perfil.
         </p>
 
-        <Notice tone="info" className="mt-4">
-          Esta conta é do <strong>nosso sistema</strong> — <strong>não é o Gov.br</strong>.{" "}
-          <strong>Nunca pedimos sua senha, código ou token do Gov.br dentro deste site.</strong>{" "}
-          Quando uma etapa exigir login no órgão, você faz isso na janela oficial.{" "}
-          <Link href="/ajuda#gov-br" className="font-medium underline underline-offset-2">
-            Entenda quando isso acontece
-          </Link>
-          .
+        <Notice tone="neutral" className="mt-4">
+          Contas internas são criadas pela administração — <strong>não há cadastro aqui</strong>.
         </Notice>
 
         {aviso ? (
@@ -74,7 +75,7 @@ export default async function LoginPage({
         {user ? (
           <Card className="mt-4">
             <p className="text-sm text-neutral-600">
-              Sessao ativa: <span className="font-medium text-neutral-900">{user.name}</span> (
+              Sessão ativa: <span className="font-medium text-neutral-900">{user.name}</span> (
               {ROLE_LABELS[user.role]})
             </p>
             <form action={signOutAction} className="mt-3">
@@ -88,6 +89,8 @@ export default async function LoginPage({
         <Card className="mt-4">
           <p className="text-sm font-medium">Entrar com e-mail e senha</p>
           <form action={signInWithPasswordAction} className="mt-3 space-y-3">
+            {/* Devolve o erro nesta tela, nao na do cliente (allowlist na action). */}
+            <input type="hidden" name="origem" value="equipe" />
             <div>
               <label htmlFor="email" className="block text-sm text-neutral-600">
                 E-mail
@@ -116,31 +119,19 @@ export default async function LoginPage({
               />
             </div>
             <Button type="submit" className="w-full py-2.5 text-base">
-              Entrar na minha conta
+              Entrar
             </Button>
           </form>
         </Card>
 
-        <Card className="mt-4 bg-neutral-50">
-          <p className="text-sm font-medium text-neutral-900">Ainda não tem conta?</p>
-          <p className="mt-1 text-sm text-neutral-600">
-            Criar leva poucos minutos e você já passa a acompanhar tudo pelo painel.
-          </p>
-          <Link href="/cadastro" className="mt-3 inline-block w-full">
-            <Button variant="secondary" className="w-full py-2.5 text-base">
-              Criar minha conta
-            </Button>
-          </Link>
-        </Card>
-
         {modoMock ? (
           <Card className="mt-4">
-            <p className="text-sm font-medium">Perfis de demonstração</p>
+            <p className="text-sm font-medium">Perfis internos de demonstração</p>
             <p className="mt-1 text-xs text-neutral-500">
               Atalho de <strong>desenvolvimento</strong>, sem senha. Não existe em produção.
             </p>
             <div className="mt-3 space-y-2">
-              {CLIENT_MOCK_USERS.map((mockUser) => (
+              {INTERNAL_MOCK_USERS.map((mockUser) => (
                 <form key={mockUser.id} action={signInMockAction}>
                   <input type="hidden" name="userId" value={mockUser.id} />
                   <Button type="submit" variant="secondary" className="w-full justify-between">
@@ -153,37 +144,10 @@ export default async function LoginPage({
           </Card>
         ) : null}
 
-        <Card className="mt-6">
-          <p className="text-sm font-medium text-neutral-900">Com dúvida em alguma etapa?</p>
-          <p className="mt-1 text-sm text-neutral-600">
-            A central de ajuda explica como criar a conta, enviar documentos e acompanhar o
-            pedido — e como falar com uma pessoa da nossa equipe.
-          </p>
-          <p className="mt-3 flex flex-wrap gap-4 text-sm">
-            <Link
-              href="/ajuda"
-              className="font-medium text-neutral-900 underline underline-offset-2"
-            >
-              Central de ajuda
-            </Link>
-            <Link
-              href="/ajuda#suporte"
-              className="font-medium text-neutral-900 underline underline-offset-2"
-            >
-              Falar com suporte
-            </Link>
-          </p>
-        </Card>
-
-        {/*
-          Porta da equipe interna (docs/61 §4.D). Discreta e no rodape de
-          proposito: quem precisa dela ja sabe que existe. Sem jargao operacional
-          na tela do cliente (docs/24) — o texto nao diz "admin", "painel
-          interno" nem nome de perfil.
-        */}
-        <p className="mt-6 text-center text-xs text-neutral-400">
-          <Link href="/equipe" className="underline underline-offset-2 hover:text-neutral-600">
-            Acesso da equipe
+        <p className="mt-6 text-center text-sm text-neutral-500">
+          Você é cliente?{" "}
+          <Link href="/login" className="font-medium text-neutral-900 underline underline-offset-2">
+            Entrar na sua conta
           </Link>
         </p>
       </div>
