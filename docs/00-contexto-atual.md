@@ -282,6 +282,34 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   **NÃO abre a Fase 2**, não altera código/login/banco/Prisma/migration/
   rotas/UI/testes; **Fase 9 segue bloqueada** e
   `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/67-decisao-pagamentos-gru-admin-mvp.md` — **decisão de pagamentos base e
+  GRU administrada internamente**, fechando o **Bloco G** do `docs/61 §4.G`.
+  **Meios aceitos:** **Pix** (base atual) e **cartão** (aprovado para a fase
+  próxima, **sem implementação**); **boleto fica fora do MVP** por compensação
+  lenta, vencimento, inadimplência e custo de suporte. **O gateway NÃO é
+  reaberto:** **Mercado Pago** segue como decidido no `docs/17` e refletido em
+  `mercadoPagoProvider.ts`. **Cobrança:** o cliente paga à plataforma um preço
+  que já embute a GRU, com decomposição interna obrigatória de serviço, GRU
+  provisionada, taxas do gateway e margem líquida. **GRU:** o cliente **não
+  paga a GRU diretamente** e **não acessa o Banco do Brasil** — o sistema emite
+  e organiza, a GRU vai para uma **fila/central administrativa**, a **equipe
+  interna paga manualmente**, marca o estado (Pendente, Gerada, Paga, Vencida,
+  Erro, Cancelada) e registra o **comprovante** no processo. Registra
+  `/admin/grus` como **direção futura, não implementada**. **Automação de
+  pagamento no Banco do Brasil fica FORA do MVP**, só estudável depois de vendas
+  reais e volume comprovado, sob conta PJ, validação jurídica/contábil,
+  auditoria, dupla aprovação, conciliação, limites e prevenção de pagamento
+  duplicado. **Corrige premissas verificadas no código:** a decomposição
+  serviço/GRU **já existe** (`pricing.ts`), o fluxo de GRU paga pela empresa
+  **já está documentado** (`docs/11 §9`) e os campos de GRU **já existem** no
+  `ManualExecution` — o trabalho novo é agregação, status explícito e
+  comprovante como arquivo. **Fecha o Bloco G** (G.1–G.6 `[x]`, confirmação da
+  base e das ausências intencionais). **Docs-only:** **NÃO implementa
+  pagamento**, **NÃO integra gateway**, **NÃO cria cartão/boleto/webhook**,
+  **NÃO cria `/admin/grus`**, **NÃO cria automação bancária nem reembolso**,
+  **NÃO marca D, F nem H**, **NÃO encerra a Fase 1**, **NÃO abre a Fase 2**, não
+  altera código/banco/Prisma/migration/rotas/UI/testes; **Fase 9 segue
+  bloqueada** e `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
