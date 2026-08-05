@@ -1,5 +1,21 @@
 # 61 — Checklist de Encerramento da Fase 1 — Base do SaaS
 
+> **⚠️ STATUS ATUAL (2026-08-05): a Fase 1 foi ENCERRADA** pelo
+> [`docs/70`](70-encerramento-fase-1-base-do-saas.md). Os **8 blocos A–H** estão
+> fechados (45 itens) e as **9 condições do §5** estão satisfeitas.
+>
+> **O encerramento NÃO abriu a Fase 2 como execução real** e **NÃO alterou a
+> Fase 9**: `PHASE9_REAL_EXECUTION_ENABLED` continua `false as const`, os gates
+> do `docs/26 §19` seguem íntegros e as **12 pendências do `docs/23 §5`
+> continuam abertas**. A Fase 2 só pode começar como **preparação, laboratório e
+> teste interno** (`docs/70 §7`).
+>
+> **Este documento continua sendo o checklist** — o registro de o que foi
+> exigido e como cada item foi atendido. Quem declara o encerramento é o
+> `docs/70`, não ele.
+
+---
+
 > **O que é este documento.** O **checklist objetivo** do que precisa estar
 > pronto antes de alguém poder declarar a **Fase 1 oficial (Base do SaaS)**
 > encerrada. Nasce da decisão estratégica do [`docs/60`](60-decisao-estrategia-automated-first-e-ux-cliente.md),
@@ -8,7 +24,7 @@
 >
 > **Este documento é o portão, não a passagem.**
 >
-> - ❌ **NÃO encerra** a Fase 1.
+> - ❌ **NÃO encerra** a Fase 1 — quem encerra é o `docs/70`.
 > - ❌ **NÃO abre** a Fase 2 como execução real.
 > - ❌ **NÃO altera** código, UI, rotas, auth, banco, Prisma, testes ou migration.
 > - ❌ **NÃO toca** Gov.br/SINARM/PF.
@@ -483,15 +499,20 @@ que o resolva explicitamente.
 
 ### H. Documentação final
 
-- [ ] H.1 — `docs/00` atualizado.
-- [ ] H.2 — `docs/60` registrado.
-- [ ] H.3 — Checklist da Fase 1 (**este documento**) registrado.
-- [ ] H.4 — Pendências futuras **separadas em docs próprios**.
-- [ ] H.5 — **Fase 2 oficial descrita sem execução real.**
-- [ ] H.6 — **Fase 9 real continua bloqueada.**
+- [x] H.1 — `docs/00` atualizado. → índice contínuo de `docs/00` a `docs/70`, sem lacuna
+- [x] H.2 — `docs/60` registrado. → `docs/00`, linha 184
+- [x] H.3 — Checklist da Fase 1 (**este documento**) registrado. → `docs/00`, linha 197
+- [x] H.4 — Pendências futuras **separadas em docs próprios**. → `docs/54`, `docs/59`, `docs/64`, `docs/67`, `docs/69` + [`docs/70 §6.1`](70-encerramento-fase-1-base-do-saas.md) para as residuais
+- [x] H.5 — **Fase 2 oficial descrita sem execução real.** → `docs/60 §11` (escopo) e `§12.3` ("a Fase 2 ainda NÃO deve abrir execução real")
+- [x] H.6 — **Fase 9 real continua bloqueada.** → `phase9/safety.ts:32` (`false as const`) + guard de rede + runner sem navegador
 
 > H.1–H.3 são atendidos **por este PR**; ficam listados porque o documento de
 > fechamento (§7) precisa verificá-los, não porque estejam em aberto agora.
+
+> **Verificado e fechado em 2026-08-05 pelo
+> [`docs/70`](70-encerramento-fase-1-base-do-saas.md):** H.1–H.6 confirmados com
+> evidência item a item. Com isso **os 8 blocos A–H estão fechados** — 45 itens,
+> todos `[x]`.
 
 ---
 
