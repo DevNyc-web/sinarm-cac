@@ -221,6 +221,17 @@ que o resolva explicitamente.
 > `ROLE_PERMISSIONS`); a pendência real é D.1–D.3 — hoje existe **uma única**
 > entrada pública (`/login`), sem distinção de experiência (`docs/60 §5`).
 
+> **Direção registrada em 2026-08-05 pelo
+> [`docs/64`](64-decisao-login-federado-captcha-rate-limit.md):** a entrada do
+> cliente caminha para **login federado (Google/OIDC)**, sem senha própria, e o
+> admin mantém **entrada separada** com RBAC interno, allowlist e MFA do
+> provedor como requisitos futuros.
+>
+> **Nenhum item de D é marcado por isso.** D.1–D.3 exigem a experiência de
+> entrada **implementada** — decidir a direção não entrega tela. **D exige PR
+> técnico futuro**, ainda não aprovado, e o `docs/64` **aumenta** o escopo de D
+> em vez de reduzi-lo.
+
 ### E. Área de ajuda
 
 - [ ] E.1 — Definir a **estrutura mínima** da área de ajuda.
@@ -246,6 +257,21 @@ que o resolva explicitamente.
 > Item F é uma **revisão**, não uma reescrita: espera-se confirmar o que já está
 > correto e registrar achados, no espírito do `docs/41` (achados reportados, não
 > corrigidos no mesmo PR).
+
+> **Direção registrada em 2026-08-05 pelo
+> [`docs/64`](64-decisao-login-federado-captcha-rate-limit.md):** proteção
+> contra abuso ganha **captcha** em pontos sensíveis (preferência: Cloudflare
+> Turnstile, nunca como defesa única) e **rate limit** por IP, usuário/e-mail e
+> rota, com bloqueio progressivo e logs sem PII.
+>
+> **Rate limit não é construção do zero:** já existe para login e cadastro
+> (`src/server/auth/rateLimit.ts`); o que falta é armazenamento **distribuído**
+> — hoje é memória por instância e zera no restart — e cobertura das demais
+> rotas. O **DoS de conta** documentado nesse módulo continua sem solução.
+>
+> **Nenhum item de F é marcado por isso.** F.1–F.8 são revisão do código **como
+> ele está hoje**; captcha e rate limit distribuído são trabalho **novo**, de
+> **PR técnico futuro**, e ampliam a superfície que F terá de revisar.
 
 ### G. Pagamentos base
 
