@@ -220,6 +220,25 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   pendentes**. **Docs-only:** **NÃO encerra a Fase 1**, **NÃO abre a Fase 2**,
   não altera código/Prisma/migration/UI/rotas/auth/testes;
   `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/63-decisao-tela-inicial-cliente-novo-escolha-processo.md` — **decisão e
+  plano da tela inicial do cliente novo**: cliente **sem processos** é recebido
+  pela pergunta **"Qual processo você deseja realizar?"**, com cards simples,
+  **nomes amigáveis** ("Tirar ou renovar meu CR", "Emitir Guia de Tráfego"…)
+  separados dos códigos técnicos (`GUIA_TRAFEGO_PF_CAC`), o que está
+  **disponível agora** distinto do que está **em preparação** (sem CTA, sem
+  promessa de prazo ou aprovação) e **ajuda visível com vídeos em destaque**.
+  "Meus processos" deixa de ser o foco do cliente novo — a lista vazia vira
+  informação **secundária** — e volta a ser destaque a partir do primeiro
+  processo (número interno, data, status simples, consulta). Registra que
+  ramificação (`semPedidos`), regra de disponibilidade
+  (`processAvailability.ts`) e ajuda com vídeos (`/ajuda#videos`) **já
+  existem**: o PR técnico futuro (`feat/client-start-process-selection`)
+  **evolui** o `ClientStartPanel`/dashboard, sem caminho paralelo. Dá
+  **decisão/plano ao bloco B** do `docs/61 §4.B` — **sem fechá-lo**: B só é
+  concluído após o PR de UI, e a condição `docs/61 §5.4` **continua não
+  satisfeita**. **Docs-only:** **NÃO fecha o bloco B**, **NÃO encerra a Fase
+  1**, **NÃO abre a Fase 2**, não altera código/UI/rotas/auth/banco/Prisma/
+  migration/testes; `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
