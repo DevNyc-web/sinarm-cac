@@ -260,6 +260,28 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   1**, **NÃO abre a Fase 2**, não altera código/login/banco/Prisma/migration/
   rotas/UI/testes; **Fase 9 segue bloqueada** e
   `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/65-decisao-transicao-contas-senha-login-federado.md` — **decisão sobre a
+  transição das contas com senha própria** para o login federado, respondendo à
+  pergunta em aberto do `docs/64 §13.1`. **Cliente novo** futuro entra por
+  **login federado**, sem senha própria como fluxo principal, com UX que não
+  ofereça escolha confusa entre senha e Google; contas **seed/dev/teste** podem
+  ser ajustadas, recriadas ou descartadas **sem migração formal**; **não se cria
+  migração complexa para usuário real inexistente**; se surgir **usuário real**
+  com senha antes da implementação federada, a migração é **reavaliada e
+  decidida antes** do PR técnico; **admin/equipe interna** fica sob **regra
+  separada**, sem migração automática, com RBAC interno obrigatório e
+  allowlist/MFA como direção futura. A decisão se apoia em premissas
+  **verificadas no código**: `passwordHash` é **anulável** e o `prisma/seed.ts`
+  **não o preenche** (as contas de dev nascem sem senha), o domínio é
+  `example.com` (RFC 2606) e `AUTH_MODE` é `mock` por padrão — **não há
+  evidência de base real de clientes**. **Nada é removido:** a estrutura de
+  senha própria continua no lugar. Mantém abertas as demais perguntas do
+  `docs/64 §13` (13.2–13.6) e **não altera a decisão principal do `docs/64`**.
+  **Docs-only:** **NÃO implementa auth**, **NÃO fecha o bloco D** (D.1–D.5
+  seguem `[ ]`, condição `§5.5` não satisfeita), **NÃO encerra a Fase 1**,
+  **NÃO abre a Fase 2**, não altera código/login/banco/Prisma/migration/
+  rotas/UI/testes; **Fase 9 segue bloqueada** e
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados

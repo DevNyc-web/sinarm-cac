@@ -84,8 +84,11 @@ corrigem a premissa de que tudo aqui é campo aberto.
 > **Sobre o que existe hoje.** A senha própria (1.1.1) **não é removida por este
 > documento**. O que fazer com as contas já criadas com senha — migrar,
 > coexistir por um período, ou exigir vínculo com o provedor no próximo login —
-> é **decisão em aberto** (§13.1) e precisa ser resolvida **antes** do PR
+> era **decisão em aberto** (§13.1) e precisava ser resolvida **antes** do PR
 > técnico, não durante.
+>
+> **Resolvido em 2026-08-05 pelo [`docs/65`](65-decisao-transicao-contas-senha-login-federado.md)**
+> — ver §13.1 abaixo. A senha própria **continua não sendo removida aqui**.
 
 ---
 
@@ -276,12 +279,29 @@ Não decididas aqui, e que o **PR técnico não pode improvisar**:
 
 | # | Questão |
 |---|---|
-| 13.1 | **Contas com senha já existentes** — migrar, coexistir por um período, ou exigir vínculo no próximo login? Afeta usuários reais e precisa de decisão antes do código. |
+| 13.1 | ~~**Contas com senha já existentes** — migrar, coexistir por um período, ou exigir vínculo no próximo login?~~ → **DECIDIDA** pelo [`docs/65`](65-decisao-transicao-contas-senha-login-federado.md) (2026-08-05). |
 | 13.2 | **Modelo de dados** do vínculo com o provider — tabela própria ou colunas no usuário? Provavelmente exige migration. |
 | 13.3 | **Provedor fora do ar** — existe caminho de contingência para a equipe interna, ou o produto simplesmente para? |
 | 13.4 | **Backend do rate limit distribuído** — Redis é uma dependência de infraestrutura nova, com custo e operação próprios. |
 | 13.5 | **Mesmo e-mail em dois provedores** (Google e Microsoft) — uma conta ou duas? |
 | 13.6 | **LGPD**: o que o provedor compartilha, o que guardamos e o que consta no consentimento (`docs/05`, `/consentimento`). |
+
+> **13.1 — decisão registrada pelo [`docs/65`](65-decisao-transicao-contas-senha-login-federado.md):**
+>
+> | Caso | Destino |
+> |---|---|
+> | **Cliente novo** | **Login federado preferencial** — senha própria não é o fluxo principal. |
+> | **Contas seed/dev/teste** | Podem ser ajustadas, recriadas ou descartadas **sem migração formal**. |
+> | **Usuário real que surja antes da mudança** | **Exige decisão e plano de transição** antes do PR técnico — não se improvisa migração de credencial. |
+> | **Admin / equipe interna** | **Regra separada**, sem migração automática, RBAC interno obrigatório. |
+>
+> A base da decisão é factual: **não há usuário real** — `passwordHash` é
+> anulável e o `prisma/seed.ts` **não o preenche**. Por isso **não se constrói
+> migração** para uma população vazia; se a premissa mudar, o `docs/65 §2.5`
+> reabre o assunto. **13.2–13.6 continuam abertas.**
+>
+> **A decisão principal deste documento (§2) não muda:** login federado,
+> Google/OIDC primeiro, captcha e rate limit seguem como decididos.
 
 ---
 

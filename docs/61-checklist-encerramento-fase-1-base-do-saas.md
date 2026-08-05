@@ -264,6 +264,19 @@ que o resolva explicitamente.
 > técnico futuro**, ainda não aprovado, e o `docs/64` **aumenta** o escopo de D
 > em vez de reduzi-lo.
 
+> **Decisão de transição registrada em 2026-08-05 pelo
+> [`docs/65`](65-decisao-transicao-contas-senha-login-federado.md):** resolvida,
+> **para fins de planejamento**, a pergunta que o `docs/64 §13.1` deixava aberta
+> — o destino das contas com senha própria. Cliente novo entra por **login
+> federado**, sem senha própria como fluxo principal; **seed/dev/teste** é
+> ajustável **sem migração formal**; **usuário real** que apareça antes da
+> mudança **exige plano de transição** decidido antes do PR técnico; **admin**
+> fica sob **regra separada**, sem migração automática.
+>
+> **Nenhum item de D é marcado por isso.** D.1–D.5 continuam `[ ]` e a condição
+> `§5.5` continua **não satisfeita** — o `docs/65` remove um **impedimento de
+> decisão** do PR técnico de D, não entrega a entrada separada.
+
 ### E. Área de ajuda
 
 - [x] E.1 — Definir a **estrutura mínima** da área de ajuda. → **5 seções em ordem de prioridade**, com índice de atalhos e âncoras estáveis, travadas por teste
