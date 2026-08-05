@@ -93,12 +93,13 @@ Legenda: ✅ pronto · 🟡 avançado/parcial
 | 3.6 | Relatório financeiro read-only para cancelados pagos | ✅ | `docs/59`; rota `/admin/financeiro`, gate `audit.view.financial` |
 | 3.7 | Data **real** de cancelamento no relatório financeiro (via `ProcessStatusEvent`, em lote, sem N+1) | ✅ | `docs/59` (PR 2, `626f407`) |
 | 3.8 | `Process.code` existe e é único | ✅ | `prisma/schema.prisma` (`code String @unique`) |
-| 3.9 | Cliente novo já tem **alguma** ramificação | 🟡 | `ClientStartPanel` (variantes `full`/`compact`) + `semPedidos` no dashboard — entrega boas-vindas, **não** escolha de processo (§4.B) |
+| 3.9 | Cliente novo entra pela **escolha de processo** | ✅ | `ClientStartPanel` (variantes `full`/`compact`) + `semPedidos` no dashboard — a variante `full` passou de boas-vindas para **escolha de processo** no PR de §4.B |
 | 3.10 | Execução real Gov.br/SINARM/PF bloqueada | ✅ | Gates do `docs/26 §19` abertos; nenhum acesso real no app |
 | 3.11 | `PHASE9_REAL_EXECUTION_ENABLED` segue `false` | ✅ | `src/server/automation/phase9/safety.ts` (`false as const`) |
 
-**Leitura correta de 3.9:** "avançado" significa **a estrutura existe**, não que
-o requisito está atendido. O item continua **pendente** no §4.B.
+**Leitura correta de 3.9:** o item nasceu 🟡 — a **estrutura de ramificação**
+existia, mas entregava boas-vindas, não escolha de processo. Passou a ✅ quando
+o §4.B foi implementado; o histórico dessa transição está na nota do §4.B.
 
 ---
 
@@ -147,11 +148,11 @@ que o resolva explicitamente.
 
 ### B. Entrada do cliente novo
 
-- [ ] B.1 — Melhorar a tela inicial para **cliente sem processos**.
-- [ ] B.2 — Priorizar a pergunta **"Qual processo você deseja realizar?"**.
-- [ ] B.3 — **Não destacar** lista vazia de "Meus processos".
-- [ ] B.4 — Exibir **opções simples de processo**.
-- [ ] B.5 — Manter **ajuda visível**.
+- [x] B.1 — Melhorar a tela inicial para **cliente sem processos**. → `ClientStartPanel` (variante `full`) passa a ser a **escolha de processo**
+- [x] B.2 — Priorizar a pergunta **"Qual processo você deseja realizar?"**. → é o **`<h1>` da página** no ramo `semPedidos`
+- [x] B.3 — **Não destacar** lista vazia de "Meus processos". → o cabeçalho "Meus processos" só renderiza **quando há processos**; sem processos, a lista vira `<h2>` secundário
+- [x] B.4 — Exibir **opções simples de processo**. → 4 cards com **nomes amigáveis**, CTA só no processo criável
+- [x] B.5 — Manter **ajuda visível**. → card de ajuda **vídeo-first** (`/ajuda#videos`) na própria tela
 
 > Evoluir o `ClientStartPanel`/dashboard existentes — **sem criar um segundo
 > caminho paralelo** (`docs/60 §6`).
@@ -169,6 +170,34 @@ que o resolva explicitamente.
 > — comportamento observável, que só o PR técnico de UI
 > (`feat/client-start-process-selection`, `docs/63 §10`) entrega. **O bloco B
 > NÃO está fechado** e a condição `§5.4` **NÃO** está satisfeita.
+
+> **Implementado em 2026-08-04 (PR técnico `feat/client-start-process-selection`):**
+> **B.1–B.5 estão feitos.** O `ClientStartPanel` (variante `full`) deixou de
+> abrir com boas-vindas + "Primeiros passos" e passou a abrir com a **pergunta
+> como `<h1>`** e com **cards de escolha** em nomes amigáveis, vindos do módulo
+> puro `src/server/support/clientProcessChoices.ts`. O dashboard só renderiza o
+> cabeçalho **"Meus processos"** quando **há** processos; sem processos, a lista
+> aparece como `<h2>` secundário, com copy que não aponta mais para o botão
+> "Nova solicitação" — que esse ramo deixou de exibir. A ajuda ficou
+> **vídeo-first** (`/ajuda#videos` antes de `/ajuda#suporte`).
+>
+> **CTA falso é impossível por construção:** `href` e `cta` só recebem valor
+> quando o processo é criável hoje, e a disponibilidade continua sendo lida da
+> regra única que já existia (`processAvailability.ts`) — os três processos em
+> preparação aparecem com selo e aviso, sem link. **Sem caminho paralelo**: o
+> componente e a ramificação `semPedidos` são os que já existiam
+> (`docs/60 §6`).
+>
+> **Com isso, a condição §5.4** ("cliente novo tiver entrada clara") **passa a
+> estar satisfeita.**
+>
+> **O bloco B está fechado. A Fase 1 continua NÃO encerrada** — os blocos
+> **C–H seguem integralmente abertos**, e das 9 condições do §5 apenas **§5.4 e
+> §5.6** estão satisfeitas.
+>
+> **Nota de escopo:** este PR **não** fecha o bloco C. Ele introduz nomes
+> amigáveis **na tela de escolha**; a revisão das labels em todo o produto
+> (fila admin, detalhe, catálogo operacional) continua sendo C.
 
 ### C. Nomes amigáveis dos processos
 

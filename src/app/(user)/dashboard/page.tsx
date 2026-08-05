@@ -57,19 +57,30 @@ export default async function DashboardPage() {
 
   return (
     <Container>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Meus processos</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Acompanhe o andamento e continue de onde parou.
-          </p>
+      {/*
+        Quem ainda nao tem processo abre na PERGUNTA, nao em "Meus processos"
+        (docs/63 §3): o `ClientStartPanel` traz o `<h1>` e o CTA do processo
+        criavel, entao o cabecalho da lista — titulo e botao — sairia duplicado
+        e roubaria o topo da escolha. Quem ja tem processo continua com a lista
+        como conteudo principal.
+      */}
+      {semPedidos ? (
+        <ClientStartPanel name={user.name} />
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Meus processos</h1>
+            <p className="mt-1 text-sm text-neutral-500">
+              Acompanhe o andamento e continue de onde parou.
+            </p>
+          </div>
+          <Link href="/processos/novo" className="w-full sm:w-auto">
+            <Button className="w-full px-5 py-3 text-base sm:w-auto sm:py-2 sm:text-sm">
+              Nova solicitação
+            </Button>
+          </Link>
         </div>
-        <Link href="/processos/novo" className="w-full sm:w-auto">
-          <Button className="w-full px-5 py-3 text-base sm:w-auto sm:py-2 sm:text-sm">
-            Nova solicitação
-          </Button>
-        </Link>
-      </div>
+      )}
 
       <Card className="mt-4">
         <p className="text-sm text-neutral-600">
@@ -81,25 +92,34 @@ export default async function DashboardPage() {
         </p>
       </Card>
 
-      {/*
-        Cliente sem pedido ve a jornada completa; quem ja tem pedido ve so o
-        essencial DEPOIS da lista, para a lista nao ser empurrada para baixo.
-      */}
-      {semPedidos ? <ClientStartPanel name={user.name} /> : null}
-
       {/* Antes da lista so para quem ainda nao tem pedido — ver `documentosCard`. */}
       {semPedidos ? documentosCard : null}
 
       <div className="mt-6">
+        {/*
+          Sem processo, "Meus processos" existe como informacao SECUNDARIA
+          (docs/63 §8.1.3) — um `<h2>` depois da escolha, nunca o titulo da
+          pagina. Com `dbUnavailable` o `<h1>` acima ja diz "Meus processos".
+        */}
+        {semPedidos ? (
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Meus processos
+          </h2>
+        ) : null}
+
         {dbUnavailable ? (
           <EmptyState
             title="Não foi possível carregar seus processos"
             description="Tente novamente em instantes. Se continuar assim, fale com o suporte."
           />
         ) : processes.length === 0 ? (
+          /*
+            A copy antiga mandava usar “Nova solicitação” — botao que este ramo
+            deixou de renderizar. Agora so informa; comecar e a escolha acima.
+          */
           <EmptyState
-            title="Nenhum processo ainda"
-            description="Comece criando uma Guia de Tráfego em “Nova solicitação”."
+            title="Você ainda não tem processos"
+            description="Quando você começar um processo, ele aparece aqui para acompanhamento."
           />
         ) : (
           <ul className="space-y-3">
