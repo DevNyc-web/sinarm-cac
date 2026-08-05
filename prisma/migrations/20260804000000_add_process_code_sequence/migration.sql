@@ -1,0 +1,40 @@
+-- Fonte de sequencia para o numero interno do processo, decidido pelo docs/62:
+-- `CAC-YYYY-NNNNNN`, sequencia GLOBAL e monotonica que NAO reinicia por ano
+-- (o ano e rotulo visual do momento da criacao, nao chave de particao).
+--
+-- MIGRATION ADITIVA: cria um objeto NOVO. Nao altera tabela, coluna, indice,
+-- enum, default ou constraint. Nao toca nenhuma linha existente.
+--
+-- SEM BACKFILL: os codigos ja gravados (`GT-DEV-...` do gerador atual,
+-- `GT-DEMO-001` do seed) ficam EXATAMENTE como estao — docs/62 §5 decidiu
+-- preservar, sem renomear e sem migration de reescrita. Esta sequence so
+-- alimenta processos NOVOS.
+--
+-- POR QUE SEQUENCE, E NAO `count() + 1`: `count() + 1` e racy — duas criacoes
+-- simultaneas leem o mesmo total e derivam o mesmo numero; o `@unique` de
+-- `processes.code` transformaria a corrida em erro P2002 visivel ao cliente.
+-- `nextval` e atomico e nao bloqueante: nunca devolve o mesmo valor a dois
+-- pedidos concorrentes (docs/62 §4.1).
+--
+-- LACUNAS SAO ESPERADAS: `nextval` consome o numero mesmo se a transacao der
+-- rollback. A sequencia e MONOTONICA (nunca anda para tras, nunca repete), o
+-- que docs/62 §4 exige — nao e "sem lacunas", o que docs/62 nao exige.
+--
+-- `IF NOT EXISTS`: como o CI nao tem Postgres, esta migration nunca e
+-- exercitada por teste antes de rodar em ambiente real — idempotencia e a
+-- unica defesa contra reaplicacao parcial. Mesmo criterio da
+-- `20260802000000_add_real_cancellation_status`.
+--
+-- NAO E MODELADA NO `schema.prisma`: o Prisma nao representa sequences avulsas
+-- no schema. O objeto e gerenciado por esta migration e lido via `$queryRaw`
+-- em `src/server/processes/processCode.ts`.
+--
+-- ORDEM DE DEPLOY — OBRIGATORIA: esta migration precisa estar aplicada ANTES
+-- do codigo que a le. Se o codigo subir primeiro, todo `nextval` falha e
+-- NENHUM processo pode ser criado.
+--
+-- NAO USAR `db:push`: ele sincroniza o banco com o schema e desconhece o
+-- historico de migrations. Use `npm run db:migrate` (dev) ou `npm run db:deploy`
+-- (aplicar) — mesmo criterio das migrations anteriores.
+
+CREATE SEQUENCE IF NOT EXISTS process_code_seq;
