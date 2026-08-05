@@ -310,6 +310,32 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   **NÃO marca D, F nem H**, **NÃO encerra a Fase 1**, **NÃO abre a Fase 2**, não
   altera código/banco/Prisma/migration/rotas/UI/testes; **Fase 9 segue
   bloqueada** e `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/68-revisao-seguranca-pii-logs-fase-1.md` — **revisão de segurança, PII,
+  logs e permissões** do **Bloco F** da Fase 1, sobre o código como ele está.
+  **NENHUM achado bloqueante.** Confirmados seguros: cliente **sem permissão
+  interna por construção** (`USER: []`) com a matriz como fonte única;
+  **segregação de funções** real (OPERADOR não confirma Pix, FINANCEIRO não
+  executa SINARM, `process.cancel` só ADMIN); **não há CPF no schema** e
+  `Process` é sem PII por contrato; DTOs com `USER_SELECT` explícito e
+  `passwordHash` **barrado pelo tipo**; **permissão na query, não no filtro**
+  (consultas do cliente escopadas por dono no `where`); **`storageKey` ausente
+  de todo `.tsx`**; rota de arquivo respondendo **404 igual para inexistente e
+  não autorizado** (sem oráculo de existência), tocando o storage só após
+  autorizar; **payload cru do PSP fora do domínio** e token do Mercado Pago
+  recusado se não for `TEST-`; sessão com **token opaco de 256 bits e apenas o
+  SHA-256 no banco**; **zero `console.*` em todo o `src/`**; e **trava dura de
+  rede** que bloqueia Gov.br/SINARM/PF **mesmo que alguém os adicione à
+  allowlist**. **Achados importantes, reportados sem correção** (método do
+  `docs/41`): `audit.view.all` e `audit.view.own` **não têm ponto de aplicação**
+  e não existe modelo de auditoria dedicado; e o **rate limit é por instância**
+  (zera no restart, DoS de conta por e-mail) — pré-condição de **produção**.
+  **Marca F.1–F.7 `[x]`** e **mantém F.8 `[ ]`**, porque a lacuna de auditoria é
+  interna ao próprio item revisado. Recomenda **seguir para o Bloco D**, com
+  F.8 resolvível em paralelo por decisão curta. **Docs-only:** **NÃO corrige
+  nenhum achado**, **NÃO fecha o bloco F** (F.8 pendente), **NÃO fecha D nem
+  H**, **NÃO encerra a Fase 1** (segue aberta até D/F/H), **NÃO abre a Fase 2**,
+  não altera código/auth/login/banco/Prisma/migration/rotas/UI/testes; **Fase 9
+  segue bloqueada** e `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados

@@ -320,13 +320,13 @@ que o resolva explicitamente.
 
 ### F. Segurança e permissões
 
-- [ ] F.1 — Revisar **need-to-know**.
-- [ ] F.2 — Revisar **PII**.
-- [ ] F.3 — Revisar **DTOs seguros** (permissão na query + DTO redigido, `docs/18 §6`).
-- [ ] F.4 — Revisar **logs sem credenciais, cookies ou tokens**.
-- [ ] F.5 — Revisar **`storageKey` fora da UI**.
-- [ ] F.6 — Revisar **permissões financeiras**.
-- [ ] F.7 — Revisar **permissões de cancelamento**.
+- [x] F.1 — Revisar **need-to-know**. → **revisado**: `USER: []`, matriz como fonte única, segregação de funções; achado de melhoria futura registrado (`FINANCEIRO` com `pii.viewFull`)
+- [x] F.2 — Revisar **PII**. → **revisado**: **não há CPF no schema**; `Process` é sem PII por contrato
+- [x] F.3 — Revisar **DTOs seguros** (permissão na query + DTO redigido, `docs/18 §6`). → **revisado**: `USER_SELECT` explícito, `passwordHash` barrado pelo tipo, consultas escopadas por dono no `where`
+- [x] F.4 — Revisar **logs sem credenciais, cookies ou tokens**. → **revisado**: **zero `console.*` em `src/`**; `redaction.ts` em duas camadas
+- [x] F.5 — Revisar **`storageKey` fora da UI**. → **revisado**: **zero ocorrência em `.tsx`**; rota de arquivo não o expõe
+- [x] F.6 — Revisar **permissões financeiras**. → **revisado**: `/admin/financeiro` sob `audit.view.financial`; payload cru do PSP não chega à UI
+- [x] F.7 — Revisar **permissões de cancelamento**. → **revisado**: `process.cancel` é permissão própria, só ADMIN
 - [ ] F.8 — Revisar **auditoria**.
 
 > Item F é uma **revisão**, não uma reescrita: espera-se confirmar o que já está
@@ -347,6 +347,36 @@ que o resolva explicitamente.
 > **Nenhum item de F é marcado por isso.** F.1–F.8 são revisão do código **como
 > ele está hoje**; captcha e rate limit distribuído são trabalho **novo**, de
 > **PR técnico futuro**, e ampliam a superfície que F terá de revisar.
+
+> **Revisão executada em 2026-08-05 pelo
+> [`docs/68`](68-revisao-seguranca-pii-logs-fase-1.md):** **nenhum achado
+> bloqueante**. Confirmados: cliente sem permissão interna por construção
+> (`USER: []`), consultas do cliente escopadas por dono no `where`,
+> `passwordHash` barrado pelo tipo, **sem CPF no schema**, **`storageKey` fora
+> de todo `.tsx`**, rota de arquivo respondendo 404 igual para inexistente e não
+> autorizado, payload cru do PSP fora do domínio, sessão com token opaco e
+> apenas o hash no banco, **zero `console.*` no servidor**, e trava dura de rede
+> que bloqueia Gov.br/SINARM/PF **mesmo contra a própria allowlist**.
+>
+> **F.1–F.7 marcados `[x]`. F.8 fica `[ ]`** — a revisão encontrou uma lacuna
+> **dentro do próprio objeto revisado**: `audit.view.all` e `audit.view.own`
+> estão na matriz mas **não têm ponto de aplicação** em nenhuma rota ou action, e
+> **não existe modelo de auditoria dedicado** (a trilha é `ProcessStatusEvent`,
+> por processo). Não é vulnerabilidade — permissão não aplicada não concede nada
+> —, mas marcar "auditoria revisada" com essa lacuna aberta afirmaria o que a
+> própria revisão nega. **F.8 fecha com uma decisão curta**: construir a visão de
+> auditoria ou remover as permissões até ela existir.
+>
+> Achados **importantes** registrados sem correção (método do `docs/41`): a
+> lacuna de auditoria acima e o **rate limit por instância** (memória local,
+> zera no restart, DoS de conta por e-mail) — este último é pré-condição de
+> **produção**, não do bloco D.
+>
+> **O bloco F NÃO está fechado** (F.8 pendente). **A Fase 1 continua NÃO
+> encerrada** — **D e H seguem abertos**, e das 9 condições do §5 continuam
+> satisfeitas apenas **§5.4 e §5.6**; a condição **§5.7** ("segurança /
+> permissions / PII / logs revisados") **passa a estar substancialmente
+> atendida**, mas só é declarável no fechamento com F.8 resolvido.
 
 ### G. Pagamentos base
 
