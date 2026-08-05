@@ -11,9 +11,11 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import AjudaPage from "../../../src/app/(public)/ajuda/page";
 import { ClientStatusGuideSection } from "../../../src/components/help/ClientStatusGuideSection";
+import { HelpByProcessSection } from "../../../src/components/help/HelpByProcessSection";
 import { HelpTopicsSection } from "../../../src/components/help/HelpTopicsSection";
 import { SupportChannelSection } from "../../../src/components/help/SupportChannelSection";
 import { TutorialVideosSection } from "../../../src/components/help/TutorialVideosSection";
+import { clientProcessChoices } from "../../../src/server/support/clientProcessChoices";
 import { CLIENT_STATUS_GUIDE } from "../../../src/server/support/clientStatusGuide";
 import { HELP_TOPICS } from "../../../src/server/support/helpTopics";
 import { TUTORIAL_VIDEOS } from "../../../src/server/support/tutorialVideos";
@@ -150,6 +152,109 @@ test("/ajuda: o atalho #suporte leva ao BLOCO de suporte, nao ao card de FAQ", (
   );
 });
 
+/* ---------------------------------------------------------------------------
+   Estrutura minima da ajuda — bloco E (docs/61 §4.E).
+   --------------------------------------------------------------------------- */
+
+test("processos: cada processo aparece com o nome amigavel", () => {
+  const html = renderToStaticMarkup(createElement(HelpByProcessSection));
+  for (const choice of clientProcessChoices()) {
+    assert.ok(html.includes(choice.label), `processo ausente: ${choice.label}`);
+    assert.ok(!html.includes(choice.code), `codigo tecnico exposto: ${choice.code}`);
+  }
+});
+
+test("processos: so o criavel tem CTA — em preparacao nao vira link falso", () => {
+  const html = renderToStaticMarkup(createElement(HelpByProcessSection));
+  const criaveis = clientProcessChoices().filter((c) => c.available);
+  assert.ok(criaveis.length > 0, "o cenario precisa de ao menos um processo criavel");
+
+  const links = html.match(/href="\/processos\/novo"/g) ?? [];
+  assert.equal(links.length, criaveis.length, "numero de CTAs deve bater com o de criaveis");
+
+  for (const choice of clientProcessChoices().filter((c) => !c.available)) {
+    assert.ok(html.includes(choice.note ?? ""), `aviso ausente: ${choice.code}`);
+  }
+});
+
+test("/ajuda: video vem ANTES de texto e de suporte", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  const posVideos = html.indexOf('id="videos"');
+  const posProcessos = html.indexOf('id="processos"');
+  const posDuvidas = html.indexOf('id="duvidas-frequentes"');
+  const posSuporte = html.indexOf('id="suporte"');
+
+  for (const [nome, pos] of Object.entries({ posVideos, posProcessos, posDuvidas, posSuporte })) {
+    assert.ok(pos >= 0, `secao ausente: ${nome}`);
+  }
+  assert.ok(posVideos < posProcessos, "videos antes de ajuda por processo");
+  assert.ok(posProcessos < posDuvidas, "ajuda por processo antes das duvidas");
+  assert.ok(posDuvidas < posSuporte, "suporte por ultimo — e excecao, nao fluxo");
+});
+
+test("/ajuda: os atalhos seguem a mesma ordem das secoes", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  const atalhos = anchorsOf(html);
+  assert.equal(atalhos[0], "videos", "o primeiro atalho deve ser o de video");
+  assert.equal(atalhos.at(-1), "suporte", "o ultimo atalho deve ser o de suporte");
+});
+
+test("/ajuda: os links de ajuda do painel do cliente tem destino real", () => {
+  // O ClientStartPanel aponta para estas ancoras — se sumirem, o link morre.
+  const ids = new Set(idsOf(renderWithEnv(AjudaPage, undefined)));
+  const panel = readFileSync("src/components/client/ClientStartPanel.tsx", "utf8");
+  for (const [, anchor] of panel.matchAll(/href="\/ajuda#([a-z-]+)"/g)) {
+    assert.ok(ids.has(anchor), `o painel aponta para #${anchor}, que nao existe em /ajuda`);
+  }
+});
+
+test("/ajuda NAO promete aprovacao, prazo nem automacao", () => {
+  const texto = renderWithEnv(AjudaPage, undefined).toLowerCase();
+  for (const termo of [
+    "automaticamente",
+    "garantimos",
+    "será aprovado",
+    "será deferido",
+    "aprovação garantida",
+    "resolvemos tudo",
+    "cuidamos de tudo",
+  ]) {
+    assert.ok(!texto.includes(termo), `texto proibido encontrado: "${termo}"`);
+  }
+
+  /*
+    Prazo so e promessa quando vem com NUMERO ("prazo de 5 dias"). A pagina diz
+    hoje "Não informamos prazo de análise: esse tempo é do órgão competente" —
+    a negacao e justamente o comportamento correto, e um `includes("prazo de")`
+    a reprovaria. O que precisa falhar e o compromisso, nao a ressalva.
+  */
+  assert.doesNotMatch(texto, /prazo de \d/, "prazo com numero e promessa");
+  assert.doesNotMatch(texto, /em at[eé] \d/, "janela com numero e promessa");
+  assert.doesNotMatch(texto, /\d+\s*(dias|horas|semanas)\s*(úteis)?\s*para/, "promessa de tempo");
+});
+
+test("/ajuda deixa explicito que NAO e servico oficial", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  assert.ok(html.includes("Não somos órgão público"), "aviso de nao-oficialidade ausente");
+  assert.ok(
+    html.includes("nunca pedimos sua senha, código ou token do Gov.br"),
+    "aviso sobre credencial do Gov.br ausente",
+  );
+  for (const termo of ["canal oficial", "somos o órgão", "em nome da polícia"]) {
+    assert.ok(!html.toLowerCase().includes(termo), `texto proibido: "${termo}"`);
+  }
+});
+
+test("/ajuda nao apresenta Gov.br/SINARM/PF como execucao nossa", () => {
+  const html = renderWithEnv(AjudaPage, undefined);
+  assert.ok(
+    html.includes("<strong>você</strong> faz isso na janela oficial"),
+    "a etapa oficial precisa continuar sendo do cliente",
+  );
+  assert.ok(!html.includes("acessamos o Gov.br"), "nao operamos o portal");
+  assert.ok(!html.includes("protocolamos"), "nao prometemos protocolo automatico");
+});
+
 /** Trava estatica: as secoes sao so leitura — sem banco, sem automacao, sem Fase 9. */
 function codeOnly(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -160,6 +265,7 @@ const HELP_COMPONENTS = [
   "src/components/help/ClientStatusGuideSection.tsx",
   "src/components/help/TutorialVideosSection.tsx",
   "src/components/help/SupportChannelSection.tsx",
+  "src/components/help/HelpByProcessSection.tsx",
   "src/app/(public)/ajuda/page.tsx",
 ];
 
