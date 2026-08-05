@@ -201,13 +201,45 @@ que o resolva explicitamente.
 
 ### C. Nomes amigáveis dos processos
 
-- [ ] C.1 — Revisar as **labels exibidas ao cliente**.
-- [ ] C.2 — Evitar termos técnicos como foco principal.
-- [ ] C.3 — Manter **códigos técnicos internamente** (ex.: `GUIA_TRAFEGO_PF_CAC`).
-- [ ] C.4 — Usar **linguagem simples** na escolha de processo e no acompanhamento.
+- [x] C.1 — Revisar as **labels exibidas ao cliente**. → **5 superfícies** revisadas: dashboard, detalhe, sucesso, escolha de processo e `/processos/novo`
+- [x] C.2 — Evitar termos técnicos como foco principal. → o **nome do registro** ("Guia de Trafego (Pessoa Fisica - CAC)") saiu das telas do cliente; o nome **regulatório** do catálogo virou linha secundária
+- [x] C.3 — Manter **códigos técnicos internamente** (ex.: `GUIA_TRAFEGO_PF_CAC`). → **nenhum código renomeado**; catálogo, mapeamento, seed e admin intactos
+- [x] C.4 — Usar **linguagem simples** na escolha de processo e no acompanhamento. → **dois registros**: ação ("Emitir Guia de Tráfego") ao escolher, substantivo ("Guia de Tráfego") ao acompanhar
 
 > Continua valendo `docs/24`: sem jargão de dev, sem status cru, sem erro
 > técnico exposto ao cliente.
+
+> **Implementado em 2026-08-05 (PR técnico `feat/friendly-process-labels`):**
+> **C.1–C.4 estão feitos.** O `clientProcessChoices.ts` — já a fronteira de copy
+> do cliente desde o bloco B — ganhou o **registro substantivo** (`name`) ao
+> lado do de ação (`label`), mais `clientProcessName(code, fallback)`, que
+> aceita o código **persistido** (`GUIA_TRAFEGO_PF_CAC`) ou o do **catálogo**
+> (`GUIA_TRAFEGO`) e cai no nome do banco quando o tipo é desconhecido — tipo
+> fora do catálogo continua exibível.
+>
+> **O achado real do bloco C não eram enums na tela.** O cliente nunca viu
+> `GUIA_TRAFEGO` cru: via o `ProcessType.name` **semeado**, que é
+> `"Guia de Trafego (Pessoa Fisica - CAC)"` — sem acento e com rótulo de
+> registro —, em **3** telas (dashboard, detalhe, sucesso), mais o nome
+> **regulatório** do catálogo como título na escolha ("Emissão de CRAF",
+> "Autorização de Compra") e um `"Guia de Tráfego (CAC)"` hardcoded em
+> `/processos/novo`.
+>
+> **Nada foi renomeado por baixo (C.3):** `LAUNCH_PROCESS_CODES`,
+> `PERSISTED_PROCESS_TYPE_CODES`, `ProcessType.name` no banco e o catálogo
+> seguem idênticos — a tradução é de **exibição**. Sem migration, sem Prisma,
+> sem `db:push`. O **admin preserva** nome e código técnicos
+> (`detail.processTypeName`, `detail.processTypeCode`), com teste travando essa
+> preservação.
+>
+> **`Process.code` × `ProcessType.code` ficou explícito no código** — o
+> `clientProcessName` documenta a distinção e há teste garantindo que um número
+> interno (`CAC-2026-000001`) **não** é tratado como tipo de processo. Isso
+> atende a ressalva não bloqueante registrada na revisão do `docs/63`.
+>
+> **O bloco C está fechado. A Fase 1 continua NÃO encerrada** — os blocos
+> **D–H seguem integralmente abertos**, e das 9 condições do §5 continuam
+> satisfeitas apenas **§5.4 e §5.6** (C não tem condição própria no §5).
 
 ### D. Separação cliente/admin
 

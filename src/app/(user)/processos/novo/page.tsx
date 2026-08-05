@@ -6,6 +6,7 @@ import { requireUser } from "@/server/auth/guards";
 import { DEFAULT_JUSTIFICATION, UFS } from "@/server/processes/guiaTrafegoSchema";
 import { MOCK_FIREARMS, mockFirearmLabel } from "@/server/processes/mockFirearms";
 import { ProcessTypeSelection } from "@/components/processes/ProcessTypeSelection";
+import { CLIENT_PROCESS_LABELS } from "@/server/support/clientProcessChoices";
 import { NovoProcessoForm } from "./NovoProcessoForm";
 
 export default async function NovoProcessoPage() {
@@ -34,7 +35,10 @@ export default async function NovoProcessoPage() {
         <Card className="mt-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>Serviço</Badge>
-            <p className="font-medium text-neutral-900">Guia de Tráfego (CAC)</p>
+            {/* Nome do cliente — "(CAC)" era rotulo de registro (docs/61 §4.C). */}
+            <p className="font-medium text-neutral-900">
+              {CLIENT_PROCESS_LABELS.GUIA_TRAFEGO.name}
+            </p>
           </div>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div>

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { requireUser } from "@/server/auth/guards";
 import { OPERATIONAL_STATUS_USER_LABELS } from "@/server/processes/statusLabels";
+import { clientProcessName } from "@/server/support/clientProcessChoices";
 import { findProcessByCodeForUser } from "@/server/repositories/processRepository";
 
 export default async function SucessoPage({
@@ -29,7 +30,8 @@ export default async function SucessoPage({
             </p>
             <p className="text-neutral-600">
               Status: {OPERATIONAL_STATUS_USER_LABELS[process.operationalStatus]} ·{" "}
-              {process.processType.name}
+              {/* Nome do cliente, nao o do registro operacional (docs/61 §4.C). */}
+              {clientProcessName(process.processType.code, process.processType.name)}
             </p>
             {process.destination ? (
               <p className="text-neutral-600">
