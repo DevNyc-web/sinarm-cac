@@ -239,6 +239,27 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   satisfeita**. **Docs-only:** **NÃO fecha o bloco B**, **NÃO encerra a Fase
   1**, **NÃO abre a Fase 2**, não altera código/UI/rotas/auth/banco/Prisma/
   migration/testes; `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+- `docs/64-decisao-login-federado-captcha-rate-limit.md` — **decisão futura**
+  de autenticação e proteção contra abuso: o produto caminha para **login
+  federado**, começando por **Google/OIDC** para o cliente comum (Microsoft e
+  Apple ficam em aberto), **evitando senha própria**; admin mantém **entrada
+  separada**, RBAC interno, allowlist e MFA do provedor como requisitos
+  futuros. Registra que federar **não** transfere responsabilidade — sessão,
+  autorização, auditoria, PII e proteção de rota continuam nossos — e que o
+  **banco continua guardando** usuário, vínculo com provider, `providerAccountId`,
+  e-mail verificado, perfil, RBAC, processos, documentos, pagamentos e logs.
+  **Captcha** (preferência: Cloudflare Turnstile) entra em pontos sensíveis,
+  nunca como defesa única. **Corrige duas premissas verificadas no código:**
+  o **rate limit JÁ EXISTE** para login e cadastro (`src/server/auth/rateLimit.ts`)
+  — o que falta é torná-lo **distribuído** e estendê-lo às demais rotas — e
+  `AGUARDANDO_CAPTCHA` no schema **não é captcha de produto**, e sim estado de
+  processo sobre o portal Gov.br. Deixa **6 perguntas em aberto** (§13), a
+  começar pelo destino das contas que já têm senha. **Alimenta os blocos D e F**
+  do `docs/61` **sem concluir nenhum dos dois**. **Docs-only:** **NÃO implementa
+  auth**, **NÃO fecha D nem F**, **NÃO reabre o bloco B**, **NÃO encerra a Fase
+  1**, **NÃO abre a Fase 2**, não altera código/login/banco/Prisma/migration/
+  rotas/UI/testes; **Fase 9 segue bloqueada** e
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
