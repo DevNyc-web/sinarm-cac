@@ -363,6 +363,33 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   código/banco/Prisma/migration/rotas/UI/testes; **Fase 9 segue bloqueada** e
   `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
+- `docs/70-encerramento-fase-1-base-do-saas.md` — **ENCERRAMENTO OFICIAL DA
+  FASE 1 (Base do SaaS)**, o único documento capaz de declará-la encerrada
+  (`docs/61 §5`). Percorre o **§4 bloco a bloco** (A–H, **45 itens, todos
+  fechados**) e o **§5 condição a condição** (as 9, todas satisfeitas, com
+  evidência), incluindo a justificativa da **5.3**: os fluxos manuais que
+  existem — execução no SINARM por pessoa e **pagamento manual da GRU** — são o
+  **modelo decidido desta fase** (`docs/25 §2`, `docs/67 §5`), não remendo de
+  produto faltando, porque o escopo da Fase 1 (`docs/61 §2`) **não inclui
+  automação**. **Encerrar NÃO libera nada:** **a Fase 2 NÃO é aberta como
+  execução real** — pode começar apenas como **preparação, laboratório e teste
+  interno**, com Playwright somente em `localhost`/sintético; **execução real de
+  Gov.br/SINARM/PF continua bloqueada**; `PHASE9_REAL_EXECUTION_ENABLED` segue
+  `false as const`; os gates do `docs/26 §19` seguem íntegros; e as **12
+  pendências do `docs/23 §5` continuam abertas** — encerrar a Fase 1 **não
+  libera cliente real**. Registra as **pendências futuras** fora da Fase 1
+  (§6.1): log de acesso a PII e PII/KMS **antes** do CPF, rate limit
+  distribuído, auditoria ampla, `/admin/grus`, cartão, automação BB, login
+  federado, descoberta dos portais de certidões externas e do laboratório
+  sintético, mais dois polimentos. Reafirma que a regra de **nunca burlar
+  captcha** continua valendo integralmente e que qualquer discussão de política
+  exige **PR próprio**. Registra que o **`docs/66` existe apenas como arquivo
+  local untracked, fora da `main` e de todo o histórico** — não faz parte deste
+  encerramento e ainda aguarda destino. Aponta como próximo passo real decidir
+  **como a sessão autenticada do cliente chega ao servidor**, hoje não
+  especificada em nenhum documento. **Docs-only:** não altera
+  código/`src`/`prisma`/testes/`package.json`/migration/auth/captcha/Fase 9.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
