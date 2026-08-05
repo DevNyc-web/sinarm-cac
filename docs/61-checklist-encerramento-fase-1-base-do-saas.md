@@ -156,6 +156,20 @@ que o resolva explicitamente.
 > Evoluir o `ClientStartPanel`/dashboard existentes — **sem criar um segundo
 > caminho paralelo** (`docs/60 §6`).
 
+> **Decisão/plano registrados em 2026-08-04 pelo
+> [`docs/63`](63-decisao-tela-inicial-cliente-novo-escolha-processo.md):**
+> a tela do cliente novo passa a abrir com **"Qual processo você deseja
+> realizar?"**, cards simples com **nomes amigáveis**, separação entre
+> **disponível agora** e **em preparação** (sem CTA, sem promessa de prazo ou
+> aprovação) e **ajuda visível com vídeos em destaque**; "Meus processos" vira
+> informação secundária enquanto não houver processo.
+>
+> **B.1–B.5 continuam `[ ]`.** Diferente do bloco A, cuja condição (`§5.6`)
+> exige **decisão**, a condição de B (`§5.4`) exige **entrada clara**
+> — comportamento observável, que só o PR técnico de UI
+> (`feat/client-start-process-selection`, `docs/63 §10`) entrega. **O bloco B
+> NÃO está fechado** e a condição `§5.4` **NÃO** está satisfeita.
+
 ### C. Nomes amigáveis dos processos
 
 - [ ] C.1 — Revisar as **labels exibidas ao cliente**.
