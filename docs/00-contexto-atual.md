@@ -363,6 +363,26 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   código/banco/Prisma/migration/rotas/UI/testes; **Fase 9 segue bloqueada** e
   `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
+**Bloco D implementado em 2026-08-05** (PR técnico
+`feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
+passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
+cadastro, ajuda e o aviso permanente de que **não é o Gov.br** —, e o atalho de
+desenvolvimento lista **apenas o perfil cliente**. A nova rota **`/equipe`** é a
+da **equipe interna**: sem cadastro, sem jornada de cliente, com aviso de que o
+acesso depende das permissões do perfil. **A rota `/equipe` é apenas uma porta
+de entrada interna dentro do mesmo sistema: não cria segundo site, segundo
+banco, segundo produto ou auth paralela.** Ela reusa a mesma Server Action,
+sessão e política de `authenticate.ts`; **nada de senha, OAuth, captcha, rate
+limit, banco, Prisma ou migration foi tocado**. O
+roteamento por perfil saiu do id literal e virou regra no módulo puro
+`src/server/auth/entryPaths.ts` (`destinationFor` / `entryPathFor`); o
+**logout** devolve o interno para `/equipe` e o cliente para `/login`; e o
+**erro de login volta à porta de origem** por **allowlist** (nunca redirect com
+string crua). A separação é de **experiência**: `/equipe` **não concede nada** —
+`USER: []`, `requireAdminRole` e `requirePermission` seguem intactos. **Fecha o
+bloco D** (D.1–D.5) e satisfaz a condição `docs/61 §5.5`; **a Fase 1 continua
+aberta pelo bloco H**. `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
+
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
 fictícios** (`docs/18`, `docs/19`, `docs/20` e `docs/22`). Roda com **Postgres

@@ -243,11 +243,11 @@ que o resolva explicitamente.
 
 ### D. Separação cliente/admin
 
-- [ ] D.1 — Revisar a **experiência de entrada**.
-- [ ] D.2 — Deixar claro o **acesso de cliente comum**.
-- [ ] D.3 — Deixar claro o **acesso admin/equipe interna**.
-- [ ] D.4 — Garantir que o **cliente não veja área administrativa**.
-- [ ] D.5 — Garantir que o admin continue sob **RBAC/permissions**.
+- [x] D.1 — Revisar a **experiência de entrada**. → **duas portas**: `/login` (cliente) e `/equipe` (equipe interna), com destino por perfil em `destinationFor`
+- [x] D.2 — Deixar claro o **acesso de cliente comum**. → `/login` focado no cliente: sem vocabulário interno, atalho de dev só com o perfil cliente, cadastro e ajuda preservados
+- [x] D.3 — Deixar claro o **acesso admin/equipe interna**. → `/equipe` sem cadastro e sem jornada de cliente; logout devolve interno para `/equipe`; erro de login volta à porta de origem
+- [x] D.4 — Garantir que o **cliente não veja área administrativa**. → link `/admin` atrás de `isInternalRole` no `Header`; `/equipe` não concede nada por si
+- [x] D.5 — Garantir que o admin continue sob **RBAC/permissions**. → `USER: []` intacto; `requireAdminRole`/`requirePermission` inalterados; 18 testes travando o comportamento
 
 > **Verificado:** D.4 e D.5 já são garantidos por permissão hoje (`USER: []` em
 > `ROLE_PERMISSIONS`); a pendência real é D.1–D.3 — hoje existe **uma única**
@@ -263,6 +263,49 @@ que o resolva explicitamente.
 > entrada **implementada** — decidir a direção não entrega tela. **D exige PR
 > técnico futuro**, ainda não aprovado, e o `docs/64` **aumenta** o escopo de D
 > em vez de reduzi-lo.
+
+> **Implementado em 2026-08-05 (PR técnico `feat/separate-client-admin-entry`):**
+> **D.1–D.5 estão feitos.** A entrada deixou de ser uma porta só. `/login` é a
+> **do cliente** — "Entrar na sua conta", cadastro, ajuda e o aviso permanente
+> sobre o Gov.br — e o atalho de desenvolvimento passou a listar **apenas o
+> perfil cliente**, em vez de misturar Operador, Financeiro e Suporte na mesma
+> caixa. A nova rota **`/equipe`** é a da equipe interna: sem cadastro (conta
+> interna não se cria sozinha), sem jornada de cliente, e com o aviso de que o
+> que se vê depois de entrar **depende das permissões do perfil**.
+>
+> **A rota `/equipe` é apenas uma porta de entrada interna dentro do mesmo
+> sistema: não cria segundo site, segundo banco, segundo produto ou auth
+> paralela.** Ela **reusa a mesma Server Action** (`signInWithPasswordAction`),
+> a mesma sessão e a mesma política de `authenticate.ts`. Duplicar o caminho de
+> auth criaria dois lugares para corrigir a mesma falha. **Nada de senha, OAuth,
+> captcha, rate limit, banco, Prisma ou migration foi tocado.**
+>
+> **Roteamento saiu do id e virou regra de perfil:** o novo módulo puro
+> `src/server/auth/entryPaths.ts` concentra `destinationFor` (para onde vai
+> depois de entrar) e `entryPathFor` (para onde volta ao sair). O
+> `signInMockAction` deixou de decidir por `userId === "mock-user"` — comparação
+> literal que quebraria em silêncio se um id mudasse de nome.
+>
+> **Dois detalhes que a separação exigia:** o **logout** agora lê o perfil
+> *antes* de encerrar a sessão e devolve o interno para `/equipe` (antes todo
+> mundo caía na tela do cliente); e o **erro de login volta para a porta de
+> origem**, via campo `origem` traduzido por **allowlist** — devolver a string
+> crua ao `redirect` seria open redirect, e há teste com entradas hostis
+> travando isso.
+>
+> **D.4 continua sendo permissão, não pintura:** `/equipe` **não concede nada**.
+> Quem entra por lá com perfil de cliente cai em `/dashboard` como sempre, e
+> `/admin` segue barrado por `requireAdminRole`. `USER: []` está intacto.
+>
+> **18 testes** em `tests/unit/support/entrySeparation.test.ts` travam os cinco
+> critérios, incluindo a ausência de open redirect e a não regressão do aviso do
+> Gov.br. `typecheck`, `lint`, `build` e `test:unit:all` (1.422 testes) passam.
+>
+> **O bloco D está fechado. Com isso a condição §5.5** ("admin estiver separado
+> do fluxo de cliente") **passa a estar satisfeita.**
+>
+> **A Fase 1 continua NÃO encerrada** — o bloco **H segue aberto**, e o
+> encerramento continua reservado ao documento próprio (§7).
 
 > **Decisão de transição registrada em 2026-08-05 pelo
 > [`docs/65`](65-decisao-transicao-contas-senha-login-federado.md):** resolvida,
