@@ -13,6 +13,7 @@ import {
   REQUIREMENT_TYPE_LABELS,
   requirementSummaryForProcess,
 } from "@/server/processes/processDocumentRequirements";
+import { CLIENT_PROCESS_LABELS } from "@/server/support/clientProcessChoices";
 
 /**
  * Selecao dos PROCESSOS DE LANCAMENTO na entrada de novo processo.
@@ -54,9 +55,17 @@ export function ProcessTypeSelection() {
               className={`space-y-2 text-sm ${available ? "border-emerald-300" : "opacity-90"}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium text-neutral-900">{definition.name}</p>
+                {/*
+                  Titulo no nome do CLIENTE; o nome regulatorio do catalogo
+                  ("Emissão de CRAF") desce para linha secundaria — continua
+                  visivel, deixa de ser o foco (docs/61 §4.C).
+                */}
+                <p className="font-medium text-neutral-900">
+                  {CLIENT_PROCESS_LABELS[definition.code].label}
+                </p>
                 <Badge>{PROCESS_AVAILABILITY_LABELS[entry.availability]}</Badge>
               </div>
+              <p className="text-xs text-neutral-500">{definition.name}</p>
 
               <dl className="grid gap-1 text-xs text-neutral-600">
                 <div className="flex justify-between gap-2">

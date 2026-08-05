@@ -16,6 +16,7 @@ import {
 import { loadOwnerExtractionFields } from "@/server/services/loadOwnerExtractionFields";
 import { deriveAutomationReadiness } from "@/server/automation/automationReadiness";
 import { isClosed } from "@/server/processes/operationalSignals";
+import { clientProcessName } from "@/server/support/clientProcessChoices";
 import {
   clientVisibleStatusLabel,
   DOCUMENT_STATUS_LABELS,
@@ -130,7 +131,10 @@ export default async function ProcessoRevisaoPage({
             */}
             {clientVisibleStatusLabel(process)}
           </p>
-          <p className="text-neutral-600">{process.processType.name}</p>
+          {/* Nome do cliente, nao o do registro operacional (docs/61 §4.C). */}
+          <p className="text-neutral-600">
+            {clientProcessName(process.processType.code, process.processType.name)}
+          </p>
           <p className="text-xs text-neutral-500">
             A execução é feita por uma <strong>pessoa da nossa equipe</strong> na janela oficial —
             este aplicativo <strong>não opera os sistemas do órgão</strong>.

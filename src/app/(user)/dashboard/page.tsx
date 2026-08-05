@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ClientStartPanel } from "@/components/client/ClientStartPanel";
+import { clientProcessName } from "@/server/support/clientProcessChoices";
 import { requireUser } from "@/server/auth/guards";
 import { clientVisibleStatusLabel, PAYMENT_STATUS_LABELS } from "@/server/processes/statusLabels";
 import { listProcessesByUser } from "@/server/repositories/processRepository";
@@ -151,7 +152,12 @@ export default async function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-sm text-neutral-600">
-                        {process.processType.name}
+                        {/*
+                          Nome do CLIENTE, nao o do registro operacional: o
+                          `ProcessType.name` semeado e "Guia de Trafego (Pessoa
+                          Fisica - CAC)" (docs/61 §4.C).
+                        */}
+                        {clientProcessName(process.processType.code, process.processType.name)}
                         {process.destination
                           ? ` · ${process.destination.eventName} — ${process.destination.city}/${process.destination.uf}`
                           : ""}
