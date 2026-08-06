@@ -551,6 +551,16 @@ string crua). A separação é de **experiência**: `/equipe` **não concede nad
 bloco D** (D.1–D.5) e satisfaz a condição `docs/61 §5.5`; **a Fase 1 continua
 aberta pelo bloco H**. `PHASE9_REAL_EXECUTION_ENABLED` segue `false`.
 
+**Nota (2026-08-06):** criado
+`docs/75-plano-capacidade-carga-e-infraestrutura.md` — plano técnico
+docs-only de **capacidade, teste de carga e infraestrutura**, para orientar
+testes futuros de escala e a decisão entre **Vercel**, **Hostinger VPS/Cloud**
+e **servidor dedicado** (fase futura), por medição e não por preferência.
+Cobre separação web/worker, os eixos de concorrência (500 usuários ≠ 500
+Playwright), desenho de fila de jobs (sem schema), cenários/ferramentas de
+teste de carga a avaliar, métricas e critérios de aceitação. **Não implementa
+nada, não instala ferramenta, não escolhe fornecedor e não toca a Fase 9.**
+
 **Código de aplicação:** o app do MVP existe (Next.js + TypeScript + Prisma),
 com as **Fases 1–7** implementadas e **validadas localmente com dados
 fictícios** (`docs/18`, `docs/19`, `docs/20` e `docs/22`). Roda com **Postgres
