@@ -482,6 +482,45 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/`.env`/
   migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`.
 
+- `docs/74-maquina-estados-automacao-sintetica-fase-2.md` — **máquina de estados
+  da automação sintética** da Fase 2, prevista no `docs/73 §12.1`. Define **8
+  estados de sessão** (`CREATED`, `CLAIMED`, `IN_PROGRESS`, `COMPLETED`,
+  `EXPIRED`, `CANCELLED`, `BLOCKED`, `FAILED`), **9 de run** (incluindo
+  `WAITING_SYNTHETIC_HANDOFF`, `WAITING_SYNTHETIC_STEP` e
+  `BLOCKED_BY_SYNTHETIC_CAPTCHA`) e **7 de etapa**, mais as cinco entidades
+  conceituais (`syntheticSession`, `syntheticRun`, `syntheticStep`,
+  `syntheticEvidence`, `syntheticAuditEvent`), com **um run por sessão** —
+  retentar exige **nova sessão**. São **14 transições permitidas** e **11
+  proibidas**, entre elas toda aresta para **execução real**, para
+  **Gov.br/SINARM/PF** e para **uso de senha, cookie, OTP ou credencial**, além
+  de `COMPLETED`/`FAILED`/`EXPIRED`/`CANCELLED` → `IN_PROGRESS`. **Terminais:**
+  `COMPLETED`, `FAILED`, `EXPIRED`, `CANCELLED` — não reabrem, não renovam, não
+  reexecutam. **`BLOCKED` não tem saída para frente:** captcha sintético é
+  bloqueio, não desafio; **não existe evento de desbloqueio, bypass nem "modo
+  teste que pula"**, e o resultado esperado é `BLOCKED`, nunca `COMPLETED`. Cada
+  transição emite um dos **9 eventos** do `docs/73 §7`, sempre com **estado
+  anterior e estado novo**, `auditCorrelationId`, `processId`, `actorId`,
+  timestamp e motivo redigido — **nunca** PII, segredo, cookie, senha ou
+  screenshot real. Define ainda **10 falhas sintéticas** e as evidências
+  admitidas por estado (só `COMPLETED` admite protocolo, e só `PROT-FICT-*`).
+  **Declara duas extensões ao `docs/73`** (§14.1): `FAILED` acrescentado como
+  estado de sessão e `BLOCKED` deixando de ser terminal — **nenhuma afrouxa
+  trava** (`BLOCKED` segue sem saída para frente). **Este mesmo PR reconcilia o
+  `docs/73`**, que passa a ter os **8 estados**, os terminais
+  `COMPLETED`/`FAILED`/`EXPIRED`/`CANCELLED`, a regra de desfecho do bloqueio
+  (§5.12) e a justificativa (§5.13) — **sem tocar nas listas de campos
+  permitidos (11) e proibidos (17)**, que ficam inalteradas. Assim a `main` não
+  recebe dois documentos discordando em ponto normativo. **Não implementa nada e
+  não abre execução
+  real. Fase 9 segue bloqueada** — `PHASE9_REAL_EXECUTION_ENABLED` segue
+  `false as const`, **allowlist e `networkGuard` intocados**, nenhum estado tem
+  aresta para o real, os gates do `docs/26 §19` seguem íntegros e as 12
+  pendências do `docs/23 §5` seguem abertas. Próximo passo sugerido:
+  `feat: add synthetic session contract types` — **local/sintético, sem portal
+  real, sem Fase 9, sem Prisma/migration** salvo decisão posterior. **Docs-only:**
+  não altera código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/
+  `.env`/migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`/`docs/73`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
