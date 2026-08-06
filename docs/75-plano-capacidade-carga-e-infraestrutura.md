@@ -59,6 +59,14 @@ por quatro critérios:
 > como candidato concreto ao lado de Railway/Render, para ser comparado com
 > dado, não substituído por suposição.
 
+**Como comparar, na prática:** quando houver dúvida entre Vercel, Hostinger
+VPS, servidor dedicado ou outro provedor, a decisão deve ser tomada **rodando
+o mesmo roteiro de carga nos ambientes candidatos**, com os **mesmos
+cenários** (§5.1), **mesma massa de teste**, **mesmos limites de
+concorrência** (§3/§4) e **mesmas métricas** (§6) — nunca escolher por
+preferência ou suposição. Comparar provedor A contra provedor B com testes
+diferentes não produz decisão, produz dois números incomparáveis.
+
 ---
 
 ## 2. Separação entre web e automação
@@ -230,6 +238,15 @@ CI, não preferência isolada.
 > 1 (navegação) e péssimo no cenário 4 (consulta de status que deveria ser
 > quase instantânea). O critério de aceitação (§7) é o que dá sentido ao
 > número.
+
+**Nenhum número de capacidade é prometido aqui.** Este documento **não
+promete** um número fixo de requisições por segundo, usuários simultâneos ou
+processos por minuto **antes de benchmark real** — nenhum desses números
+existe hoje, e escrever um agora seria suposição vestida de dado. Qualquer
+número de capacidade deve sair de **teste medido** (§5), com **ambiente,
+banco, fila, worker, storage e limites de concorrência documentados** junto
+do resultado — um número sem esse contexto não é reproduzível e não serve
+para decidir nada.
 
 ---
 
