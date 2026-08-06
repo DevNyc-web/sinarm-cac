@@ -531,6 +531,13 @@ nome de chave suspeito, `environment: production`, URL externa, host oficial
 implementa os **8 estados** e as **transições** do `docs/74`, com `BLOCKED` sem
 saída para frente. `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`.
 
+**Helpers da máquina de estados sintética (2026-08-06).** Começaram a ser
+implementados localmente os **helpers puros** sobre a máquina de estados do
+`docs/74` (`sessionState.ts`), reaproveitando os tipos/constantes já validados
+em `sessionContract.ts` — ainda **sem I/O, sem Playwright, sem Prisma, sem
+rota e sem Fase 9**. Continua sem abrir execução real;
+`PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
