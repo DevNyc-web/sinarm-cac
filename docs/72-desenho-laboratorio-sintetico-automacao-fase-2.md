@@ -134,7 +134,7 @@ documentação.
 | 5.9 | **OTP real** |
 | 5.10 | **Cookie real** |
 | 5.11 | **Credencial Gov.br real** |
-| 5.12 | **Captcha real** — o laboratório usa captcha **sintético**, e apenas como bloqueio (§6.9) |
+| 5.12 | **Captcha real** — o laboratório usa captcha **sintético**, e apenas como bloqueio (§7.10) |
 | 5.13 | **Bypass de captcha** — sem 2captcha, anti-captcha, resolvedor externo ou evasão |
 | 5.14 | **Produção** |
 | 5.15 | **Cliente real** |
