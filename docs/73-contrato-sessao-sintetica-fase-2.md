@@ -78,7 +78,7 @@ ignorado. Descrição conceitual — o tipo é o PR seguinte.
 | **`issuedAt`** | Instante de criação | Base do prazo e da ordem dos eventos. |
 | **`environment`** | Marcação de ambiente | Apenas `synthetic` / `local` / `test`. **Nunca `production`** (§6.1). |
 | **`consentMarker`** | Marcador sintético | Registra que houve "consentimento" no laboratório. **Não substitui** o consentimento real do `docs/39 §5` — e não pode ser reaproveitado como se fosse. |
-| **`handoffState`** | Estado do handoff | Um de: `CREATED`, `CLAIMED`, `IN_PROGRESS`, `COMPLETED`, `EXPIRED`, `CANCELLED`, `BLOCKED` (§5). |
+| **`handoffState`** | Estado do handoff | Um de: `CREATED`, `CLAIMED`, `IN_PROGRESS`, `COMPLETED`, `EXPIRED`, `CANCELLED`, `BLOCKED`, `FAILED` (§5). Lista fechada e **alinhada ao [`docs/74 §4`](74-maquina-estados-automacao-sintetica-fase-2.md)**. |
 | **`auditCorrelationId`** | Id interno de correlação | Amarra os eventos sintéticos de uma execução (§7). Interno, sem relação com identificador externo. |
 | **`allowedSyntheticProcessCode`** | Código fictício aceito | Apenas `PROT-FICT-*` (padrão do `labRunReport.ts`) ou `CAC-*` de ambiente local (`docs/62`). Formato de protocolo real é rejeitado (§6.5). |
 
@@ -135,26 +135,40 @@ O contrato **nunca** pode conter, sob nome nenhum e em nenhuma forma
 | 5.4 | **Conclusão** | Estado `COMPLETED`. Só aqui pode existir protocolo — e só o sintético (`PROT-FICT-*`). |
 | 5.5 | **Expiração** | Passado o `expiresAt`, estado `EXPIRED`, mesmo no meio de uma etapa. O motor para e registra. |
 | 5.6 | **Cancelamento** | Interrupção deliberada (humano ou sistema). Estado `CANCELLED`. |
-| 5.7 | **Bloqueio por captcha sintético** | Estado `BLOCKED`, degradação para humano. **É o comportamento correto**, não uma falha do desenho (`docs/72 §7.10`). |
-| 5.8 | **Erro sintético** | Falha de etapa termina sem protocolo — invariante herdado do `docs/37`. |
+| 5.7 | **Bloqueio por captcha sintético** | Estado `BLOCKED`, degradação para humano. **É o comportamento correto**, não uma falha do desenho (`docs/72 §7.10`). **Não é terminal** — exige desfecho explícito (5.12). |
+| 5.8 | **Erro sintético** | Estado `FAILED`. Falha de etapa termina sem protocolo — invariante herdado do `docs/37`. |
 | 5.9 | **Sem renovação silenciosa** | Handle vencido **não se renova**. Continuar exige **novo** handle, com novo `issuedAt` e novo evento. |
-| 5.10 | **Descarte após o fim** | Em `COMPLETED`, `EXPIRED`, `CANCELLED` ou `BLOCKED`, o handle é invalidado e descartado. O descarte é **verificado**, não presumido — se falhar, é incidente (`docs/42 §8`). |
+| 5.10 | **Descarte após o fim** | Em `COMPLETED`, `FAILED`, `EXPIRED` ou `CANCELLED`, o handle é invalidado e descartado. O descarte é **verificado**, não presumido — se falhar, é incidente (`docs/42 §8`). |
 | 5.11 | **Logs redigidos** | Todo o ciclo passa pela redação existente (`docs/37 §4`). |
+| 5.12 | **Desfecho do bloqueio** | De `BLOCKED` a sessão sai para `CANCELLED`, `FAILED` ou `EXPIRED` — **nunca** para `COMPLETED` nem de volta para `IN_PROGRESS` (§5.13). |
 
 **Transições válidas:**
 
 ```
-CREATED ──▶ CLAIMED ──▶ IN_PROGRESS ──▶ COMPLETED
+CREATED ──▶ CLAIMED ──▶ IN_PROGRESS ──▶ COMPLETED  ✦
    │           │             │
-   │           │             ├──▶ BLOCKED     (captcha sintético)
-   │           │             ├──▶ CANCELLED   (interrupção)
-   │           │             └──▶ EXPIRED     (prazo)
-   ├───────────┴─────────────────▶ EXPIRED
-   └─────────────────────────────▶ CANCELLED
+   │           │             ├──▶ BLOCKED ──┬──▶ CANCELLED ✦
+   │           │             │              ├──▶ FAILED    ✦
+   │           │             │              └──▶ EXPIRED   ✦
+   │           │             ├──▶ FAILED    ✦  (erro sintético)
+   │           │             ├──▶ CANCELLED ✦  (interrupção)
+   │           │             └──▶ EXPIRED   ✦  (prazo)
+   ├───────────┴─────────────────▶ EXPIRED  ✦
+   └───────────┴─────────────────▶ CANCELLED ✦
 ```
 
-`COMPLETED`, `EXPIRED`, `CANCELLED` e `BLOCKED` são **terminais**: não voltam,
-não renovam, não reabrem.
+`COMPLETED`, `FAILED`, `EXPIRED` e `CANCELLED` são **terminais** (`✦`): não
+voltam, não renovam, não reabrem. **`BLOCKED` não é terminal** — é estado de
+bloqueio que **exige desfecho explícito** (5.12).
+
+### 5.13 Por que `FAILED` existe e por que `BLOCKED` não é terminal
+
+| # | Motivo |
+|---|---|
+| 5.13.1 | **`FAILED` separa defeito de bloqueio.** Erro técnico do laboratório (timeout, etapa indisponível, campo proibido) é coisa diferente de captcha parando a automação — o primeiro é problema, o segundo é o desenho funcionando. Sem estado próprio, o erro sintético do 5.8 não tinha casa. |
+| 5.13.2 | **`BLOCKED` não-terminal evita sessão que morre sem desfecho auditável.** Quem foi bloqueado ou é encerrado (`CANCELLED`), ou vira falha do cenário (`FAILED`), ou vence (`EXPIRED`). Terminar em `BLOCKED` deixaria a trilha muda sobre o que houve depois do humano assumir. |
+| 5.13.3 | **A mudança não afrouxa nada.** `BLOCKED` continua **sem saída para frente**: `BLOCKED → COMPLETED` e `BLOCKED → IN_PROGRESS` seguem **proibidos**, porque exigiriam um **evento de desbloqueio sintético** que **não existe** e cuja criação seria decisão própria, em PR próprio (`docs/74 §8.5`, `§10.2`). |
+| 5.13.4 | Os oito estados e as transições ficam **alinhados ao [`docs/74`](74-maquina-estados-automacao-sintetica-fase-2.md)**, que é a fonte da máquina de estados; esta página segue sendo a fonte dos **campos permitidos e proibidos**. |
 
 ---
 
@@ -312,8 +326,10 @@ Este PR **não**:
 > `auditCorrelationId` e `allowedSyntheticProcessCode` — e **17 famílias de
 > campo proibidas**, entre elas senha, OTP, cookie, `storageState`, tokens,
 > credencial Gov.br, CPF/RG reais, documento real e qualquer segredo que exija
-> KMS. O ciclo de vida tem **sete estados**, quatro deles terminais, **sem
-> renovação silenciosa** e com **descarte verificado** no fim. A validação é
+> KMS. O ciclo de vida tem **oito estados** — quatro deles terminais
+> (`COMPLETED`, `FAILED`, `EXPIRED`, `CANCELLED`), com **`BLOCKED` exigindo
+> desfecho explícito e sem saída para frente** —, **sem renovação silenciosa** e
+> com **descarte verificado** no fim. A validação é
 > **allow-list**: campo não listado é rejeitado, não ignorado — e `cpf` e
 > `storageState` precisam de checagem própria, porque a `isSecretKey` atual não
 > os cobre. **Nada aqui é implementado.** `PHASE9_REAL_EXECUTION_ENABLED`
