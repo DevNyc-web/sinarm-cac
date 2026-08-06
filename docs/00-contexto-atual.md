@@ -420,6 +420,34 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   abertas. **Docs-only:** não altera
   código/`src`/`prisma`/testes/`package.json`/migration/captcha/Fase 9.
 
+- `docs/72-desenho-laboratorio-sintetico-automacao-fase-2.md` — **desenho do
+  laboratório sintético da Fase 2**, o passo previsto no `docs/71 §9.1`.
+  Registra que o laboratório **não começa do zero**: as Fases técnicas **8A–8D**
+  (`docs/27`, `docs/28`, `docs/30`, `docs/37`) já entregaram portal sintético,
+  Playwright contra `localhost`, dez exceções sintéticas e log redigido — e
+  desenha **apenas as lacunas** da Fase 2: **login sintético** (sem campo de
+  senha), **handoff**, **contrato abstrato de sessão** com `sessionHandle`
+  **opaco** (mais `processId`, `actorId`, escopo, expiração curta, ambiente,
+  consentimento e eventos), **timeout sintético**, **expiração de handle** e
+  **captcha sintético que apenas bloqueia e degrada para humano — nunca é
+  contornado**. Define **9 eventos**, as **evidências permitidas** (screenshot,
+  HTML e log redigidos, protocolo `PROT-FICT-*`, timestamps) e as **proibidas**
+  (PII real, cookie, senha/OTP/credencial, documento real), mais a
+  testabilidade (unitários puros, integração local, Playwright só `localhost`,
+  fixtures sintéticas, snapshots sem PII, falhas determinísticas e **asserção
+  negativa** nos bloqueios). O contrato **nunca** carrega senha, OTP, cookie,
+  credencial, CPF ou `storageState` — é a ausência que impede a **Opção C** de
+  voltar como detalhe técnico (`docs/71 §4.3`). **É desenho, não construção: não
+  abre execução real** — nada de Gov.br/SINARM/PF, `acesso.gov.br`, Banco do
+  Brasil, Mercado Pago, CPF real, senha, OTP, cookie, credencial, captcha real,
+  bypass de captcha, produção ou cliente real. **Mantém a Fase 9 bloqueada** —
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, os configs do
+  laboratório e da Fase 9 seguem separados, os gates do `docs/26 §19` seguem
+  íntegros e as 12 pendências do `docs/23 §5` seguem abertas. Próximo passo
+  sugerido: `docs: specify synthetic session contract`. **Docs-only:** não
+  altera código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/`.env`/
+  migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
