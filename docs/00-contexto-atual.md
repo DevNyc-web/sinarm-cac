@@ -390,6 +390,36 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   especificada em nenhum documento. **Docs-only:** não altera
   código/`src`/`prisma`/testes/`package.json`/migration/auth/captcha/Fase 9.
 
+- `docs/71-decisao-arquitetura-sessao-fase-2.md` — **primeira decisão da Fase 2**,
+  respondendo ao `docs/70 §7.6`: **como a sessão autenticada do cliente no
+  Gov.br/SINARM/PF poderia chegar ao ambiente de automação de forma segura**.
+  Compara quatro opções — **A** (o cliente executa a etapa autenticada no próprio
+  navegador; o servidor orienta e recebe só o resultado/protocolo/documento — é o
+  **piso** e o que o produto entrega hoje), **B** (**handoff assistido**: o
+  cliente autentica, a automação continua em ambiente controlado — **alvo futuro,
+  não autorizado**, exige escopo jurídico, consentimento, política de sessão,
+  isolamento e auditoria), **C** (execução remota com senha, OTP, cookie ou
+  credencial Gov.br — **rejeitada sob as regras atuais**; não pode reaparecer
+  como "detalhe técnico" em PR futuro, e qualquer reabertura exigiria **decisão
+  formal própria**, com revisão jurídica, revisão de segurança, análise LGPD,
+  consentimento, retenção, auditoria, KMS/segredos e **revogação explícita** das
+  regras que hoje proíbem armazenar ou repassar credencial; nenhum campo de
+  credencial pode nascer em request, tipo ou schema) e **D** (API oficial
+  ou integração permitida — **melhor caminho se existir**, exige descoberta e
+  documentação oficial). **Recomendação:** preparar **B em laboratório
+  sintético**, com **contrato de sessão abstrato**, **sem dado real** e **apenas
+  contra `localhost`**, mantendo **A** como entrega de curto prazo e abrindo a
+  **descoberta de D** em paralelo ao gate jurídico. Lista **13 gates mínimos,
+  todos abertos**, antes de qualquer sessão real. **A Fase 2 começou apenas como
+  decisão, preparação, laboratório e desenho técnico — a execução real continua
+  bloqueada:** nada de Gov.br/SINARM/PF, CPF real, senha, cookie real, bypass de
+  captcha, produção, cliente real, automação do Banco do Brasil ou certidões
+  externas reais. **Fase 9 segue bloqueada**,
+  `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, os gates do
+  `docs/26 §19` seguem íntegros e as 12 pendências do `docs/23 §5` seguem
+  abertas. **Docs-only:** não altera
+  código/`src`/`prisma`/testes/`package.json`/migration/captcha/Fase 9.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
