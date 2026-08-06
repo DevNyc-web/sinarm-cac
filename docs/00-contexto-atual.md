@@ -521,6 +521,16 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   não altera código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/
   `.env`/migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`/`docs/73`.
 
+**Contrato sintético em implementação local (2026-08-06).** O contrato de sessão
+sintética definido no `docs/73` começou a ser implementado localmente com
+**tipos TypeScript**, **allow-lists** e **validador puro**, ainda **sem I/O, sem
+Prisma, sem rota, sem Playwright, sem Fase 9 e sem execução real**. O módulo é
+determinístico (não lê relógio nem sorteia), rejeita campo fora da lista fechada,
+nome de chave suspeito, `environment: production`, URL externa, host oficial
+(`gov.br`/`servicos.pf`/`sinarm`/`acesso.gov`) e valor com formato de CPF — e
+implementa os **8 estados** e as **transições** do `docs/74`, com `BLOCKED` sem
+saída para frente. `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
