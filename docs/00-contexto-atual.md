@@ -448,6 +448,40 @@ ficavam fora desta lista; preenchido nesta atualização (docs-only).
   altera código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/`.env`/
   migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`.
 
+- `docs/73-contrato-sessao-sintetica-fase-2.md` — **especificação do contrato de
+  sessão sintética** da Fase 2, prevista no `docs/72 §13.1`. É **contrato
+  SINTÉTICO, não real**: descreve o que o motor do **laboratório local** pode
+  receber. Define **11 campos permitidos**, em **lista fechada** —
+  `sessionHandle` (opaco, não derivado de cookie, não reversível, prazo curto),
+  `processId`, `actorId`, `scope` (ex. `LAB_GUIA_TRAFEGO_SYNTHETIC`, que **não
+  representa permissão em portal real**), `expiresAt`, `issuedAt`,
+  `environment` (só `synthetic`/`local`/`test`, **nunca `production`**),
+  `consentMarker` (sintético, **não substitui** consentimento real),
+  `handoffState`, `auditCorrelationId` e `allowedSyntheticProcessCode` (só
+  `PROT-FICT-*` ou `CAC-*` local) — e **17 famílias de campo proibidas**: senha,
+  OTP, token Gov.br, cookie, `storageState`, refresh/access token, credencial
+  Gov.br, CPF/RG reais, nome da mãe, data de nascimento, documento e PDF reais,
+  HTML real de Gov.br/SINARM/PF, screenshot real de portal externo, qualquer
+  segredo que exija KMS e qualquer identificador de sessão real externo. O
+  **ciclo de vida** tem 7 estados (`CREATED`, `CLAIMED`, `IN_PROGRESS`,
+  `COMPLETED`, `EXPIRED`, `CANCELLED`, `BLOCKED`), quatro deles **terminais**,
+  **sem renovação silenciosa** e com **descarte verificado**. A **validação é
+  allow-list** (campo não listado é rejeitado, não ignorado) e registra
+  **achado verificado no código**: a `isSecretKey` de `redaction.ts` cobre
+  senha/token/cookie/credential/otp/session, mas **não cobre `cpf` nem
+  `storageState`** — que exigem checagem própria. Define **9 eventos de
+  auditoria sintéticos**, as evidências permitidas, **9 estados de falha** e as
+  regras de determinismo. **Não implementa nada e não abre execução real.**
+  **Fase 9 segue bloqueada** — `PHASE9_REAL_EXECUTION_ENABLED` segue
+  `false as const`, nenhum campo do contrato pode ser usado para contorná-la, a
+  implementação futura deve continuar **estruturalmente incapaz** de apontar
+  para Gov.br/SINARM/PF, os gates do `docs/26 §19` seguem íntegros e as 12
+  pendências do `docs/23 §5` seguem abertas. Próximo passo recomendado:
+  `docs: define synthetic automation state machine` (docs-only) **antes** de
+  `feat: add synthetic session contract types`. **Docs-only:** não altera
+  código/`src`/`prisma`/`tests`/`package.json`/`package-lock.json`/`.env`/
+  migration/captcha/Fase 9/`docs/25`/`docs/26`/`docs/70`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
