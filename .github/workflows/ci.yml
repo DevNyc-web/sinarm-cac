@@ -10,6 +10,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 # Cancela runs antigas da mesma ref quando chega um push novo.
 concurrency:
