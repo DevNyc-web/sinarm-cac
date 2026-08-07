@@ -605,6 +605,27 @@ endpoint, sem Server Action, sem cookie e sem `localStorage`. **Nenhuma execuç�
 real foi habilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const` e
 `phase9/` continua intocado.
 
+**Interrupções sintéticas implementadas em 2026-08-07**, na mesma rota
+`/admin/lab/sessao-sintetica` — fecham as lacunas do `docs/72 §7.9/§7.10/§7.11`.
+**Timeout sintético:** usa a falha `TIMEOUT` já prevista no domínio
+(`docs/74 §11.1`), termina em `FAILED`, nunca em sucesso, e **não produz
+protocolo**. **Captcha sintético:** é **bloqueio, não desafio** — leva a
+`BLOCKED`, emite `synthetic_session_blocked_by_captcha` e mostra o **fallback
+humano**; as únicas saídas continuam sendo `CANCELLED`, `FAILED` e `EXPIRED`.
+**Não existe — nem na tela nem no fluxo — ação de resolver, pular, desbloquear
+ou contornar captcha**, e há teste estrutural barrando esses termos no código.
+Nenhuma integração real de captcha foi adicionada (sem Turnstile, sem serviço
+externo). **Expiração de handle:** termina em `EXPIRED`, distinto de defeito, sem
+renovação silenciosa, e a sessão expirada não continua nem reabre. **Nova
+sessão:** de `COMPLETED`/`FAILED`/`EXPIRED`/`CANCELLED` o caminho é **iniciar
+outra sessão**, com **handle, correlação, processo, código e `issuedAt` novos** —
+a terminal permanece imutável e nunca é reaproveitada (`docs/74 §9.4`); o
+histórico de eventos é preservado **apenas em memória**, e o reset completo
+continua existindo. O laboratório segue **local, volátil e sem rede** — sem
+persistência, endpoint, Server Action, Prisma, cookie ou `localStorage`.
+**Execução real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
