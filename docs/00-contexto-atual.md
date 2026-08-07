@@ -737,6 +737,32 @@ concluída**, e nenhum Prisma/Redis/banco/filesystem foi adicionado.
 **Execução real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED`
 segue `false as const`, `phase9/` continua intocado.
 
+**Adaptador Prisma do store sintético em 2026-08-10**
+(`prismaSyntheticRunStore.ts`, modelos `SyntheticRun`/`SyntheticRunClaim` em
+`prisma/schema.prisma`, migration `20260810000000_add_synthetic_run_store`):
+implementa EXATAMENTE o mesmo contrato `SyntheticRunStore` do adaptador em
+memória — nenhuma mudança de interface para acomodar o banco. **Versão e
+claim agora são garantidos transacionalmente pelo Postgres**, não simulados
+em memória: `save` é um único `updateMany` condicional em
+`(run_id, version, run_state NOT IN terminal)` — zero linhas afetadas É o
+conflito, sem leitura-decide-escreve; `claimNext` roda em `$transaction`,
+com `run_id` UNIQUE na tabela de claim (1:1) garantindo por construção que
+só existe uma reserva ativa por run, e captura de `P2002` resolve a corrida
+entre dois workers. **Idempotência agora é persistida**: `idempotency_key`
+é UNIQUE no banco (criação) e `last_step_idempotency_key` decide replay de
+etapa antes de qualquer escrita nova. **Recuperação é consultável** via
+`listRecoverable` (índices por estado e por expiração do claim). **Sessão
+viva e `sessionHandle` continuam NUNCA persistidos** — só `session_state` e
+`audit_correlation_id`; todo JSON gravado (`plan`/etapas/eventos/evidências)
+passa por `validateStoredSyntheticRun` antes de gravar e é REVALIDADO ao
+ler, nunca confiado cegamente. Migration puramente ADITIVA, sem alterar
+tabela existente. `syntheticRunStoreFactory.ts` deixa a escolha entre
+`"memory"`/`"prisma"` explícita, sem fallback silencioso; nenhum consumidor
+existente foi trocado por padrão. **Ainda não existe worker contínuo, cron
+nem polling** — só o adaptador e o contrato. **Execução real continua
+desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`,
+`phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
