@@ -129,7 +129,9 @@ function step(name: string, status: LabStepInput["status"]): LabStepInput {
 }
 
 async function loginAdmin(page: Page): Promise<void> {
-  await page.goto("/login");
+  // O mock-login de perfil interno migrou de /login para /equipe (PR #138,
+  // docs/61 §4.D) — /login hoje só lista os perfis de cliente.
+  await page.goto("/equipe");
   await page.getByRole("button", { name: "Admin Exemplo" }).click();
   await page.waitForURL("**/admin");
 }

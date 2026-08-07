@@ -681,6 +681,31 @@ separado em Node, e a tela continua 100% cliente, sem servidor e sem estado
 entre requisições. **Execução real da Fase 9 continua desabilitada e
 intocada.**
 
+**Harness de execução completa em 2026-08-08**
+(`src/server/automation/synthetic/playwright/syntheticPlaywrightRunHarness.ts`):
+roda o **plano sintético inteiro** — criar sessão, criar run, executar cada
+etapa pelo adaptador Playwright local, atualizar o run e repetir enquanto o
+estado permitir — e produz um **relatório final redigido**
+(`SyntheticPlaywrightRunReport`), com validação própria que reusa as travas
+de conteúdo já existentes (host oficial, URL externa, CPF, segredo
+serializado) em vez de copiar regex. O loop tem **teto de segurança** contra
+laço infinito: nunca ilimitado, derivado do plano e nunca maior que o número
+de etapas, mesmo se pedido maior. Comprovado com Playwright real: **sucesso
+completo** (4 etapas, protocolo `PROT-FICT-*`), **captcha sintético**
+(`WAITING_HUMAN`, fallback obrigatório, sem etapa posterior), **timeout**
+(interrompe sem retry, sem protocolo, erro redigido), **expiração** (sessão e
+run em `EXPIRED`, sem renovar o handle) e o **limite de segurança** (para no
+teto mesmo com um plano maior). O portal continua o mesmo laboratório
+fictício em loopback, sem nenhum seletor alterado. Um comando novo,
+`npm run lab:synthetic:playwright`, roda o laboratório completo localmente:
+sobe (ou reaproveita) o servidor local do jeito que `playwright.config.ts` já
+fazia, imprime só um **resumo redigido** (sem `sessionHandle`) e não grava
+relatório em arquivo. **Nenhuma persistência foi adicionada, nenhuma UI viva
+de execução foi criada** — a tela `Execução sintética` continua só com a nota
+explicativa. **Execução real continua desabilitada:**
+`PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
+intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
