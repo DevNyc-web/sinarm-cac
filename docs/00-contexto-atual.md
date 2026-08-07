@@ -584,8 +584,26 @@ foram **deliberadamente descartados** para não criar segundo nome nem segundo
 modelo de erro para a mesma regra.
 
 Tudo segue **local, sintético, puro, determinístico e sem rede**. **Nenhuma
-execução real foi habilitada.** Próxima etapa provável: as **telas sintéticas de
-login e handoff** do `docs/72 §7.1/§7.2`.
+execução real foi habilitada.**
+
+**Login e handoff sintéticos implementados em 2026-08-07** (`docs/72 §7.1/§7.2`),
+na rota interna **`/admin/lab/sessao-sintetica`** (ADMIN/OPERADOR), separada do
+laboratório de Guia de Tráfego. É o **primeiro consumidor do lifecycle**: o
+operador simula o login sintético (emite o handle → `CREATED`), gera o handoff
+(`CREATED → CLAIMED`), confirma o recebimento (`CLAIMED → IN_PROGRESS`, **com a
+primeira etapa na mesma operação**), registra etapas seguintes, conclui, expira o
+handle ou aplica uma das 10 falhas sintéticas — vendo os **eventos emitidos** e as
+**violações tipadas** de cada ação recusada. A regra da máquina de estados **não
+foi replicada na tela**: estado, descrição e ações permitidas vêm de
+`sessionState.ts`/`sessionLifecycle.ts`, e o componente é casca fina sobre o
+módulo puro `labSyntheticFlow.ts`. **Não pede CPF, senha, token, cookie nem
+qualquer dado Gov.br** — a tela não tem um único `<input>` de texto. O
+`sessionHandle` **não chega à interface**: a view exposta simplesmente não o
+inclui. O laboratório tem **relógio sintético próprio** (sem `Date.now()`), o
+estado vive em `useState` e **some no reload** — sem banco, sem Prisma, sem
+endpoint, sem Server Action, sem cookie e sem `localStorage`. **Nenhuma execução
+real foi habilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const` e
+`phase9/` continua intocado.
 
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
