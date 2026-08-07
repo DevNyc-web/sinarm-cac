@@ -294,6 +294,13 @@ export function LabSyntheticSession() {
             Coordenador puro sobre um plano fictício de 4 etapas — fila local, sem rede, sem
             persistência. Independente do fluxo de login/handoff acima.
           </p>
+          <p className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600">
+            Os botões abaixo executam só o coordenador (fila/eventos/evidências em memória — sem
+            navegador). A execução real contra o portal fictício via Playwright roda por teste ou
+            CLI local (<code>npm run test:e2e -- lab-guia-trafego-playwright-adapter</code>), nunca a
+            partir desta tela: Playwright abre um navegador separado em Node, e esta página é
+            100% cliente, sem servidor, sem estado entre requisições.
+          </p>
 
           <div className="mb-4 flex flex-wrap gap-3">
             <Button data-testid="lab-run-create" onClick={() => dispatchRun({ kind: "create-run" })}>
