@@ -531,6 +531,30 @@ nome de chave suspeito, `environment: production`, URL externa, host oficial
 implementa os **8 estados** e as **transições** do `docs/74`, com `BLOCKED` sem
 saída para frente. `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`.
 
+**Lifecycle sintético implementado em 2026-08-06** (branch
+`feat/synthetic-session-lifecycle`). O contrato dizia se uma transição era
+permitida; agora existe a camada que **aplica** a transição, devolve o estado
+novo e **emite os eventos de laboratório** — `sessionLifecycle.ts`, com
+`createSyntheticSession`, `applySyntheticTransition` e `recordSyntheticStep`.
+Emite os **9 eventos** do `docs/74 §12`, cada um com **estado anterior e estado
+novo**, `auditCorrelationId`, `processId`, `actorId`, timestamp, etapa e motivo
+**redigido** (`redactLabText`) — e **nunca** o `sessionHandle` em claro. Cobre as
+**10 falhas sintéticas** do `docs/74 §11`, incluindo a regra de que **handle
+expirado termina em `EXPIRED`, não em `FAILED`** (prazo não é defeito); marca
+como **alarme** a tentativa de credencial ou de dado real (§11.9/§11.10).
+Invariantes protegidas: transição proibida **não altera estado e não emite
+evento algum**; falha **nunca** produz protocolo, e só `COMPLETED` aceita
+`PROT-FICT-*`; `BLOCKED` **não avança** para `COMPLETED` nem `IN_PROGRESS`;
+terminal **não reabre** — retentar exige nova sessão; handle vencido só admite
+`EXPIRED`, sem renovação silenciosa; a sessão de entrada **não é mutada**.
+Continua **puro, local, em memória, determinístico** (o instante entra como
+parâmetro, nunca lido do relógio) e **sem rede, sem I/O, sem Prisma, sem
+persistência de sessão, sem rota, sem UI e sem Playwright novo**. **Não libera
+execução real:** nenhum estado tem aresta para o real, `phase9/`, `safety.ts` e
+`networkGuard.ts` seguem intocados e `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`. Próxima etapa provável: as **telas sintéticas de login e
+handoff** do `docs/72 §7.1/§7.2`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
