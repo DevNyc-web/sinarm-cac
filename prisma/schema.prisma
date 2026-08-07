@@ -34,12 +34,12 @@ enum Role {
 /// NADA aqui guarda credencial de Gov.br/SINARM. A senha que existira no futuro e
 /// do PRODUTO; credencial de orgao oficial continua proibida (docs/00 §8).
 model User {
-  id        String   @id @default(uuid())
+  id           String   @id @default(uuid())
   /// SEMPRE gravado normalizado (trim + minusculo) — o indice unico e
   /// case-sensitive, entao normalizar so na leitura criaria conta inacessivel e
   /// permitiria duplicata disfarcada. Ver `normalizeEmail` em `authenticate.ts`.
-  email     String   @unique
-  name      String
+  email        String   @unique
+  name         String
   /// Senha do PRODUTO, formato versionado `scrypt$N$r$p$salt$hash`.
   ///
   /// NULLABLE de proposito: os usuarios de seed nao tem senha, e `null` significa
@@ -47,12 +47,12 @@ model User {
   ///
   /// NAO E, e nunca sera, senha de Gov.br/SINARM: guardar credencial de orgao
   /// oficial continua proibido (docs/00 §8).
-  passwordHash String? @map("password_hash")
-  role      Role     @default(USER)
+  passwordHash String?  @map("password_hash")
+  role         Role     @default(USER)
   /// Desativa o acesso sem apagar o historico (processos sao trilha operacional).
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   processes Process[]
   sessions  Session[]
@@ -100,41 +100,41 @@ model ProcessType {
 /// `userId` e o id do usuario MOCK (Fase 2) — vira FK para `users` quando a
 /// auth real entrar (docs/15 §3.8).
 model Process {
-  id               String           @id @default(uuid())
-  code             String           @unique
-  userId           String           @map("user_id")
+  id                    String                 @id @default(uuid())
+  code                  String                 @unique
+  userId                String                 @map("user_id")
   /// `onDelete: Restrict` de proposito: apagar usuario NAO pode arrastar processo.
   /// Processo e registro operacional (e potencialmente fiscal) — desativa-se o
   /// usuario via `User.active`, nao se apaga a trilha.
-  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  processTypeId    String           @map("process_type_id")
-  processType      ProcessType      @relation(fields: [processTypeId], references: [id])
-  internalStatus   InternalStatus   @default(RASCUNHO) @map("internal_status")
-  userFacingStatus UserFacingStatus @default(RECEBIDO) @map("user_facing_status")
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  processTypeId         String                 @map("process_type_id")
+  processType           ProcessType            @relation(fields: [processTypeId], references: [id])
+  internalStatus        InternalStatus         @default(RASCUNHO) @map("internal_status")
+  userFacingStatus      UserFacingStatus       @default(RECEBIDO) @map("user_facing_status")
   /// Trilha OPERACIONAL do modo dev/assistido (Fase 6). Nao substitui
   /// `internalStatus` (docs/12 §6, canonico, com estados SINARM/GRU): e a visao
   /// que a fila/operacao usa enquanto nao ha protocolo real. As transicoes
   /// sincronizam `userFacingStatus` para o usuario nao ver algo divergente.
-  operationalStatus OperationalStatus     @default(RASCUNHO) @map("operational_status")
-  priority          ProcessPriority       @default(NORMAL)
+  operationalStatus     OperationalStatus      @default(RASCUNHO) @map("operational_status")
+  priority              ProcessPriority        @default(NORMAL)
   /// Responsavel atual (usuario MOCK — docs/11 §4). Vira FK com auth real.
-  assignedToMockUserId String?             @map("assigned_to_mock_user_id")
-  notes             ProcessNote[]
+  assignedToMockUserId  String?                @map("assigned_to_mock_user_id")
+  notes                 ProcessNote[]
   /// Etapa da EXECUCAO ASSISTIDA MANUAL (Fase 7, docs/21). Descreve o que o
   /// OPERADOR HUMANO declarou ter feito FORA do app. O sistema nao acessa
   /// Gov.br/SINARM, nao automatiza e nao protocola.
-  manualExecutionStatus ManualExecutionStatus @default(EXECUCAO_MANUAL_NAO_INICIADA) @map("manual_execution_status")
-  manualExecution   ManualExecution?
+  manualExecutionStatus ManualExecutionStatus  @default(EXECUCAO_MANUAL_NAO_INICIADA) @map("manual_execution_status")
+  manualExecution       ManualExecution?
   /// Padrao "Guia para treino", editavel (docs/10 §4).
-  justification    String                 @map("justification")
-  destination      Destination?
-  firearm          FirearmPce?
-  statusEvents     ProcessStatusEvent[]
-  checklistItems   ProcessChecklistItem[]
-  documents        ProcessDocument[]
-  payments         Payment[]
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
+  justification         String                 @map("justification")
+  destination           Destination?
+  firearm               FirearmPce?
+  statusEvents          ProcessStatusEvent[]
+  checklistItems        ProcessChecklistItem[]
+  documents             ProcessDocument[]
+  payments              Payment[]
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([operationalStatus])
@@ -295,19 +295,19 @@ enum ProcessEventKind {
 /// Registra quem marcou (usuario mock + perfil) e quando — base da futura
 /// auditoria (docs/11 §18). Um item por (processo, key).
 model ProcessChecklistItem {
-  id                  String    @id @default(uuid())
-  processId           String    @map("process_id")
-  process             Process   @relation(fields: [processId], references: [id])
+  id                  String         @id @default(uuid())
+  processId           String         @map("process_id")
+  process             Process        @relation(fields: [processId], references: [id])
   /// Grupo do item: revisao geral (docs/11 §6) ou checkpoint GRU (docs/11 §7).
   group               ChecklistGroup @default(REVISAO)
   key                 String
   label               String
-  checked             Boolean   @default(false)
-  checkedByMockUserId String?   @map("checked_by_mock_user_id")
-  checkedByRole       String?   @map("checked_by_role")
-  checkedAt           DateTime? @map("checked_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  checked             Boolean        @default(false)
+  checkedByMockUserId String?        @map("checked_by_mock_user_id")
+  checkedByRole       String?        @map("checked_by_role")
+  checkedAt           DateTime?      @map("checked_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
 
   @@unique([processId, key])
   @@map("process_checklist_items")
@@ -347,18 +347,18 @@ model Destination {
 /// decisao de criptografia 3.10 (docs/15). Nesta fase, os valores vem de um
 /// catalogo MOCK 100% ficticio (src/server/processes/mockFirearms.ts).
 model FirearmPce {
-  id        String   @id @default(uuid())
-  processId String   @unique @map("process_id")
-  process   Process  @relation(fields: [processId], references: [id])
+  id            String   @id @default(uuid())
+  processId     String   @unique @map("process_id")
+  process       Process  @relation(fields: [processId], references: [id])
   /// Id do item no catalogo mock — para rastrear a escolha em dev.
-  mockCatalogId String @map("mock_catalog_id")
-  species   String
-  brand     String
-  model     String
-  caliber   String
-  quantity  Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  mockCatalogId String   @map("mock_catalog_id")
+  species       String
+  brand         String
+  model         String
+  caliber       String
+  quantity      Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("firearms_pce")
 }
@@ -447,10 +447,10 @@ model DocumentExtraction {
   /// docs/00 §8 vale aqui como no resto do schema.
   failureReason String? @map("failure_reason")
 
-  extractedAt          DateTime? @map("extracted_at")
-  reviewedAt           DateTime? @map("reviewed_at")
-  reviewedBy           String?   @map("reviewed_by_mock_user_id")
-  reviewedByRole       String?   @map("reviewed_by_role")
+  extractedAt    DateTime? @map("extracted_at")
+  reviewedAt     DateTime? @map("reviewed_at")
+  reviewedBy     String?   @map("reviewed_by_mock_user_id")
+  reviewedByRole String?   @map("reviewed_by_role")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -459,11 +459,9 @@ model DocumentExtraction {
   /// (created_at DESC, id DESC) — sem isso, empate de milissegundo desempatava
   /// pelo que o Postgres devolvesse, e podia alternar entre execucoes.
   @@index([documentId, createdAt(sort: Desc), id(sort: Desc)])
-
   /// Varredura do reaper global (#47D-2): PROCESSANDO parada ha tempo demais.
   /// O relogio e `updated_at`, renovado no claim PENDENTE -> PROCESSANDO.
   @@index([state, updatedAt])
-
   /// Fila de trabalho (#47D-1): PENDENTE mais antigas primeiro. O indice acima,
   /// que comeca em `document_id`, NAO serve — a fila nao filtra por documento.
   @@index([state, createdAt, id])
@@ -644,4 +642,145 @@ enum UserFacingStatus {
   CANCELADO
 
   @@map("user_facing_status")
+}
+
+/// Estados do RUN sintético — espelha `SyntheticRunState`
+/// (`syntheticRunCoordinator.ts`). Paridade travada por teste, mesmo critério de
+/// `Role`/`ExtractionState` acima. NÃO é o estado da sessão (ver
+/// `synthetic_handoff_state` abaixo) — são camadas separadas por desenho
+/// (docs da Fase 2 do motor sintético).
+enum SyntheticRunDbState {
+  QUEUED
+  RUNNING
+  WAITING_HUMAN
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@map("synthetic_run_state")
+}
+
+/// Os 8 estados do HANDOFF da sessão sintética — espelha `SyntheticHandoffState`
+/// (`sessionContract.ts`). Só o ESTADO é persistido aqui; a sessão viva (com
+/// `sessionHandle`) nunca é gravada — quem retoma um run fornece a sessão de
+/// novo, na hora (ver `syntheticStoredRunExecutor.ts`).
+enum SyntheticSessionDbState {
+  CREATED
+  CLAIMED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  BLOCKED
+  FAILED
+
+  @@map("synthetic_handoff_state")
+}
+
+/// Registro PERSISTENTE do motor sintético — a mesma projeção segura de
+/// `StoredSyntheticRun` (`syntheticRunStore.ts`), sem alteração de contrato.
+///
+/// NUNCA guarda `sessionHandle`, credencial, CPF ou qualquer dado do contrato de
+/// sessão além do ESTADO (`sessionState`) e da correlação (`auditCorrelationId`) —
+/// a regra permanente de docs/00 §8 vale aqui como no resto do schema.
+///
+/// `plan`/`pendingSteps`/`completedSteps`/`events`/`evidence`/`result` são JSON
+/// SÓ porque já são estruturas FECHADAS e validadas pelo domínio antes de
+/// gravar (`validateStoredSyntheticRun`) e IMEDIATAMENTE revalidadas depois de
+/// ler — nunca um objeto arbitrário de fora.
+///
+/// Este é o MOTOR SINTÉTICO (laboratório local, loopback, fictício) — não tem
+/// nenhuma relação com `Process`/`ProcessDocument` nem com a Fase 9.
+model SyntheticRun {
+  id String @id @default(uuid())
+
+  /// Identificador de domínio do run — ver `SyntheticAutomationRun.runId`.
+  runId String @unique @map("run_id")
+
+  /// Chave fictícia de idempotência da CRIAÇÃO. Única: duas criações com a
+  /// mesma chave e payload compatível devolvem o MESMO registro (ver
+  /// `payloadFingerprint`); payload incompatível é conflito.
+  idempotencyKey String @unique @map("idempotency_key")
+
+  /// Fingerprint ESTÁVEL do payload de criação (runId + plano + correlação da
+  /// sessão) — resolve "mesma chave, payload incompatível" sem duplicar o
+  /// plano inteiro como segunda cópia só para comparação.
+  payloadFingerprint String @map("payload_fingerprint")
+
+  /// Concorrência otimista: começa em 1, cada `save` bem-sucedido incrementa
+  /// em 1. Divergência de `expectedVersion` é conflito tipado, nunca
+  /// sobrescrita silenciosa.
+  version Int @default(1)
+
+  runState     SyntheticRunDbState     @map("run_state")
+  sessionState SyntheticSessionDbState @map("session_state")
+
+  /// Substitui o `sessionHandle` como identificador de correlação seguro.
+  auditCorrelationId String @map("audit_correlation_id")
+
+  plan           Json @map("plan")
+  pendingSteps   Json @map("pending_steps")
+  completedSteps Json @map("completed_steps")
+  events         Json @map("events")
+  evidence       Json @map("evidence")
+
+  humanFallbackRequired Boolean @default(false) @map("human_fallback_required")
+
+  /// `{ outcome, syntheticProtocol, completedAt }` ou `null` enquanto o run
+  /// não terminou. `syntheticProtocol` só é não-nulo em sucesso — falha nunca
+  /// produz protocolo (regra do domínio, não deste schema).
+  result Json? @map("result")
+
+  attempts Int @default(0)
+
+  /// Chave de idempotência do ÚLTIMO save de ETAPA bem-sucedido — permite
+  /// reconhecer um replay ANTES de reservar o run, mesmo já terminal.
+  lastStepIdempotencyKey String? @map("last_step_idempotency_key")
+
+  /// Motivo tipado da última interrupção (`SyntheticFailureKind` ou
+  /// `"CAPTCHA"`) — string curta e fechada, revalidada na leitura contra o
+  /// vocabulário do domínio, nunca um enum de banco à parte (o domínio é a
+  /// fonte de verdade da lista).
+  lastInterruptionReason String? @map("last_interruption_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  claim SyntheticRunClaim?
+
+  /// Varredura de `listRecoverable`: estado + o relógio da reserva (via
+  /// relação) decidem elegibilidade; este índice cobre o filtro por estado.
+  @@index([runState, updatedAt])
+  @@map("synthetic_runs")
+}
+
+/// Reserva de trabalho sobre um `SyntheticRun` — tabela SEPARADA (não campo
+/// embutido) de propósito: a garantia "só um claim ativo por run" e a limpeza
+/// atômica na liberação/conclusão (DELETE, não UPDATE para null) ficam mais
+/// simples e mais seguras como uma linha própria, 1:1 com o run.
+///
+/// Nunca guarda segredo: `workerId` é fictício, escolhido por quem chama.
+model SyntheticRunClaim {
+  id String @id @default(uuid())
+
+  /// 1:1 com `SyntheticRun` — no máximo UMA linha de claim por run, e é o
+  /// próprio Postgres que garante isso via este único.
+  runId String       @unique @map("run_id")
+  run   SyntheticRun @relation(fields: [runId], references: [runId], onDelete: Cascade)
+
+  claimId  String @unique @map("claim_id")
+  workerId String @map("worker_id")
+
+  claimedAt DateTime @map("claimed_at")
+  expiresAt DateTime @map("expires_at")
+
+  /// Versão do run NO MOMENTO da reserva — só diagnóstico, não substitui o
+  /// `expectedVersion` do `save`.
+  runVersionAtClaim Int @map("run_version_at_claim")
+
+  /// Varredura de reserva expirada (`listRecoverable`, e o próprio `claimNext`
+  /// tentando substituir um claim vencido).
+  @@index([expiresAt])
+  @@map("synthetic_run_claims")
 }
