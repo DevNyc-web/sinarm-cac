@@ -410,6 +410,27 @@ test("o resultado do worker nunca carrega sessionHandle nem credencial", async (
   }
 });
 
+// ---------------------------------------------------- runId opcional (lote)
+
+test("runId opcional mira um run específico, pulando a busca própria (usado pelo despachante em lote)", async () => {
+  const store = new InMemorySyntheticRunStore();
+  const runA = makeRun("run-worker-target-a");
+  const runB = makeRun("run-worker-target-b");
+  await store.create({ run: runA, idempotencyKey: "idem-target-a", at: T0 });
+  await store.create({ run: runB, idempotencyKey: "idem-target-b", at: T0 });
+
+  const executor = new ScriptedExecutor(["SUCCESS"]);
+  const result = await runSyntheticWorkerOnce({
+    store, executor, workerId: "worker-1", session: session(), at: T0, claimTtlMs: TTL, idempotencyKey: "attempt-1", runId: runB.runId,
+  });
+
+  assert.equal(result.runId, runB.runId, "processou o run indicado, não o primeiro elegível");
+  assert.equal(executor.calls.length, 1);
+
+  const other = await store.getById(runA.runId);
+  assert.equal(other?.version, 1, "o run NÃO indicado ficou intacto");
+});
+
 // -------------------------------------------------------------- estrutural
 
 test("nenhuma variável global mutável, nenhum timer, nenhum polling, nenhuma rede fora do executor", () => {

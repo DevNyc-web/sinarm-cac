@@ -12,9 +12,15 @@
  * NÃO duplica lógica: "buscar" é `store.listRecoverable`; "reservar →
  * executar → salvar → concluir/liberar" é INTEIRAMENTE
  * `executeStoredSyntheticStep` (`syntheticStoredRunExecutor.ts`), chamado no
- * máximo uma vez. Este módulo só ESCOLHE o run (o primeiro elegível) e
- * TRADUZ o resultado para um vocabulário de saída mais rico — nenhuma regra
- * de claim, versão, idempotência ou lifecycle é reimplementada aqui.
+ * máximo uma vez. Este módulo só ESCOLHE o run (o primeiro elegível, ou um
+ * já indicado via `input.runId` — ver abaixo) e TRADUZ o resultado para um
+ * vocabulário de saída mais rico — nenhuma regra de claim, versão,
+ * idempotência ou lifecycle é reimplementada aqui.
+ *
+ * `input.runId` (opcional) permite que um despachante em lote
+ * (`syntheticBatchDispatcher.ts`) escolha candidatos DISTINTOS por fora
+ * (uma única `listRecoverable`) e mire cada worker num run específico, sem
+ * reimplementar reserva/execução/salvamento — só pulando a busca própria.
  *
  * A sessão viva (com `sessionHandle`) é SEMPRE fornecida pelo chamador desta
  * função — nunca lida do store, nunca persistida. `SyntheticStepExecutor`
@@ -70,6 +76,13 @@ export interface RunSyntheticWorkerOnceInput {
   /** Chave de idempotência da ETAPA — repetir a mesma nunca duplica evento/evidência/protocolo. */
   idempotencyKey: string;
   reason?: string;
+  /**
+   * Opcional: mira um run JÁ ESCOLHIDO por fora (ex.: um despachante em lote
+   * que já rodou `listRecoverable` uma vez e distribuiu candidatos distintos
+   * entre vários workers), pulando a busca própria. Omitido, o comportamento
+   * é o de sempre: procurar o primeiro elegível via `store.listRecoverable`.
+   */
+  runId?: string;
 }
 
 export interface SyntheticWorkerResult {
@@ -138,18 +151,23 @@ export async function runSyntheticWorkerOnce(input: RunSyntheticWorkerOnceInput)
   }
 
   // 1. buscar — o primeiro run elegível, e só ele; nenhuma segunda tentativa
-  // com outro candidato se este falhar.
-  const candidates = await store.listRecoverable({ at });
-  const candidate = candidates[0];
-  if (candidate === undefined) {
-    return { outcome: "NO_RUN_AVAILABLE", runId: null, run: null, violations: [] };
+  // com outro candidato se este falhar. Se `runId` já veio escolhido por
+  // fora, pula a busca própria (usado pelo despachante em lote).
+  let targetRunId = input.runId;
+  if (targetRunId === undefined) {
+    const candidates = await store.listRecoverable({ at });
+    const candidate = candidates[0];
+    if (candidate === undefined) {
+      return { outcome: "NO_RUN_AVAILABLE", runId: null, run: null, violations: [] };
+    }
+    targetRunId = candidate.runId;
   }
 
   // 2-5. reservar → executar UMA etapa → salvar → concluir/liberar — tudo
   // dentro do serviço já existente, chamado exatamente uma vez.
   const executeInput: ExecuteStoredSyntheticStepInput = {
     store,
-    runId: candidate.runId,
+    runId: targetRunId,
     workerId,
     session,
     executor,
@@ -161,7 +179,7 @@ export async function runSyntheticWorkerOnce(input: RunSyntheticWorkerOnceInput)
   const executed = await executeStoredSyntheticStep(executeInput);
 
   if (!executed.ok) {
-    return { outcome: failureOutcome(executed.violations), runId: candidate.runId, run: executed.run, violations: executed.violations };
+    return { outcome: failureOutcome(executed.violations), runId: targetRunId, run: executed.run, violations: executed.violations };
   }
-  return { outcome: successOutcome(executed.run.runState), runId: candidate.runId, run: executed.run, violations: [] };
+  return { outcome: successOutcome(executed.run.runState), runId: targetRunId, run: executed.run, violations: [] };
 }
