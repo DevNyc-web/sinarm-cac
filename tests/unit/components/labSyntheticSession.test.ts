@@ -15,6 +15,7 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LabSyntheticSession } from "../../../src/app/(admin)/admin/lab/sessao-sintetica/LabSyntheticSession";
 import {
+  LAB_HUMAN_FALLBACK_NOTICE,
   LAB_SYNTHETIC_NOTICE,
   applyLabAction,
   initialLabFlowState,
@@ -109,6 +110,48 @@ test("oferece os botões do fluxo de login e handoff", () => {
   ]) {
     assert.ok(html.includes(`data-testid="${testId}"`), `botão ausente: ${testId}`);
   }
+});
+
+test("oferece os controles de interrupção e de nova sessão", () => {
+  const html = render();
+
+  for (const testId of [
+    "lab-action-timeout",
+    "lab-action-captcha",
+    "lab-action-expire",
+    "lab-action-cancel",
+    "lab-action-new-session",
+  ]) {
+    assert.ok(html.includes(`data-testid="${testId}"`), `controle ausente: ${testId}`);
+  }
+});
+
+test("os rótulos das interrupções são explícitos", () => {
+  const html = render();
+
+  assert.ok(html.includes("Simular timeout"));
+  assert.ok(html.includes("Simular captcha"));
+  assert.ok(html.includes("Expirar handle"));
+  assert.ok(html.includes("Iniciar nova sessão"));
+});
+
+test("não existe controle para resolver, pular ou contornar captcha", () => {
+  const html = render().toLowerCase();
+
+  for (const proibido of [
+    "resolver captcha",
+    "pular captcha",
+    "contornar",
+    "bypass",
+    "desbloquear",
+  ]) {
+    assert.equal(html.includes(proibido), false, `a tela não pode oferecer "${proibido}"`);
+  }
+});
+
+test("o aviso de fallback humano existe e nega resolver o captcha", () => {
+  assert.ok(LAB_HUMAN_FALLBACK_NOTICE.includes("não resolve nem contorna"));
+  assert.ok(LAB_HUMAN_FALLBACK_NOTICE.includes("humano"));
 });
 
 test("os rótulos nomeiam login e handoff em linguagem de laboratório", () => {

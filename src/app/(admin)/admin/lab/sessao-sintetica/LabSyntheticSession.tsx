@@ -44,7 +44,19 @@ const FLOW_ACTIONS: readonly { action: LabAction; label: string; testId: string 
     testId: "lab-action-next-step",
   },
   { action: { kind: "complete" }, label: "Concluir jornada", testId: "lab-action-complete" },
+];
+
+/**
+ * Cenarios de interrupcao.
+ *
+ * Nao existe botao de resolver, pular ou contornar captcha — e nao pode passar
+ * a existir: o unico desfecho do bloqueio e humano.
+ */
+const DISRUPTION_ACTIONS: readonly { action: LabAction; label: string; testId: string }[] = [
+  { action: { kind: "timeout" }, label: "Simular timeout", testId: "lab-action-timeout" },
+  { action: { kind: "captcha" }, label: "Simular captcha", testId: "lab-action-captcha" },
   { action: { kind: "expire" }, label: "Expirar handle", testId: "lab-action-expire" },
+  { action: { kind: "cancel" }, label: "Encerrar sessão (humano)", testId: "lab-action-cancel" },
 ];
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -97,7 +109,25 @@ export function LabSyntheticSession() {
               <p data-testid="lab-session-state" className="text-sm text-neutral-900">
                 {view.description}
               </p>
+              {view.humanFallbackNotice === null ? null : (
+                <p
+                  data-testid="lab-human-fallback"
+                  className="rounded-md border border-orange-300 bg-orange-50 px-4 py-2 text-sm text-orange-900"
+                >
+                  {view.humanFallbackNotice}
+                </p>
+              )}
+              {view.terminal ? (
+                <p
+                  data-testid="lab-terminal-notice"
+                  className="rounded-md border border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-800"
+                >
+                  Sessão encerrada. Ela não reabre e não se renova — continuar exige{" "}
+                  <strong>iniciar uma nova sessão sintética</strong>.
+                </p>
+              ) : null}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Field label="Sessão nº (fictícia)" value={String(view.sessionNumber)} />
                 <Field label="Processo (fictício)" value={view.processId} />
                 <Field label="Código sintético" value={view.processCode} />
                 <Field label="Ambiente" value={view.environment} />
@@ -123,6 +153,22 @@ export function LabSyntheticSession() {
           <div className="flex flex-wrap gap-3">
             {FLOW_ACTIONS.map(({ action, label, testId }) => (
               <Button key={testId} data-testid={testId} onClick={() => dispatch(action)}>
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          <h3 className="mb-3 mt-6 text-sm font-semibold text-neutral-900">
+            Interrupções sintéticas
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {DISRUPTION_ACTIONS.map(({ action, label, testId }) => (
+              <Button
+                key={testId}
+                variant="secondary"
+                data-testid={testId}
+                onClick={() => dispatch(action)}
+              >
                 {label}
               </Button>
             ))}
@@ -154,6 +200,12 @@ export function LabSyntheticSession() {
               Aplicar falha sintética
             </Button>
             <Button
+              data-testid="lab-action-new-session"
+              onClick={() => dispatch({ kind: "new-session" })}
+            >
+              Iniciar nova sessão
+            </Button>
+            <Button
               variant="secondary"
               data-testid="lab-action-reset"
               onClick={() => dispatch({ kind: "reset" })}
@@ -164,7 +216,8 @@ export function LabSyntheticSession() {
 
           <p className="mt-3 text-xs text-neutral-500">
             Os botões ficam sempre ativos de propósito: pedir uma ação fora de ordem é o que
-            demonstra a violação tipada devolvida pelo lifecycle.
+            demonstra a violação tipada devolvida pelo lifecycle. “Iniciar nova sessão” preserva o
+            histórico de eventos em memória; “Reiniciar laboratório” limpa tudo.
           </p>
         </Card>
 
@@ -213,6 +266,9 @@ export function LabSyntheticSession() {
                     {event.previousState ?? "—"} → {event.nextState} · {event.timestamp}
                     {event.step === null ? null : ` · etapa: ${event.step}`}
                   </div>
+                  {event.reason === "" ? null : (
+                    <div className="mt-1 text-xs text-neutral-700">motivo: {event.reason}</div>
+                  )}
                 </li>
               ))}
             </ol>
