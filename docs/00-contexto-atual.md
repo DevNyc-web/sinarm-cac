@@ -706,6 +706,37 @@ explicativa. **Execução real continua desabilitada:**
 `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
 intocado.
 
+**Contratos de armazenamento durável em 2026-08-09**
+(`src/server/automation/synthetic/store/`): prepara a arquitetura para
+persistência real SEM adicioná-la ainda. `SyntheticRunStore` define
+`create`/`getById`/`save`/`claimNext`/`renewClaim`/`releaseClaim`/
+`completeClaim`/`listRecoverable`; `StoredSyntheticRun` é uma **projeção
+segura** de `SyntheticAutomationRun` — nunca o `sessionHandle`, só o
+`SyntheticHandoffState` e o `auditCorrelationId`. Quem precisa retomar um run
+fornece a sessão viva de novo, na hora; o store nunca guarda o segredo.
+**Concorrência otimista** por `version` monotônico (`save` exige
+`expectedVersion`; divergência devolve `VERSION_CONFLICT` tipado, sem
+sobrescrever; run terminal é imutável). **Claim/reserva** com expiração
+(`SyntheticRunClaim`): só um claim ativo por run, claim expirado libera para
+nova reserva, worker errado nunca renova/libera/conclui, run terminal ou
+`WAITING_HUMAN` nunca é reservável para execução automática. **Idempotência**
+por chave fictícia — na criação (mesma chave devolve o registro existente;
+payload incompatível gera conflito) e por ETAPA (`lastStepIdempotencyKey`),
+checada ANTES de reservar, para que repetir a chave depois da última etapa
+devolva o resultado em vez de recusar por terminalidade. **Recuperação**
+(`syntheticRunRecovery.ts`, puro) classifica `RECOVERABLE` /
+`NOT_RECOVERABLE` / `WAITING_HUMAN` / `TERMINAL` / `CLAIM_STILL_VALID` sem
+executar nada — só torna o run elegível para um novo claim; terminal,
+`WAITING_HUMAN` e `EXPIRED` nunca são recuperáveis. `syntheticStoredRunExecutor.ts`
+liga `claim → carregar → reconstruir → executar UMA etapa com o runner já
+existente → salvar com `expectedVersion` → concluir/liberar claim`, recebendo
+`SyntheticStepExecutor` por injeção — não importa Playwright. **Nesta PR só
+existe o adaptador `InMemorySyntheticRunStore`** (isolado por instância, cópia
+defensiva, sem timer real, sem variável global) — **nenhuma fila durável foi
+concluída**, e nenhum Prisma/Redis/banco/filesystem foi adicionado.
+**Execução real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED`
+segue `false as const`, `phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
