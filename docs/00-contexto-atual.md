@@ -763,6 +763,34 @@ nem polling** — só o adaptador e o contrato. **Execução real continua
 desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`,
 `phase9/` continua intocado.
 
+**Worker sintético de execução única em 2026-08-11**
+(`syntheticSingleStepWorker.ts`, `runSyntheticWorkerOnce`): uma chamada
+processa **no máximo um run e uma etapa**, depois retorna — sem
+`while (true)`, sem `setInterval`, sem polling, sem cron, sem retry
+automático. Não duplica nada: "buscar" é `store.listRecoverable`;
+"reservar → executar → salvar → concluir/liberar" é inteiramente
+`executeStoredSyntheticStep` (PR anterior), chamado no máximo uma vez — o
+worker só escolhe o primeiro run elegível e traduz o resultado para um
+vocabulário mais rico (`STEP_COMPLETED`/`RUN_COMPLETED`/`WAITING_HUMAN`/
+`RUN_FAILED`/`RUN_EXPIRED`/`RUN_CANCELLED`/`NO_RUN_AVAILABLE`/
+`VERSION_CONFLICT`/`CLAIM_CONFLICT`/`SESSION_REQUIRED`/`SESSION_MISMATCH`/
+`EXECUTION_REJECTED`). **Claim, versão e idempotência continuam garantidos
+pelo store**, não reimplementados aqui — inclusive o caso de repetir a
+chave de idempotência de etapa depois do run já `COMPLETED` (reconhecido
+como replay antes mesmo de tentar reservar). **A sessão sintética viva
+continua efêmera**: é sempre fornecida pelo chamador na hora, nunca lida do
+store nem persistida — `sessão ausente` e `correlação incompatível` são
+recusados antes de tocar o executor. Depende só da interface
+`SyntheticRunStore`: os mesmos testes comportamentais (e um teste de
+paridade explícito) rodam contra `InMemorySyntheticRunStore` e
+`PrismaSyntheticRunStore`, sem dois workers. Novo comando
+`npm run lab:synthetic:worker-once` (`--prisma` para o store real, escolha
+explícita, sem fallback silencioso) cria um run fictício, chama o worker
+uma única vez e imprime um resumo redigido. **Nenhum worker contínuo, cron
+ou polling foi adicionado — só a execução única.** **Execução real
+continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`, `phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
