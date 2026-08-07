@@ -652,6 +652,35 @@ ou rede foi adicionada**, e a **execução real continua desabilitada**:
 `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const` e `phase9/` continua
 intocado.
 
+**Coordenador conectado ao Playwright LOCAL em 2026-08-07**
+(`src/server/automation/synthetic/playwright/`), fechando
+`SyntheticAutomationRun → próxima etapa → ação Playwright no portal fictício
+→ resultado tipado → evento do lifecycle → evidência → próxima etapa ou
+interrupção`. O coordenador continua puro: `syntheticRunCoordinator.ts`,
+`sessionLifecycle.ts`, `sessionContract.ts` e `sessionState.ts` não importam
+Playwright — o contrato `SyntheticStepExecutor` (`syntheticStepExecutor.ts`)
+é a única fronteira, e `localSyntheticPlaywrightAdapter.ts` é quem a
+implementa. **Execução somente contra o laboratório fictício já existente**
+(`/admin/lab/guia-trafego`), sob a mesma `playwright.config.ts` de sempre —
+nenhuma config nova, `playwright.phase9.config.ts` intocado. Guard de
+loopback fechado (`localSyntheticNetworkGuard.ts`): só
+`http://localhost[:porta]` e `http://127.0.0.1[:porta]` passam, validado
+ANTES de abrir o navegador; toda requisição fora disso é **abortada de
+fato** via `context.route()` — provado no spec Playwright com navegação e
+recurso externo genuinamente bloqueados, não só observados. As 4 etapas
+fictícias (`VALIDATE_INPUT`/`OPEN_FORM`/`FILL_FORM`/`CONFIRM_RESULT`) foram
+mapeadas para o fluxo real do laboratório sem alterar um único seletor da
+página. Captcha sintético (cenário nativo "pausa humana" do laboratório) e
+timeout continuam interrompendo o run, sem produzir protocolo e sem
+avançar a fila; erro bruto do Playwright nunca vira evidência — só um dos 6
+resultados fechados do executor, redigido. Sem screenshot, sem persistência,
+sem credencial/CPF/`sessionHandle` na evidência. A tela `Execução sintética`
+ganhou uma nota explicando que a execução via Playwright roda por
+teste/CLI (`npm run test:e2e`), não por botão — Playwright abre navegador
+separado em Node, e a tela continua 100% cliente, sem servidor e sem estado
+entre requisições. **Execução real da Fase 9 continua desabilitada e
+intocada.**
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
