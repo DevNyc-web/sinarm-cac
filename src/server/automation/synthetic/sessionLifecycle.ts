@@ -17,6 +17,8 @@
  *
  * Garantias inegociaveis:
  * - transicao proibida NAO altera estado e NAO emite evento algum;
+ * - entrar em `IN_PROGRESS` exige a PRIMEIRA ETAPA na mesma operacao, e emite
+ *   UM unico `synthetic_session_step_started` — nunca dois para a mesma etapa;
  * - falha NUNCA produz protocolo, e so `COMPLETED` admite `PROT-FICT-*`
  *   (docs/74 §13.2);
  * - `BLOCKED` nao vai para `COMPLETED` nem `IN_PROGRESS` — nao existe evento de
@@ -69,8 +71,15 @@ export type SyntheticLabEventName = (typeof SYNTHETIC_LAB_EVENTS)[number];
  *
  * `IN_PROGRESS` nao tem evento proprio na tabela: o §4 diz que ele "emite os
  * eventos de etapa", e o gatilho da transicao `CLAIMED -> IN_PROGRESS` e
- * justamente "primeira etapa inicia" (§7.4). Por isso entrar em execucao emite
- * `synthetic_session_step_started`, e nao um decimo evento inventado.
+ * justamente "primeira etapa inicia" (§7.4).
+ *
+ * DECISAO DE IMPLEMENTACAO: `synthetic_session_step_started` representa uma
+ * ETAPA CONCRETA iniciada — nao a mera mudanca de estado. Por isso entrar em
+ * `IN_PROGRESS` EXIGE a primeira etapa (`step`), e as duas coisas acontecem
+ * numa unica operacao atomica que emite UM evento so. Sem a etapa, a transicao
+ * e recusada com `FIRST_STEP_REQUIRED` — assim nao existe sessao executando sem
+ * evidencia de qual etapa comecou, nem uma segunda chamada para "completar" o
+ * evento que produziria o mesmo `step_started` duas vezes.
  */
 const EVENT_BY_STATE: Readonly<Record<SyntheticHandoffState, SyntheticLabEventName>> = {
   CREATED: "synthetic_session_created",
@@ -178,6 +187,7 @@ export const SYNTHETIC_LIFECYCLE_VIOLATION_CODES = [
   "FAILURE_KIND_MISMATCH",
   "PROTOCOL_NOT_ALLOWED",
   "STEP_REQUIRES_IN_PROGRESS",
+  "FIRST_STEP_REQUIRED",
 ] as const;
 
 export type SyntheticLifecycleViolationCode = (typeof SYNTHETIC_LIFECYCLE_VIOLATION_CODES)[number];
@@ -376,7 +386,12 @@ export interface SyntheticTransitionInput {
   failure?: SyntheticFailureKind;
   /** Aceito somente em `COMPLETED`, e somente `PROT-FICT-*`. */
   syntheticProtocol?: string;
-  /** Etapa sintetica em que a transicao aconteceu, se houver. */
+  /**
+   * Etapa sintetica em que a transicao aconteceu.
+   *
+   * OBRIGATORIA quando `to === "IN_PROGRESS"`: e a primeira etapa, e sem ela a
+   * transicao e recusada com `FIRST_STEP_REQUIRED`. Opcional nas demais.
+   */
   step?: string;
 }
 
@@ -432,6 +447,16 @@ export function applySyntheticTransition(
       code: "FORBIDDEN_TRANSITION",
       field: "to",
       detail: `${from} -> ${to} não está entre as 14 transições permitidas`,
+    });
+  }
+
+  // ---- entrar em execucao exige a primeira etapa, na mesma operacao
+  if (to === "IN_PROGRESS" && (input.step === undefined || input.step.trim() === "")) {
+    violations.push({
+      code: "FIRST_STEP_REQUIRED",
+      field: "step",
+      detail:
+        "entrar em IN_PROGRESS exige a primeira etapa concreta: o evento step_started nomeia uma etapa, não a mudança de estado",
     });
   }
 
@@ -530,7 +555,18 @@ const STEP_EVENT = {
 } as const satisfies Record<SyntheticStepInput["phase"], SyntheticLabEventName>;
 
 /**
- * Registra uma etapa sintetica e emite o evento de etapa.
+ * Registra uma etapa sintetica SUBSEQUENTE e emite o evento de etapa.
+ *
+ * A PRIMEIRA etapa nao passa por aqui: ela entra junto com a transicao para
+ * `IN_PROGRESS`, atomicamente (ver `applySyntheticTransition`). Chamar esta
+ * funcao para a primeira etapa produziria um segundo `step_started` para a
+ * mesma etapa — e e justamente por a transicao ja exigir a etapa que nao sobra
+ * motivo para faze-lo.
+ *
+ * ponytail: a funcao e pura e sem memoria, entao nao TEM como detectar que o
+ * chamador repetiu a mesma etapa; a duplicidade e evitada pelo formato da API
+ * (a primeira etapa e atomica), nao por deteccao. Detectar exigiria estado por
+ * sessao, que o contrato fechado do docs/73 §3 nao comporta.
  *
  * NAO muda o estado da sessao: etapa acontece DENTRO de `IN_PROGRESS`
  * (docs/74 §7 — etapa so sai de `PENDING` com o run em `RUNNING`, e o run so

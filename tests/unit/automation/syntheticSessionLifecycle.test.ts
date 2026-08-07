@@ -62,10 +62,15 @@ function codes(result: SyntheticLifecycleResult): string[] {
   return result.violations.map((v) => v.code);
 }
 
+/** Nome de etapa sintética reusado nos testes que entram em execução. */
+const PRIMEIRA_ETAPA = "selecionar servico sintetico";
+
 /** Argumento extra que cada destino exige para ser aceito. */
 function extrasFor(to: SyntheticHandoffState): Record<string, unknown> {
   if (to === "FAILED") return { failure: "TIMEOUT" as SyntheticFailureKind };
   if (to === "EXPIRED") return { at: DEPOIS };
+  // Entrar em execução exige a primeira etapa concreta, na mesma operação.
+  if (to === "IN_PROGRESS") return { step: PRIMEIRA_ETAPA };
   return {};
 }
 
@@ -139,9 +144,9 @@ test("toda transição fora da tabela §7 é rejeitada, sem exceção", () => {
       const result = applySyntheticTransition({
         session: at(from),
         to,
-        at: to === "EXPIRED" ? DEPOIS : DURANTE,
+        at: DURANTE,
         reason: "tentativa",
-        ...(to === "FAILED" ? { failure: "TIMEOUT" as SyntheticFailureKind } : {}),
+        ...extrasFor(to),
       });
 
       assert.equal(result.ok, false, `${from} -> ${to} deveria ser rejeitada`);
@@ -183,7 +188,12 @@ test("cada estado alcançado emite o evento do docs/74 §12", () => {
   ];
 
   for (const [from, to, event] of esperado) {
-    const result = applySyntheticTransition({ session: at(from), to, at: DURANTE });
+    const result = applySyntheticTransition({
+      session: at(from),
+      to,
+      at: DURANTE,
+      ...extrasFor(to),
+    });
     assert.equal(result.events[0]?.event, event, `${from} -> ${to}`);
   }
 
@@ -389,7 +399,12 @@ test("COMPLETED sem protocolo continua válido", () => {
 
 test("BLOCKED não avança para COMPLETED nem IN_PROGRESS, com código próprio", () => {
   for (const to of ["COMPLETED", "IN_PROGRESS"] as const) {
-    const result = applySyntheticTransition({ session: at("BLOCKED"), to, at: DURANTE });
+    const result = applySyntheticTransition({
+      session: at("BLOCKED"),
+      to,
+      at: DURANTE,
+      ...extrasFor(to),
+    });
 
     assert.equal(result.ok, false);
     assert.deepEqual(
@@ -454,7 +469,7 @@ test("terminal não reabre para nenhum dos 8 estados", () => {
         session: at(from),
         to,
         at: DURANTE,
-        ...(to === "FAILED" ? { failure: "TIMEOUT" as SyntheticFailureKind } : {}),
+        ...extrasFor(to),
       });
 
       assert.equal(result.ok, false, `${from} -> ${to} deveria ser proibido`);
@@ -479,6 +494,7 @@ test("retry exige nova sessão: o mesmo handle não volta a executar", () => {
     session: falhou.session,
     to: "IN_PROGRESS",
     at: DURANTE,
+    step: PRIMEIRA_ETAPA,
   });
 
   assert.equal(retry.ok, false);
@@ -581,6 +597,7 @@ test("aceita localhost — o laboratório é local", () => {
     session: at("CLAIMED"),
     to: "IN_PROGRESS",
     at: DURANTE,
+    step: PRIMEIRA_ETAPA,
     reason: "http://localhost:3000/admin/lab/guia-trafego",
   });
 
@@ -801,6 +818,165 @@ test("etapa nunca produz protocolo", () => {
   });
 
   assert.equal(result.syntheticProtocol, null);
+});
+
+// ------------------------- entrada em IN_PROGRESS exige a primeira etapa
+
+test("entrar em IN_PROGRESS sem a primeira etapa é rejeitado", () => {
+  const result = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(codes(result), ["FIRST_STEP_REQUIRED"]);
+});
+
+test("a recusa por falta de primeira etapa não altera a sessão nem emite evento", () => {
+  const entrada = at("CLAIMED");
+  const copia = structuredClone(entrada);
+  const result = applySyntheticTransition({
+    session: entrada,
+    to: "IN_PROGRESS",
+    at: DURANTE,
+  });
+
+  assert.deepEqual(result.events, []);
+  assert.equal(result.session, null);
+  assert.equal(result.nextState, null);
+  assert.deepEqual(entrada, copia, "a sessão de entrada não pode mudar");
+});
+
+test("etapa vazia ou só espaços não conta como primeira etapa", () => {
+  for (const step of ["", "   "]) {
+    assert.deepEqual(
+      codes(
+        applySyntheticTransition({ session: at("CLAIMED"), to: "IN_PROGRESS", at: DURANTE, step }),
+      ),
+      ["FIRST_STEP_REQUIRED"],
+      `step ${JSON.stringify(step)} deveria ser recusado`,
+    );
+  }
+});
+
+test("entrar em IN_PROGRESS com a primeira etapa emite exatamente UM step_started", () => {
+  const result = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: PRIMEIRA_ETAPA,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.events.length, 1, "uma operação, um evento");
+  assert.equal(result.events[0]?.event, "synthetic_session_step_started");
+  assert.equal(result.events[0]?.previousState, "CLAIMED");
+  assert.equal(result.events[0]?.nextState, "IN_PROGRESS");
+  assert.equal(result.events[0]?.step, PRIMEIRA_ETAPA);
+  assert.equal(result.events[0]?.timestamp, DURANTE, "relógio injetado preservado");
+  assert.equal(result.session?.handoffState, "IN_PROGRESS");
+});
+
+test("o evento da primeira etapa não carrega sessionHandle", () => {
+  const result = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: PRIMEIRA_ETAPA,
+  });
+  const serializado = JSON.stringify(result.events);
+
+  assert.equal(serializado.includes("sh_lab_0001"), false);
+  assert.equal(serializado.includes("sessionHandle"), false);
+});
+
+test("o nome da primeira etapa vai redigido para o evento", () => {
+  const result = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: "etapa do titular 123.456.789-09",
+  });
+
+  // Formato de CPF no nome da etapa é recusado antes de virar evento.
+  assert.equal(result.ok, false);
+  assert.ok(codes(result).includes("CPF_LIKE_VALUE"));
+  assert.deepEqual(result.events, []);
+});
+
+test("etapa posterior emite somente o evento da nova etapa", () => {
+  const executando = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: PRIMEIRA_ETAPA,
+  });
+
+  const seguinte = recordSyntheticStep({
+    session: executando.session,
+    step: "revisar dados",
+    phase: "STARTED",
+    at: DURANTE,
+  });
+
+  assert.equal(seguinte.events.length, 1);
+  assert.equal(seguinte.events[0]?.step, "revisar dados");
+  assert.notEqual(seguinte.events[0]?.step, PRIMEIRA_ETAPA);
+});
+
+test("a jornada não produz dois step_started para a mesma primeira etapa", () => {
+  const executando = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: PRIMEIRA_ETAPA,
+  });
+  const segunda = recordSyntheticStep({
+    session: executando.session,
+    step: "informar destino",
+    phase: "STARTED",
+    at: DURANTE,
+  });
+  const terceira = recordSyntheticStep({
+    session: segunda.session,
+    step: "informar destino",
+    phase: "COMPLETED",
+    at: DURANTE,
+  });
+
+  const iniciadas = [executando, segunda, terceira]
+    .flatMap((r) => r.events)
+    .filter((e) => e.event === "synthetic_session_step_started")
+    .map((e) => e.step);
+
+  assert.deepEqual(iniciadas, [PRIMEIRA_ETAPA, "informar destino"]);
+  assert.equal(
+    new Set(iniciadas).size,
+    iniciadas.length,
+    "nenhuma etapa pode aparecer duas vezes como iniciada",
+  );
+});
+
+test("entrar em execução e registrar etapa preservam correlação e ids", () => {
+  const executando = applySyntheticTransition({
+    session: at("CLAIMED"),
+    to: "IN_PROGRESS",
+    at: DURANTE,
+    step: PRIMEIRA_ETAPA,
+  });
+  const seguinte = recordSyntheticStep({
+    session: executando.session,
+    step: "revisar",
+    phase: "COMPLETED",
+    at: DURANTE,
+  });
+
+  for (const evento of [...executando.events, ...seguinte.events]) {
+    assert.equal(evento.auditCorrelationId, "corr-lab-0001");
+    assert.equal(evento.processId, "proc-lab-0001");
+    assert.equal(evento.timestamp, DURANTE);
+  }
 });
 
 // ------------------------------------------------------- provas estruturais
