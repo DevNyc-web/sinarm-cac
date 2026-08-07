@@ -232,6 +232,58 @@ test("o componente delega o fluxo ao módulo puro", () => {
   assert.ok(code.includes("useState"));
 });
 
+// ------------------------------------------------------- execução sintética
+
+test("mostra a seção de execução sintética, vazia por padrão", () => {
+  const html = render();
+
+  assert.ok(html.includes("Execução sintética"));
+  assert.ok(html.includes('data-testid="lab-run-empty"'));
+});
+
+test("oferece os controles do coordenador de run: criar, executar, interromper, cancelar e novo run", () => {
+  const html = render();
+
+  for (const testId of [
+    "lab-run-create",
+    "lab-run-execute-next",
+    "lab-run-captcha",
+    "lab-run-fail",
+    "lab-run-failure-select",
+    "lab-run-cancel",
+    "lab-run-new-run",
+  ]) {
+    assert.ok(html.includes(`data-testid="${testId}"`), `controle ausente: ${testId}`);
+  }
+});
+
+test("o seletor de falha do run lista as 10 falhas sintéticas", () => {
+  const html = render();
+  for (const kind of SYNTHETIC_FAILURE_KINDS) {
+    assert.ok(html.includes(kind), `falha ausente no seletor de run: ${kind}`);
+  }
+});
+
+test("a seção de execução sintética não tem controle de resolver, pular ou contornar captcha", () => {
+  const html = render().toLowerCase();
+
+  for (const proibido of ["resolver captcha", "pular captcha", "contornar", "bypass", "desbloquear"]) {
+    assert.equal(html.includes(proibido), false, `a tela não pode oferecer "${proibido}"`);
+  }
+});
+
+test("o componente delega o coordenador de run ao módulo puro", () => {
+  const code = sourceCode();
+
+  assert.ok(code.includes("applyLabRunAction"));
+  assert.ok(code.includes("labRunView"));
+
+  // Nenhuma regra de fila/transição escrita à mão no componente.
+  for (const forbidden of ["SYNTHETIC_RUN_STEP_TYPES", "pendingSteps.slice", "applySyntheticTransition"]) {
+    assert.equal(code.includes(forbidden), false, `o componente não pode conter ${forbidden}`);
+  }
+});
+
 test("a rota é interna e protegida por perfil", () => {
   const page = readFileSync(PAGE_PATH, "utf8");
 

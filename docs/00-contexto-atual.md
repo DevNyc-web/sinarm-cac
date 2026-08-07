@@ -626,6 +626,32 @@ persistência, endpoint, Server Action, Prisma, cookie ou `localStorage`.
 **Execução real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
 `false as const`.
 
+**Coordenador de execução sintética implementado em 2026-08-07**
+(`src/server/automation/synthetic/syntheticRunCoordinator.ts`), ligando
+**sessão → fila de etapas → execução → eventos → evidências → resultado** por
+cima do lifecycle já existente — **não é uma segunda máquina de estados**:
+toda transição de sessão continua passando por `applySyntheticTransition` e
+`recordSyntheticStep`. O run tem os **próprios 7 estados** (`QUEUED`,
+`RUNNING`, `WAITING_HUMAN`, `COMPLETED`, `FAILED`, `EXPIRED`, `CANCELLED`),
+separados do `SyntheticHandoffState` da sessão. A **fila é local, em memória e
+imutável**: cada operação recebe o run atual e devolve um objeto novo, uma
+etapa por chamada — como não existe "executar etapa X" por id, pular ou repetir
+etapa é impossível pela própria forma da API. Cada etapa bem-sucedida gera uma
+**evidência sintética redigida** (sem `sessionHandle`, HTML, screenshot,
+credencial ou objeto arbitrário). Captcha sintético leva o run a
+`WAITING_HUMAN` com `humanFallbackRequired = true`, e `resumeSyntheticRun`
+**recusa sempre** — não existe retomada automática nem "pular captcha".
+Timeout e as demais falhas do domínio interrompem o run sem produzir
+protocolo; expiração encerra sessão e run em `EXPIRED` sem renovar o handle.
+Um plano fictício de 4 etapas (validar dados sintéticos, abrir formulário
+fictício, preencher dados fictícios, confirmar resultado fictício) foi
+integrado à rota `/admin/lab/sessao-sintetica`, na nova seção **"Execução
+sintética"** — casca fina sobre `labSyntheticRunFlow.ts`, mostrando fila,
+etapa atual, concluídas, evidências e fallback humano. **Nenhuma persistência
+ou rede foi adicionada**, e a **execução real continua desabilitada**:
+`PHASE9_REAL_EXECUTION_ENABLED` segue `false as const` e `phase9/` continua
+intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
