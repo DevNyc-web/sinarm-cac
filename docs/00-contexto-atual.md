@@ -791,6 +791,39 @@ ou polling foi adicionado — só a execução única.** **Execução real
 continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
 `false as const`, `phase9/` continua intocado.
 
+**Despachante sintético em lote em 2026-08-12**
+(`syntheticBatchDispatcher.ts`, `dispatchSyntheticBatch`): invoca o worker de
+execução única várias vezes de forma CONTROLADA — não é daemon, scheduler
+nem serviço contínuo, e uma chamada SEMPRE termina. **Quantidade e
+concorrência têm teto**: `maxRuns` positivo, nunca acima do teto interno
+(10), `maxConcurrency` positivo e normalizado para no máximo `maxRuns`;
+configuração inválida é recusada antes de tocar o store. Seleciona os
+candidatos elegíveis UMA vez (`store.listRecoverable`) e distribui entre no
+máximo `maxConcurrency` workers simultâneos — provado com um executor de
+atraso real, o pico observado nunca ultrapassa o limite. **Cada worker
+continua processando só uma etapa**: o despachante não duplica lógica —
+mira cada `runSyntheticWorkerOnce` num run já escolhido (novo parâmetro
+opcional `runId` no worker, só para pular a busca própria; comportamento
+antigo inalterado quando omitido). **Falhas são isoladas por item**: captcha,
+timeout, sessão ausente/incompatível, conflito de versão/claim não
+derrubam o lote — só configuração inválida ou erro inesperado de
+infraestrutura interrompe antes do limite, sempre como resultado redigido,
+nunca stack trace. Para de iniciar item novo ao atingir `maxRuns`, faltar
+candidato, bater a deadline injetada ou receber sinal de cancelamento
+(`AbortSignal`-like injetado, nunca lido do processo global) — workers já
+iniciados concluem com segurança, e nenhum claim fica solto. **Sessões
+vivas continuam externas ao store**: resolvidas por run via
+`resolveSession` injetado, nunca persistidas, nunca no relatório agregado.
+Idempotência do LOTE reusa a do worker/store — chave estável por run
+(`idempotencyKeyFor`), sem tabela própria; repetir a mesma chamada não
+duplica evento, evidência nem protocolo. Depende só de `SyntheticRunStore`
+— mesmos testes (com teste de paridade) contra `InMemorySyntheticRunStore`
+e `PrismaSyntheticRunStore`, um único despachante. Novo comando
+`npm run lab:synthetic:dispatch-batch` (`--prisma` explícito) roda um lote
+pequeno (3 runs, concorrência 2) e imprime resumo redigido. **Execução
+real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`, `phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
