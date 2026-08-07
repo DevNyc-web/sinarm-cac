@@ -531,6 +531,62 @@ nome de chave suspeito, `environment: production`, URL externa, host oficial
 implementa os **8 estados** e as **transições** do `docs/74`, com `BLOCKED` sem
 saída para frente. `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`.
 
+**Lifecycle sintético implementado em 2026-08-06** (branch
+`feat/synthetic-session-lifecycle`). O contrato dizia se uma transição era
+permitida; agora existe a camada que **aplica** a transição, devolve o estado
+novo e **emite os eventos de laboratório** — `sessionLifecycle.ts`, com
+`createSyntheticSession`, `applySyntheticTransition` e `recordSyntheticStep`.
+Emite os **9 eventos** do `docs/74 §12`, cada um com **estado anterior e estado
+novo**, `auditCorrelationId`, `processId`, `actorId`, timestamp, etapa e motivo
+**redigido** (`redactLabText`) — e **nunca** o `sessionHandle` em claro. Cobre as
+**10 falhas sintéticas** do `docs/74 §11`, incluindo a regra de que **handle
+expirado termina em `EXPIRED`, não em `FAILED`** (prazo não é defeito); marca
+como **alarme** a tentativa de credencial ou de dado real (§11.9/§11.10).
+Invariantes protegidas: transição proibida **não altera estado e não emite
+evento algum**; falha **nunca** produz protocolo, e só `COMPLETED` aceita
+`PROT-FICT-*`; `BLOCKED` **não avança** para `COMPLETED` nem `IN_PROGRESS`;
+terminal **não reabre** — retentar exige nova sessão; handle vencido só admite
+`EXPIRED`, sem renovação silenciosa; a sessão de entrada **não é mutada**.
+Continua **puro, local, em memória, determinístico** (o instante entra como
+parâmetro, nunca lido do relógio) e **sem rede, sem I/O, sem Prisma, sem
+persistência de sessão, sem rota, sem UI e sem Playwright novo**. **Não libera
+execução real:** nenhum estado tem aresta para o real, `phase9/`, `safety.ts` e
+`networkGuard.ts` seguem intocados e `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`.
+
+**Entrada em `IN_PROGRESS` exige a primeira etapa (decisão de implementação,
+2026-08-06).** O `docs/74` tem duas frases em tensão: o **§4** não dá evento
+próprio a `IN_PROGRESS` (diz que ele "emite os eventos de etapa") e o fecho diz
+que **toda transição emite um dos 9 eventos**. A leitura adotada é que
+`synthetic_session_step_started` nomeia uma **etapa concreta iniciada**, não a
+mudança de estado. Por isso `applySyntheticTransition` **exige o `step`** quando
+o destino é `IN_PROGRESS`: transição e primeira etapa acontecem numa **única
+operação atômica**, que emite **exatamente um** `synthetic_session_step_started`,
+com o mesmo instante injetado. Sem a etapa, a transição é **recusada** com a
+violação tipada `FIRST_STEP_REQUIRED` — sessão não muda, evento nenhum é
+emitido. `recordSyntheticStep` passa a servir **só às etapas seguintes**, o que
+elimina o caminho que produziria dois `step_started` para a mesma primeira
+etapa. **Nenhum décimo evento foi criado e nenhum dos 9 nomes normativos mudou;
+o `docs/73` e o `docs/74` não foram alterados.**
+
+**Consultas de estado incorporadas (`sessionState.ts`).** Trabalho paralelo
+revisado e absorvido: `getAllowedSyntheticTransitions(state)` — o que é possível
+a partir de um estado, devolvendo **cópia defensiva**, nunca a referência viva da
+tabela — e `describeSyntheticState(state)`, rótulo curto e estável dos 8 estados,
+com exaustividade garantida **em tempo de compilação**. O módulo é **só
+consulta/apresentação**: não aplica transição, não emite evento, não valida
+sessão, não lança em fluxo normal e **não duplica a tabela de transições**. **A
+fonte única de verdade continua sendo o `sessionContract.ts`** — estados,
+transições e terminais vivem só lá, e tanto o lifecycle quanto as consultas
+apenas os leem. Helpers redundantes do trabalho paralelo (alias de
+`canTransition`, variante que lança, predicado trivial de `BLOCKED`, re-export)
+foram **deliberadamente descartados** para não criar segundo nome nem segundo
+modelo de erro para a mesma regra.
+
+Tudo segue **local, sintético, puro, determinístico e sem rede**. **Nenhuma
+execução real foi habilitada.** Próxima etapa provável: as **telas sintéticas de
+login e handoff** do `docs/72 §7.1/§7.2`.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,

@@ -261,7 +261,7 @@ export function isSyntheticHandoffState(value: string): value is SyntheticHandof
 }
 
 /** ISO-8601 valido. Nao compara com o relogio — so com o proprio formato. */
-function isIsoTimestamp(value: string): boolean {
+export function isIsoTimestamp(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)) {
     return false;
   }
@@ -332,6 +332,21 @@ function isLoopbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Mesma varredura de conteudo aplicada aos 11 campos, exposta para quem precisa
+ * conferir um texto que NAO e campo do contrato — o `reason` de um evento, por
+ * exemplo (docs/74 §12: nenhum evento carrega PII, segredo ou host oficial).
+ *
+ * Existe para que o lifecycle NAO duplique `FORBIDDEN_HOST_PATTERN`,
+ * `CPF_LIKE_PATTERN` e `SERIALIZED_SECRET_PATTERN` num terceiro lugar: trava
+ * duplicada e trava que diverge quando so uma e endurecida.
+ */
+export function scanSyntheticValue(field: string, value: unknown): SyntheticContractViolation[] {
+  const violations: SyntheticContractViolation[] = [];
+  scanValue(field, value, violations);
+  return violations;
 }
 
 function requireNonEmptyString(
