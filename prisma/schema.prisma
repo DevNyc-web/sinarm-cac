@@ -784,3 +784,86 @@ model SyntheticRunClaim {
   @@index([expiresAt])
   @@map("synthetic_run_claims")
 }
+
+/// Estado persistido do PEDIDO ADMINISTRATIVO manual — espelha
+/// `ManualDispatchRequestStatus` (`manualDispatchRequestRegistry.ts`). Não
+/// confundir com `ManualSyntheticDispatchOutcome` (vocabulário do
+/// RESULTADO, guardado dentro do JSON `result`, não como enum de coluna).
+enum ManualDispatchRequestDbStatus {
+  PENDING
+  COMPLETED
+  DENIED
+  FAILED
+  CANCELLED
+
+  @@map("manual_dispatch_request_status")
+}
+
+/// Registro PERSISTENTE de idempotência do ACIONADOR ADMINISTRATIVO manual
+/// (`admin/manualDispatchRequestRegistry.ts`) — garante que repetir o mesmo
+/// `requestId` nunca chama `dispatchSyntheticBatch` de novo, mesmo depois de
+/// o processo reiniciar. Não tem nenhuma relação com `SyntheticRun`/
+/// `SyntheticRunClaim` (aquilo é idempotência de ETAPA/LOTE; isto é
+/// idempotência de PEDIDO) nem com a Fase 9.
+///
+/// NUNCA guarda sessão viva, `sessionHandle`, executor, store, logger,
+/// `AbortSignal`, credencial, CPF, senha, cookie, token, stack trace, erro
+/// bruto, objeto de run completo, evidência/evento completos ou URL externa
+/// — só o resultado administrativo SEGURO e fechado
+/// (`ManualSyntheticDispatchResult`), revalidado na leitura
+/// (`validateManualSyntheticDispatchResult`).
+model ManualDispatchRequest {
+  id String @id @default(uuid())
+
+  /// Identificador de domínio do pedido — único: é ele que arbitra a
+  /// idempotência administrativa no banco, não só na aplicação.
+  requestId String @unique @map("request_id")
+  batchId   String @map("batch_id")
+
+  /// Hash SHA-256 estável do payload que define a identidade lógica do
+  /// pedido (ver `computeManualDispatchRequestFingerprint`) — mesmo
+  /// `requestId` com fingerprint diferente é conflito, nunca replay.
+  fingerprint String @map("fingerprint")
+
+  status ManualDispatchRequestDbStatus @default(PENDING) @map("status")
+
+  /// Já REDIGIDO antes de chegar aqui (`redactLabText`) — nunca identidade
+  /// real em claro.
+  requestedBy String @map("requested_by")
+  /// Sempre `SYNTHETIC_LAB` neste PR — coluna, não enum, para não acoplar o
+  /// schema a uma lista que pertence ao domínio (`ManualDispatchEnvironment`).
+  environment String @map("environment")
+  /// Já redigido (`redactLabText`).
+  reason      String @map("reason")
+
+  requestedAt DateTime  @map("requested_at")
+  completedAt DateTime? @map("completed_at")
+
+  /// `ManualSyntheticDispatchResult` completo e seguro — `null` enquanto
+  /// `status === PENDING`. Revalidado com
+  /// `validateManualSyntheticDispatchResult` em toda leitura.
+  result Json? @map("result")
+
+  /// Versão da FORMA de `result` — ver `MANUAL_DISPATCH_RESULT_FORMAT_VERSION`.
+  formatVersion String @map("format_version")
+
+  /// Lease administrativa: protege a janela `reservar → dispatcher →
+  /// salvar`. `null` quando não há reserva ativa (pedido já concluído e
+  /// liberado). NUNCA identidade sensível — `claimedBy` é um rótulo
+  /// fictício/opaco (ex.: `manual-${requestId}`), não um usuário real.
+  executionToken String?   @map("execution_token")
+  claimedBy      String?   @map("claimed_by")
+  claimedAt      DateTime? @map("claimed_at")
+  leaseExpiresAt DateTime? @map("lease_expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Cobre `status` sozinho (contagem/filtragem geral) e, junto com
+  /// `leaseExpiresAt`, a varredura de `listRecoverable` (`PENDING` + lease
+  /// vencida) e de reserva ainda válida (`PENDING` + lease no futuro).
+  @@index([status])
+  @@index([status, leaseExpiresAt])
+  @@index([createdAt])
+  @@map("manual_dispatch_requests")
+}

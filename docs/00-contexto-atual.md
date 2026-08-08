@@ -906,6 +906,36 @@ lote pequeno e imprime resultado administrativo redigido. **Execução real
 continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
 `false as const`, `phase9/` continua intocado.
 
+**Registry administrativo Prisma em 2026-08-08**
+(`prismaManualDispatchRequestRegistry.ts`, modelo `ManualDispatchRequest`
+em `prisma/schema.prisma`, migration
+`20260815000000_add_manual_dispatch_request_registry`): a idempotência do
+PEDIDO administrativo (`requestId`) **agora pode ser durável** — repetir o
+mesmo pedido continua reconhecido como replay mesmo depois de o processo
+reiniciar, sem chamar `dispatchSyntheticBatch` de novo. Implementa
+EXATAMENTE o mesmo contrato `ManualDispatchRequestRegistry` do adaptador em
+memória (agora estendido com `reserve`/`finish`/`release`/
+`listRecoverable`, mantendo `find`/`count`), escolhido explicitamente via
+`manualDispatchRequestRegistryFactory.ts` (`"memory"`/`"prisma"`, sem
+fallback silencioso). **Uma RESERVA administrativa protege a concorrência**
+— `request_id` é UNIQUE no banco, e é o Postgres, não a aplicação, quem
+arbitra qual processo recebe autorização para chamar o dispatcher; os
+demais recebem replay, conflito de fingerprint ou "em execução"
+(`ALREADY_RUNNING`), sem espera indefinida. **Requests interrompidos
+(`PENDING` com lease vencida) podem ser classificados como recuperáveis**
+via `listRecoverable` — **nenhuma recuperação automática foi implementada**
+(a classificação não dispara execução nenhuma). Fingerprint agora é hash
+SHA-256 estável (mesmo padrão do store sintético), cobrindo todo campo que
+influencia a decisão da política. Falha ao persistir o resultado DEPOIS do
+dispatcher já ter rodado nunca reexecuta o lote — vira resultado tipado
+`RESULT_PERSISTENCE_FAILED`, sinal para inspeção administrativa. **Nenhuma
+rota, Server Action ou UI foi adicionada** — o trigger continua sem
+importar Prisma, só a interface do registry. Comando
+`npm run lab:synthetic:manual-dispatch -- --prisma` demonstra persistência
+real (chamada repetida entre processos continua sendo replay). **Execução
+real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`, `phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,

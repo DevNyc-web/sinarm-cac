@@ -14,6 +14,8 @@ import { dispatchSyntheticBatch } from "../../../src/server/automation/synthetic
 import { InMemorySyntheticEngineLogger } from "../../../src/server/automation/synthetic/observability/inMemorySyntheticEngineLogger";
 import { InMemoryManualDispatchRequestRegistry } from "../../../src/server/automation/synthetic/admin/inMemoryManualDispatchRequestRegistry";
 import { triggerManualSyntheticDispatch, type ManualSyntheticDispatchInput } from "../../../src/server/automation/synthetic/admin/manualSyntheticDispatchTrigger";
+import { computeManualDispatchRequestFingerprint, type ManualDispatchRequestRegistry, type FinishManualDispatchRequestInput, type FinishManualDispatchRequestResult, type ReleaseManualDispatchRequestInput, type ReleaseManualDispatchRequestResult, type ReserveManualDispatchRequestInput, type ReserveManualDispatchRequestResult } from "../../../src/server/automation/synthetic/admin/manualDispatchRequestRegistry";
+import { DEFAULT_MANUAL_DISPATCH_POLICY_CONFIG } from "../../../src/server/automation/synthetic/admin/manualSyntheticDispatchPolicy";
 import type { ManualSyntheticDispatchAdminContext } from "../../../src/server/automation/synthetic/admin/manualSyntheticDispatchTypes";
 import type { SyntheticEngineLogEvent, SyntheticEngineLogger } from "../../../src/server/automation/synthetic/observability/syntheticEngineLogger";
 import type { SyntheticSessionContract } from "../../../src/server/automation/synthetic/sessionContract";
@@ -212,7 +214,7 @@ test("falha inesperada do dispatcher vira DISPATCH_FAILED redigido, sem stack tr
   const store = new InMemorySyntheticRunStore();
   await seedRuns(store, ["run-1"], AT);
 
-  const result = await triggerManualSyntheticDispatch(baseInput(store, { now: throwingClockOnce(3, AT, 1_000) }));
+  const result = await triggerManualSyntheticDispatch(baseInput(store, { now: throwingClockOnce(4, AT, 1_000) }));
 
   assert.equal(result.outcome, "DISPATCH_FAILED");
   assert.equal(result.decision, "ALLOWED");
@@ -323,6 +325,143 @@ test("erro de logger não duplica execução nem causa retry", async () => {
   assert.equal(result.outcome, "DISPATCH_COMPLETED");
   assert.equal(executor.calls.length, 1);
   assert.ok(failingLogger.emitCount > 0);
+});
+
+// ------------------------------------------ 28. falha ao persistir depois do dispatcher
+
+test("falha ao persistir o resultado depois do dispatcher não reexecuta o lote (RESULT_PERSISTENCE_FAILED)", async () => {
+  const store = new InMemorySyntheticRunStore();
+  await seedRuns(store, ["run-1"], AT);
+  const executor = new MapExecutor();
+  const inner = new InMemoryManualDispatchRequestRegistry();
+
+  class FinishFailingRegistry implements ManualDispatchRequestRegistry {
+    finishCalls = 0;
+    reserve(i: ReserveManualDispatchRequestInput): Promise<ReserveManualDispatchRequestResult> {
+      return inner.reserve(i);
+    }
+    find(requestId: string) {
+      return inner.find(requestId);
+    }
+    async finish(_i: FinishManualDispatchRequestInput): Promise<FinishManualDispatchRequestResult> {
+      this.finishCalls += 1;
+      throw new Error("banco indisponível no momento de salvar");
+    }
+    release(i: ReleaseManualDispatchRequestInput): Promise<ReleaseManualDispatchRequestResult> {
+      return inner.release(i);
+    }
+    listRecoverable(at: string) {
+      return inner.listRecoverable(at);
+    }
+    count() {
+      return inner.count();
+    }
+  }
+  const registry = new FinishFailingRegistry();
+
+  const result = await triggerManualSyntheticDispatch(baseInput(store, { maxRuns: 1, maxConcurrency: 1, executor, registry }));
+
+  assert.equal(result.outcome, "RESULT_PERSISTENCE_FAILED");
+  assert.equal(executor.calls.length, 1, "o dispatcher rodou uma vez — a falha é só na gravação, não reexecuta");
+  assert.ok(result.warnings.some((w) => w.code === "RESULT_PERSISTENCE_FAILED"));
+  assert.equal(registry.finishCalls, 1, "finish() não foi tentado de novo (sem retry automático)");
+});
+
+// ------------------------------------------- 29/30. request interrompido / recovery
+
+test("pedido PENDING com lease vencida gera DENIED_RECOVERY_REQUIRED e NÃO executa o dispatcher sozinho", async () => {
+  const store = new InMemorySyntheticRunStore();
+  await seedRuns(store, ["run-1"], AT);
+  const executor = new MapExecutor();
+  const registry = new InMemoryManualDispatchRequestRegistry();
+
+  const requestId = "req-interrompido";
+  const requestedBy = "admin-teste-trigger";
+  const reason = "verificação administrativa de rotina";
+  const fingerprint = computeManualDispatchRequestFingerprint({
+    requestId,
+    batchId: "batch-trigger-0001",
+    role: "ADMIN",
+    environment: "SYNTHETIC_LAB",
+    explicitConfirmation: true,
+    requestedBy,
+    reason,
+    requestedAt: AT,
+    maxRuns: 1,
+    maxConcurrency: 1,
+    deadlineAt: FAR_DEADLINE,
+    policyConfig: DEFAULT_MANUAL_DISPATCH_POLICY_CONFIG,
+  });
+  // Simula um processo anterior que reservou e nunca voltou: lease com TTL
+  // curtíssimo, já vencida no instante em que o novo pedido chega.
+  await registry.reserve({ requestId, batchId: "batch-trigger-0001", fingerprint, requestedBy, environment: "SYNTHETIC_LAB", reason, requestedAt: AT, claimedBy: "worker-interrompido", at: AT, leaseTtlMs: 1 });
+
+  // `requestedAt` (domínio/fingerprint) fica IGUAL ao do pedido original —
+  // é `now()` (controle) que precisa estar bem depois da lease de 1ms para
+  // que `reserve()` a veja como vencida.
+  const muchLater = new Date(Date.parse(AT) + 10_000).toISOString();
+  const result = await triggerManualSyntheticDispatch(baseInput(store, { requestId, maxRuns: 1, maxConcurrency: 1, executor, registry, now: makeClock(muchLater, 1_000) }));
+
+  assert.equal(result.outcome, "REQUEST_DENIED");
+  assert.equal(result.decision, "DENIED_RECOVERY_REQUIRED");
+  assert.equal(executor.calls.length, 0, "recuperação NUNCA executa automaticamente");
+
+  const recoverable = await registry.listRecoverable(muchLater);
+  assert.ok(recoverable.some((e) => e.requestId === requestId), "o pedido continua classificável como recuperável");
+});
+
+// --------------------------------------------------- 7/8. outro processo em execução
+
+test("segunda chamada enquanto a primeira ainda está reservada: REQUEST_DENIED (DENIED_ALREADY_RUNNING)", async () => {
+  const store = new InMemorySyntheticRunStore();
+  await seedRuns(store, ["run-1"], AT);
+  const registry = new InMemoryManualDispatchRequestRegistry();
+  const requestId = "req-em-execucao";
+
+  const fingerprint = computeManualDispatchRequestFingerprint({
+    requestId,
+    batchId: "batch-trigger-0001",
+    role: "ADMIN",
+    environment: "SYNTHETIC_LAB",
+    explicitConfirmation: true,
+    requestedBy: "admin-teste-trigger",
+    reason: "verificação administrativa de rotina",
+    requestedAt: AT,
+    maxRuns: 1,
+    maxConcurrency: 1,
+    deadlineAt: FAR_DEADLINE,
+    policyConfig: DEFAULT_MANUAL_DISPATCH_POLICY_CONFIG,
+  });
+  // Reserva ainda VÁLIDA de "outro processo" — simulado reservando por fora, sem concluir.
+  await registry.reserve({ requestId, batchId: "batch-trigger-0001", fingerprint, requestedBy: "admin-teste-trigger", environment: "SYNTHETIC_LAB", reason: "verificação administrativa de rotina", requestedAt: AT, claimedBy: "outro-processo", at: AT, leaseTtlMs: TTL });
+
+  const executor = new MapExecutor();
+  const result = await triggerManualSyntheticDispatch(baseInput(store, { requestId, maxRuns: 1, maxConcurrency: 1, executor, registry }));
+
+  assert.equal(result.outcome, "REQUEST_DENIED");
+  assert.equal(result.decision, "DENIED_ALREADY_RUNNING");
+  assert.equal(executor.calls.length, 0);
+});
+
+// ------------------------------------------------------ 11. replay não duplica logs
+
+test("replay não duplica os eventos de log do primeiro processamento", async () => {
+  const store = new InMemorySyntheticRunStore();
+  await seedRuns(store, ["run-1"], AT);
+  const executor = new MapExecutor();
+  const logger = new InMemorySyntheticEngineLogger();
+  const registry = new InMemoryManualDispatchRequestRegistry();
+
+  const input = baseInput(store, { maxRuns: 1, maxConcurrency: 1, executor, logger, registry });
+  await triggerManualSyntheticDispatch(input);
+  const countAfterFirst = logger.snapshot().length;
+
+  await triggerManualSyntheticDispatch(input);
+  const eventsAfterSecond = logger.snapshot();
+
+  assert.equal(eventsAfterSecond.length, countAfterFirst + 2, "só REQUESTED + REPLAYED novos — nada do primeiro processamento se repete");
+  assert.equal(eventsAfterSecond[eventsAfterSecond.length - 1]?.code, "MANUAL_DISPATCH_REPLAYED");
+  assert.equal(eventsAfterSecond.filter((e) => e.code === "MANUAL_DISPATCH_STARTED").length, 1, "MANUAL_DISPATCH_STARTED não se repete no replay");
 });
 
 // ---------------------------------------------------------------- 32/33/34/35. segurança do resultado
