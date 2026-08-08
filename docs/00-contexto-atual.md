@@ -824,6 +824,48 @@ pequeno (3 runs, concorrência 2) e imprime resumo redigido. **Execução
 real continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
 `false as const`, `phase9/` continua intocado.
 
+**Observabilidade operacional do motor sintético em 2026-08-13**
+(`src/server/automation/synthetic/observability/`): camada que RECEBE
+resultados já produzidos pelo dispatcher/worker/recovery/store e os
+transforma em informação operacional segura — não altera run, não executa
+etapa, não reserva claim, não dispara Playwright, não persiste log, não
+inicia serviço contínuo, não consulta portal externo. **Métricas**
+(`syntheticEngineMetrics.ts`, `SyntheticEngineMetrics`): tipo fechado com 19
+contadores finitos e não-negativos (runs encontrados/despachados/
+concluídos/falhos/expirados/cancelados/aguardando humano, conflitos de
+claim/versão, sessão ausente/incompatível, claims expirados, runs
+recuperáveis, evidências/eventos produzidos, duração do lote, pico de
+concorrência), agregados por funções PURAS a partir do que o dispatcher e
+`store.listRecoverable` já devolveram — sem contador global mutável, sem
+consulta nova ao store. **Logs estruturados** (`syntheticEngineLogger.ts`):
+união fechada de 18 eventos (`BATCH_STARTED`...`READINESS_CHANGED`), campos
+tipados e redigidos reusando `redactLabText`/`scanSyntheticValue` já
+existentes — nenhuma regex de segurança nova; `reason` é sempre texto
+mascarado, nunca há `sessionHandle`, stack trace, HTML ou payload
+arbitrário. **Logger em memória** (`InMemorySyntheticEngineLogger`): isolado
+por instância, cópia defensiva na leitura/escrita, sem `console`, sem estado
+de módulo. **Health separado de readiness**: `buildSyntheticEngineHealth`
+responde à saúde TÉCNICA (`HEALTHY`/`DEGRADED`/`UNHEALTHY`, com limiares
+configuráveis); `buildSyntheticEngineReadiness` responde se o motor pode
+receber lote AGORA (`READY`/`NOT_READY`/`BLOCKED`) — deliberadamente **não**
+depende de `PHASE9_REAL_EXECUTION_ENABLED`, da Fase 9 bloqueada, nem de
+sessão ausente/`WAITING_HUMAN` num run isolado. **Snapshot operacional**
+(`syntheticEngineSnapshot.ts`): timestamp, métricas, health, readiness,
+resumo do último lote e avisos tipados, com validação de forma fechada —
+nunca run completo, sessão ou handle. **Integração com o dispatcher é
+OPCIONAL**: `dispatchSyntheticBatch` aceita um `logger` — ausente, o
+comportamento é IDÊNTICO ao de antes deste PR (nenhuma chamada extra a
+`now()`); presente, emite eventos reusando timestamps já calculados, e
+falha do `emit` é sempre engolida (`safeEmitSyntheticEngineEvent`) —
+observabilidade nunca duplica execução nem causa retry de etapa. Novo
+comando `npm run lab:synthetic:observability` roda um lote pequeno em
+memória com logger ligado e imprime métricas/health/readiness/snapshot
+redigidos. **Nenhuma integração externa** (sem OpenTelemetry/Prometheus/
+Sentry/Datadog), **nenhum polling/cron/serviço contínuo**, **nenhuma
+persistência de log**. **Execução real continua desabilitada:**
+`PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
+intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
