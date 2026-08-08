@@ -879,6 +879,33 @@ contínua — ver `docs/75 §8`). **Execução real permanece desabilitada:**
 `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
 intocado.
 
+**Acionador administrativo manual do dispatcher sintético em 2026-08-08**
+(`src/server/automation/synthetic/admin/`,
+`triggerManualSyntheticDispatch`): primeiro bloco POSTERIOR ao fechamento
+do `docs/75` — não reabre nem reescreve aquele marco. Exige AÇÃO e
+CONFIRMAÇÃO explícitas (`ManualSyntheticDispatchAdminContext` fechado:
+papel `ADMIN`/`OPERATOR`, ambiente sempre `SYNTHETIC_LAB`,
+`explicitConfirmation === true`) — este PR não resolve sessão real nem
+credencial, só a forma fechada que a política exige. A política
+(`evaluateManualSyntheticDispatchPolicy`, pura) usa health/readiness JÁ
+CALCULADOS (nunca consultados aqui) e aplica limites administrativos
+próprios (`maxRuns` 1–10, `maxConcurrency` 1–5, `maxConcurrency ≤ maxRuns`,
+deadline finita e futura) — sempre dentro dos limites que o dispatcher já
+impõe, nunca mais permissivos. **Idempotência de PEDIDO** (`requestId`) em
+memória (`InMemoryManualDispatchRequestRegistry`) — não confundir com a
+idempotência de ETAPA/LOTE que o store/dispatcher já garantem: repetir o
+mesmo `requestId` com o mesmo payload devolve o resultado anterior sem
+chamar o dispatcher de novo; payload incompatível é recusado
+(`DENIED_DUPLICATE_REQUEST`). **Nenhum scheduler, cron, polling ou UI foi
+adicionado** — uma chamada sempre termina. Reusa `dispatchSyntheticBatch`
+e `SyntheticEngineLogger` sem redesenhar nenhum dos dois (só 6 códigos
+administrativos novos na união fechada de eventos, que já era extensível
+por desenho). Novo comando `npm run lab:synthetic:manual-dispatch` (store
+em memória, solicitante fictício, confirmação explícita já ligada) roda um
+lote pequeno e imprime resultado administrativo redigido. **Execução real
+continua desabilitada:** `PHASE9_REAL_EXECUTION_ENABLED` segue
+`false as const`, `phase9/` continua intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,

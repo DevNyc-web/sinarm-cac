@@ -15,8 +15,8 @@ import { InMemorySyntheticEngineLogger } from "../../../src/server/automation/sy
 
 // ------------------------------------------------------------- construção
 
-test("evento tem os 18 códigos fechados e nível padrão coerente", () => {
-  assert.equal(SYNTHETIC_ENGINE_LOG_EVENT_CODES.length, 18);
+test("evento tem os 24 códigos fechados (18 do motor + 6 do acionador administrativo) e nível padrão coerente", () => {
+  assert.equal(SYNTHETIC_ENGINE_LOG_EVENT_CODES.length, 24);
   const event = buildSyntheticEngineLogEvent({ code: "RUN_FAILED", timestamp: "2026-08-13T10:00:00.000Z" });
   assert.equal(event.level, "WARN");
   const ok = buildSyntheticEngineLogEvent({ code: "RUN_COMPLETED", timestamp: "2026-08-13T10:00:00.000Z" });
