@@ -866,6 +866,19 @@ persistência de log**. **Execução real continua desabilitada:**
 `PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
 intocado.
 
+**Bloco do motor sintético da Fase 2 formalmente fechado em 2026-08-08**
+(PR #158 mergeado como `d31bf9d`): ver
+[`docs/75-fase-2-motor-sintetico-fechamento.md`](75-fase-2-motor-sintetico-fechamento.md)
+para o fechamento completo — capacidades concluídas, garantias comprovadas
+por teste, limitações atuais e evidências técnicas do bloco #144–#158.
+**1962 testes aprovados** (`npm run test:unit:all`). Observabilidade
+(métricas, logs, health, readiness, snapshot) está concluída. **Próximo
+passo recomendado:** acionamento manual administrativo do dispatcher
+sintético (ação explícita, sem scheduler, sem polling, sem operação
+contínua — ver `docs/75 §8`). **Execução real permanece desabilitada:**
+`PHASE9_REAL_EXECUTION_ENABLED` segue `false as const`, `phase9/` continua
+intocado.
+
 **Bloco D implementado em 2026-08-05** (PR técnico
 `feat/separate-client-admin-entry`): a entrada do cliente e a da equipe interna
 passaram a ser **portas distintas**. `/login` é a do **cliente** — conta,
