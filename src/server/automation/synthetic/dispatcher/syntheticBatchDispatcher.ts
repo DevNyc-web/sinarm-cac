@@ -19,10 +19,19 @@
  *
  * A sessão viva NUNCA vem do store: `resolveSession(runId)` é sempre
  * injetada, e o resultado agregado nunca carrega `sessionHandle`.
+ *
+ * Logger de observabilidade OPCIONAL (`logger` abaixo): quando ausente, o
+ * dispatcher se comporta EXATAMENTE como antes — nenhuma chamada extra a
+ * `now()`, nenhuma mudança de ordem, concorrência, claim, idempotência ou
+ * política de parada. Quando presente, os eventos reusam timestamps JÁ
+ * calculados (nunca um novo `now()`) e falha do `emit` é sempre engolida
+ * (`safeEmitSyntheticEngineEvent`) — observabilidade não pode duplicar
+ * execução nem causar retry de etapa.
  */
 import { runSyntheticWorkerOnce, type SyntheticWorkerOutcome } from "../worker/syntheticSingleStepWorker";
 import type { StoredSyntheticRun, SyntheticRunStore, SyntheticRunStoreViolation } from "../store/syntheticRunStore";
 import type { SyntheticStepExecutor } from "../playwright/syntheticStepExecutor";
+import { buildSyntheticEngineLogEvent, type SyntheticEngineLogEventCode, type SyntheticEngineLogger } from "../observability/syntheticEngineLogger";
 
 /** Teto interno — nenhum limite pode ser efetivamente ilimitado, mesmo se o chamador pedir mais. */
 export const SYNTHETIC_BATCH_MAX_RUNS_CAP = 10;
@@ -66,6 +75,8 @@ export interface DispatchSyntheticBatchInput {
   workerIdPrefix: string;
   /** Abstração equivalente a `AbortSignal` — nunca lida do processo global dentro do domínio. */
   signal?: { readonly aborted: boolean };
+  /** Observabilidade OPCIONAL — ausente, o dispatcher roda idêntico ao comportamento anterior a este PR. */
+  logger?: SyntheticEngineLogger;
 }
 
 export interface SyntheticBatchItemResult {
@@ -107,6 +118,43 @@ function classify(outcome: SyntheticWorkerOutcome): "completed" | "conflicted" |
   if (CONFLICT_OUTCOMES.has(outcome)) return "conflicted";
   if (NO_WORK_OUTCOMES.has(outcome)) return "noWork";
   return "interrupted";
+}
+
+// -------------------------------------------------------- observabilidade
+
+/** Só os outcomes com evento dedicado na união fechada; o resto (ex.: `NO_RUN_AVAILABLE`) não emite evento de item. */
+const ITEM_LOG_EVENT_BY_OUTCOME: Readonly<Partial<Record<SyntheticWorkerOutcome, SyntheticEngineLogEventCode>>> = {
+  RUN_COMPLETED: "RUN_COMPLETED",
+  WAITING_HUMAN: "RUN_WAITING_HUMAN",
+  RUN_FAILED: "RUN_FAILED",
+  RUN_EXPIRED: "RUN_EXPIRED",
+  RUN_CANCELLED: "RUN_CANCELLED",
+  CLAIM_CONFLICT: "CLAIM_CONFLICT",
+  VERSION_CONFLICT: "VERSION_CONFLICT",
+  SESSION_REQUIRED: "SESSION_REQUIRED",
+  SESSION_MISMATCH: "SESSION_MISMATCH",
+};
+
+/** Só os motivos de parada com evento dedicado; `NO_RUN_AVAILABLE`/`COMPLETED_BATCH`/`INVALID_CONFIGURATION` não têm evento extra além de `BATCH_FINISHED`. */
+const BATCH_STOP_REASON_LOG_EVENT: Readonly<Partial<Record<SyntheticBatchStopReason, SyntheticEngineLogEventCode>>> = {
+  LIMIT_REACHED: "BATCH_LIMIT_REACHED",
+  DEADLINE_REACHED: "BATCH_DEADLINE_REACHED",
+  CANCELLED: "BATCH_CANCELLED",
+};
+
+/**
+ * Falha do logger NUNCA propaga, nunca reexecuta etapa — só é engolida. É a
+ * ÚNICA porta de emissão usada por este módulo (nunca `logger.emit`
+ * diretamente), para que essa política não dependa de lembrar de repetir o
+ * try/catch em cada chamada.
+ */
+async function safeEmitSyntheticEngineEvent(logger: SyntheticEngineLogger | undefined, event: ReturnType<typeof buildSyntheticEngineLogEvent>): Promise<void> {
+  if (logger === undefined) return;
+  try {
+    await logger.emit(event);
+  } catch {
+    // política deliberada: erro de observabilidade não pode duplicar execução nem causar retry
+  }
 }
 
 function invalidConfig(input: DispatchSyntheticBatchInput, at: string): SyntheticBatchDispatchResult {
@@ -163,12 +211,14 @@ async function runWithConcurrency<T>(
  * a deadline, o cancelamento ou o fim dos candidatos.
  */
 export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput): Promise<SyntheticBatchDispatchResult> {
-  const { store, executor, at, deadlineAt, now, claimTtlMs, resolveSession, idempotencyKeyFor, workerIdPrefix, signal } = input;
+  const { store, executor, at, deadlineAt, now, claimTtlMs, resolveSession, idempotencyKeyFor, workerIdPrefix, signal, logger } = input;
 
   if (!isValidConfig(input)) return invalidConfig(input, at);
 
   const maxRuns = input.maxRuns;
   const effectiveConcurrency = Math.min(input.maxConcurrency, maxRuns);
+
+  await safeEmitSyntheticEngineEvent(logger, buildSyntheticEngineLogEvent({ code: "BATCH_STARTED", timestamp: at, counters: { maxRuns, maxConcurrency: input.maxConcurrency } }));
 
   let candidates: readonly StoredSyntheticRun[];
   try {
@@ -178,7 +228,20 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
     return invalidConfig(input, at);
   }
 
+  if (candidates.length > 0) {
+    const claimsExpired = candidates.filter((c) => c.claim !== null).length;
+    await safeEmitSyntheticEngineEvent(
+      logger,
+      buildSyntheticEngineLogEvent({ code: "RECOVERY_DETECTED", timestamp: at, counters: { runsRecoverable: candidates.length, claimsExpired } }),
+    );
+  }
+
   if (candidates.length === 0) {
+    const finishedAt = now();
+    await safeEmitSyntheticEngineEvent(
+      logger,
+      buildSyntheticEngineLogEvent({ code: "BATCH_FINISHED", timestamp: finishedAt, outcome: "NO_RUN_AVAILABLE", counters: { requested: maxRuns, dispatched: 0, completed: 0, noWork: 0, conflicted: 0, interrupted: 0, peakConcurrency: 0 } }),
+    );
     return {
       requested: maxRuns,
       dispatched: 0,
@@ -188,7 +251,7 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
       interrupted: 0,
       results: [],
       startedAt: at,
-      finishedAt: now(),
+      finishedAt,
       stopReason: "NO_RUN_AVAILABLE",
       limits: { maxRuns, maxConcurrency: input.maxConcurrency, effectiveConcurrency, peakConcurrency: 0 },
     };
@@ -196,6 +259,7 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
 
   // Seleção ÚNICA, no início — cada run selecionado é distinto e nunca reaparece neste lote.
   const selected = candidates.slice(0, maxRuns).map((c) => c.runId);
+  const beforeByRunId = new Map(candidates.map((c) => [c.runId, c] as const));
 
   const results: SyntheticBatchItemResult[] = new Array(selected.length);
   let stoppedByDeadline = false;
@@ -217,6 +281,9 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
     peakConcurrency = Math.max(peakConcurrency, activeCount);
     const startedAt = now();
     const workerId = `${workerIdPrefix}-${index}`;
+    const before = beforeByRunId.get(runId);
+
+    await safeEmitSyntheticEngineEvent(logger, buildSyntheticEngineLogEvent({ code: "WORKER_STARTED", timestamp: startedAt, runId, workerId, auditCorrelationId: before?.auditCorrelationId ?? null }));
 
     try {
       const session = await resolveSession(runId);
@@ -230,6 +297,25 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
         idempotencyKey: idempotencyKeyFor(runId),
         runId,
       });
+      const finishedAt = now();
+      const durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+      const afterRun = workerResult.run;
+      const evidenceDelta = before !== undefined && afterRun !== null ? Math.max(0, afterRun.evidence.length - before.evidence.length) : 0;
+      const eventsDelta = before !== undefined && afterRun !== null ? Math.max(0, afterRun.events.length - before.events.length) : 0;
+      const auditCorrelationId = afterRun?.auditCorrelationId ?? before?.auditCorrelationId ?? null;
+
+      await safeEmitSyntheticEngineEvent(
+        logger,
+        buildSyntheticEngineLogEvent({ code: "WORKER_FINISHED", timestamp: finishedAt, runId, workerId, outcome: workerResult.outcome, durationMs, auditCorrelationId, evidenceDelta, eventsDelta }),
+      );
+      const itemEventCode = ITEM_LOG_EVENT_BY_OUTCOME[workerResult.outcome];
+      if (itemEventCode !== undefined) {
+        await safeEmitSyntheticEngineEvent(
+          logger,
+          buildSyntheticEngineLogEvent({ code: itemEventCode, timestamp: finishedAt, runId, workerId, outcome: workerResult.outcome, durationMs, auditCorrelationId, evidenceDelta, eventsDelta }),
+        );
+      }
+
       results[index] = {
         // O runId do DESPACHANTE, não `workerResult.runId`: o worker devolve
         // `null` em desfechos como SESSION_REQUIRED, mas o item já tinha um
@@ -240,11 +326,24 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
         violations: workerResult.violations,
         runState: workerResult.run?.runState ?? null,
         startedAt,
-        finishedAt: now(),
+        finishedAt,
       };
     } catch {
       // Erro inesperado de infraestrutura NUM item isolado: não derruba o
       // lote inteiro, vira resultado redigido, sem stack trace.
+      const finishedAt = now();
+      await safeEmitSyntheticEngineEvent(
+        logger,
+        buildSyntheticEngineLogEvent({
+          code: "WORKER_FINISHED",
+          timestamp: finishedAt,
+          runId,
+          workerId,
+          outcome: "EXECUTION_REJECTED",
+          durationMs: Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt)),
+          reason: "erro inesperado ao processar este item",
+        }),
+      );
       results[index] = {
         workerId,
         runId,
@@ -252,7 +351,7 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
         violations: [{ code: "INVALID_STORED_RUN", field: null, detail: "erro inesperado ao processar este item" }],
         runState: null,
         startedAt,
-        finishedAt: now(),
+        finishedAt,
       };
     } finally {
       activeCount -= 1;
@@ -281,6 +380,15 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
         ? "LIMIT_REACHED"
         : "COMPLETED_BATCH";
 
+  const finishedAt = now();
+  const batchCounters = { requested: maxRuns, dispatched: dispatchedResults.length, completed, noWork, conflicted, interrupted, peakConcurrency };
+
+  const stopReasonEventCode = BATCH_STOP_REASON_LOG_EVENT[stopReason];
+  if (stopReasonEventCode !== undefined) {
+    await safeEmitSyntheticEngineEvent(logger, buildSyntheticEngineLogEvent({ code: stopReasonEventCode, timestamp: finishedAt, counters: batchCounters }));
+  }
+  await safeEmitSyntheticEngineEvent(logger, buildSyntheticEngineLogEvent({ code: "BATCH_FINISHED", timestamp: finishedAt, outcome: stopReason, counters: batchCounters }));
+
   return {
     requested: maxRuns,
     dispatched: dispatchedResults.length,
@@ -290,7 +398,7 @@ export async function dispatchSyntheticBatch(input: DispatchSyntheticBatchInput)
     interrupted,
     results: dispatchedResults,
     startedAt: at,
-    finishedAt: now(),
+    finishedAt,
     stopReason,
     limits: { maxRuns, maxConcurrency: input.maxConcurrency, effectiveConcurrency, peakConcurrency },
   };
