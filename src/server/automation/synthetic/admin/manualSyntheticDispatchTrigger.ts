@@ -1,10 +1,11 @@
 /**
  * Acionador ADMINISTRATIVO MANUAL do dispatcher sintético:
  *
- *   solicitação explícita → checar replay → avaliar política (papel,
+ *   solicitação explícita → reservar PEDIDO (replay/conflito/em execução/
+ *   recuperável/reservado) → se reservado, avaliar política (papel,
  *   ambiente, confirmação, motivo, configuração, limite de taxa, health,
  *   readiness) → registrar início redigido → chamar `dispatchSyntheticBatch`
- *   UMA única vez → resultado administrativo redigido → registrar → encerrar
+ *   UMA única vez → persistir resultado final → encerrar
  *
  * NÃO é scheduler, cron nem serviço contínuo — uma chamada SEMPRE termina.
  * NÃO redesenha o dispatcher: toda seleção/claim/execução/idempotência de
@@ -12,7 +13,16 @@
  * decide SE aquela chamada pode acontecer e traduz o resultado para o
  * vocabulário administrativo. A idempotência tratada AQUI é outra: a do
  * PEDIDO administrativo (`requestId`), via `ManualDispatchRequestRegistry` —
- * ver `manualDispatchRequestRegistry.ts`.
+ * ver `manualDispatchRequestRegistry.ts`. NÃO importa Prisma: só a
+ * interface do registry, injetada por quem chama.
+ *
+ * ORDEM DELIBERADA — reserva ANTES da política: o fingerprint (calculado
+ * ANTES de qualquer avaliação) já captura tudo que influencia a decisão da
+ * política, então `reserve()` sozinho decide corretamente replay (de
+ * QUALQUER outcome, inclusive negado) e conflito, sem gastar avaliação de
+ * política em pedidos que nunca vão rodar. A garantia de concorrência real
+ * (dois processos não executam o mesmo pedido) fica inteiramente no banco,
+ * dentro de `reserve()`.
  *
  * `health`/`readiness` são sempre FORNECIDOS por quem chama (já calculados
  * por `buildSyntheticEngineHealth`/`buildSyntheticEngineReadiness`) — este
@@ -35,13 +45,14 @@ import {
   evaluateManualSyntheticDispatchPolicy,
   type ManualSyntheticDispatchPolicyConfig,
 } from "./manualSyntheticDispatchPolicy";
-import type {
-  ManualSyntheticDispatchAdminContext,
-  ManualSyntheticDispatchBatchSummary,
-  ManualSyntheticDispatchOutcome,
-  ManualSyntheticDispatchPolicyDecision,
-  ManualSyntheticDispatchResult,
-  ManualSyntheticDispatchWarning,
+import {
+  MANUAL_DISPATCH_RESULT_FORMAT_VERSION,
+  type ManualSyntheticDispatchAdminContext,
+  type ManualSyntheticDispatchBatchSummary,
+  type ManualSyntheticDispatchOutcome,
+  type ManualSyntheticDispatchPolicyDecision,
+  type ManualSyntheticDispatchResult,
+  type ManualSyntheticDispatchWarning,
 } from "./manualSyntheticDispatchTypes";
 
 export interface ManualSyntheticDispatchInput {
@@ -55,6 +66,8 @@ export interface ManualSyntheticDispatchInput {
   maxConcurrency: number;
   deadlineAt: string;
   claimTtlMs: number;
+  /** TTL da lease administrativa (reserva do PEDIDO, não da etapa). Default: tempo até `deadlineAt` + 60s de folga. */
+  leaseTtlMs?: number;
   store: SyntheticRunStore;
   executor: SyntheticStepExecutor;
   resolveSession: (runId: string) => Promise<unknown>;
@@ -102,6 +115,14 @@ function classifyOutcome(batch: SyntheticBatchDispatchResult): ManualSyntheticDi
   return "DISPATCH_PARTIAL";
 }
 
+/** `status` do registry (nunca `PENDING`) equivalente a um `outcome`/`decision` administrativos. */
+function statusForOutcome(outcome: ManualSyntheticDispatchOutcome): "COMPLETED" | "DENIED" | "FAILED" | "CANCELLED" {
+  if (outcome === "REQUEST_DENIED") return "DENIED";
+  if (outcome === "DISPATCH_CANCELLED") return "CANCELLED";
+  if (outcome === "DISPATCH_FAILED" || outcome === "RESULT_PERSISTENCE_FAILED") return "FAILED";
+  return "COMPLETED";
+}
+
 interface BuildResultInput {
   requestId: string;
   batchId: string;
@@ -119,7 +140,37 @@ interface BuildResultInput {
 }
 
 function buildResult(input: BuildResultInput): ManualSyntheticDispatchResult {
-  return { ...input };
+  return { formatVersion: MANUAL_DISPATCH_RESULT_FORMAT_VERSION, ...input };
+}
+
+function defaultLeaseTtlMs(requestedAt: string, deadlineAt: string): number {
+  const untilDeadline = Math.max(0, Date.parse(deadlineAt) - Date.parse(requestedAt));
+  return untilDeadline + 60_000;
+}
+
+/**
+ * Tenta gravar o resultado final e liberar a reserva. Se `finish()` falhar
+ * (exceção OU violação tipada — dono trocou, versão conflitante, resultado
+ * inválido), o resultado devolvido é o MESMO, mas com `outcome` sobreposto
+ * para `RESULT_PERSISTENCE_FAILED`: o lote pode ter rodado, mas a gravação
+ * não pôde ser confirmada. NUNCA reexecuta o dispatcher por causa disso —
+ * é só um sinal para inspeção administrativa.
+ */
+async function finishSafely(
+  registry: ManualDispatchRequestRegistry,
+  requestId: string,
+  executionToken: string,
+  outcome: ManualSyntheticDispatchOutcome,
+  result: ManualSyntheticDispatchResult,
+  at: string,
+): Promise<ManualSyntheticDispatchResult> {
+  try {
+    const finished = await registry.finish({ requestId, executionToken, status: statusForOutcome(outcome), result, at });
+    if (finished.ok) return finished.entry.result ?? result;
+  } catch {
+    // cai no mesmo tratamento abaixo — engolido de propósito
+  }
+  return { ...result, outcome: "RESULT_PERSISTENCE_FAILED", warnings: [...result.warnings, { code: "RESULT_PERSISTENCE_FAILED", detail: "resultado administrativo não pôde ser confirmado como persistido — requer inspeção" }] };
 }
 
 /**
@@ -130,21 +181,14 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
   const { requestId, batchId, reason, requestedAt, maxRuns, maxConcurrency, deadlineAt, claimTtlMs, store, executor, resolveSession, logger, now, context, health, readiness, registry, signal } = input;
   const policyConfig: ManualSyntheticDispatchPolicyConfig = { ...DEFAULT_MANUAL_DISPATCH_POLICY_CONFIG, ...input.policyConfig };
   const workerIdPrefix = input.workerIdPrefix ?? `manual-${requestId}`;
+  const leaseTtlMs = input.leaseTtlMs ?? defaultLeaseTtlMs(requestedAt, deadlineAt);
 
   const requestedBy = redactLabText(input.requestedBy).text;
   const redactedReason = redactLabText(reason).text;
 
   await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_REQUESTED", timestamp: requestedAt, reason: redactedReason, counters: { maxRuns, maxConcurrency } }));
 
-  // ---- 0. replay do PEDIDO — nunca chama o dispatcher de novo
-  const existing = requestId.trim() === "" ? null : await registry.find(requestId);
-  const fingerprint = computeManualDispatchRequestFingerprint({ batchId, requestedBy, reason: redactedReason, maxRuns, maxConcurrency, deadlineAt });
-
-  if (existing !== null) {
-    if (existing.fingerprint === fingerprint) {
-      await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_REPLAYED", timestamp: now() }));
-      return { ...existing.result, outcome: "REQUEST_REPLAYED" };
-    }
+  const denyWithoutReserve = async (decision: ManualSyntheticDispatchPolicyDecision): Promise<ManualSyntheticDispatchResult> => {
     const denied = buildResult({
       requestId,
       batchId,
@@ -152,7 +196,7 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
       completedAt: now(),
       requestedBy,
       reason: redactedReason,
-      decision: "DENIED_DUPLICATE_REQUEST",
+      decision,
       outcome: "REQUEST_DENIED",
       batch: null,
       metrics: null,
@@ -160,9 +204,47 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
       readiness,
       warnings: [],
     });
-    await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_DENIED", timestamp: denied.completedAt, outcome: "DENIED_DUPLICATE_REQUEST" }));
+    await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_DENIED", timestamp: denied.completedAt, outcome: decision }));
     return denied;
+  };
+
+  // ---- 0. reserva do PEDIDO — decide replay/conflito/em execução/recuperável/reservado, atomicamente
+  const fingerprint = computeManualDispatchRequestFingerprint({
+    requestId,
+    batchId,
+    role: context.role,
+    environment: context.environment,
+    explicitConfirmation: context.explicitConfirmation,
+    requestedBy,
+    reason: redactedReason,
+    requestedAt,
+    maxRuns,
+    maxConcurrency,
+    deadlineAt,
+    policyConfig,
+  });
+
+  // `at` é o relógio de CONTROLE (`now()`), não o domínio (`requestedAt`): é
+  // ele que decide "esta lease já venceu?" — o mesmo papel que `now()` tem em
+  // `dispatchSyntheticBatch`. `requestedAt` seguiria igual em todo replay do
+  // MESMO pedido; `now()` não — e é exatamente essa variação que permite
+  // detectar lease vencida sem depender de o pedido em si ter mudado.
+  const reserved = await registry.reserve({ requestId, batchId, fingerprint, requestedBy, environment: context.environment, reason: redactedReason, requestedAt, claimedBy: workerIdPrefix, at: now(), leaseTtlMs });
+
+  if (reserved.outcome === "REPLAY") {
+    await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_REPLAYED", timestamp: now() }));
+    if (reserved.entry.result === null) {
+      // Nunca deveria acontecer (status terminal sempre grava resultado) — sinaliza sem inventar dado.
+      return buildResult({ requestId, batchId, requestedAt, completedAt: now(), requestedBy, reason: redactedReason, decision: "ALLOWED", outcome: "RESULT_PERSISTENCE_FAILED", batch: null, metrics: null, health, readiness, warnings: [{ code: "RESULT_PERSISTENCE_FAILED", detail: "registro terminal sem resultado gravado" }] });
+    }
+    return { ...reserved.entry.result, outcome: "REQUEST_REPLAYED" };
   }
+  if (reserved.outcome === "FINGERPRINT_CONFLICT") return denyWithoutReserve("DENIED_DUPLICATE_REQUEST");
+  if (reserved.outcome === "ALREADY_RUNNING") return denyWithoutReserve("DENIED_ALREADY_RUNNING");
+  if (reserved.outcome === "RECOVERY_REQUIRED") return denyWithoutReserve("DENIED_RECOVERY_REQUIRED");
+
+  // reserved.outcome === "RESERVED" — esta chamada, e só ela, pode prosseguir.
+  const { executionToken } = reserved.lease;
 
   // ---- 1. política — papel, ambiente, confirmação, motivo, configuração, limite de taxa, health, readiness
   const recentRequestCount = await registry.count();
@@ -188,7 +270,7 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
       warnings: [],
     });
     await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_DENIED", timestamp: denied.completedAt, outcome: policyResult.decision }));
-    return denied;
+    return finishSafely(registry, requestId, executionToken, "REQUEST_DENIED", denied, denied.completedAt);
   }
 
   await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_ALLOWED", timestamp: now() }));
@@ -243,8 +325,7 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
       warnings,
     });
     await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_FINISHED", timestamp: failed.completedAt, outcome }));
-    await registry.save({ requestId, fingerprint, result: failed });
-    return failed;
+    return finishSafely(registry, requestId, executionToken, outcome, failed, failed.completedAt);
   }
 
   const metrics = buildSyntheticEngineMetrics({ batch });
@@ -265,7 +346,7 @@ export async function triggerManualSyntheticDispatch(input: ManualSyntheticDispa
   });
 
   await safeEmit(logger, buildSyntheticEngineLogEvent({ code: "MANUAL_DISPATCH_FINISHED", timestamp: result.completedAt, outcome }));
-  await registry.save({ requestId, fingerprint, result });
 
-  return result;
+  // ---- 3. persistir resultado final e liberar a reserva — falha AQUI nunca reexecuta o dispatcher (ver `finishSafely`)
+  return finishSafely(registry, requestId, executionToken, outcome, result, result.completedAt);
 }

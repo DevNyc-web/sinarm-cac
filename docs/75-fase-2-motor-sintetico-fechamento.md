@@ -241,8 +241,12 @@ fechamento documental.
 
 > **Atualização (2026-08-08, não reabre este fechamento):** o acionador
 > abaixo foi implementado em
-> `src/server/automation/synthetic/admin/manualSyntheticDispatchTrigger.ts`.
-> Este §8 permanece como registro do que foi RECOMENDADO no momento do
+> `src/server/automation/synthetic/admin/manualSyntheticDispatchTrigger.ts`,
+> e sua idempotência de PEDIDO ganhou um adaptador Prisma durável
+> (`prismaManualDispatchRequestRegistry.ts`, modelo `ManualDispatchRequest`)
+> além do adaptador em memória — primeiro item de "etapas futuras" abaixo a
+> avançar (persistência do registry), ainda sem rota/Server Action/UI. Este
+> §8 permanece como registro do que foi RECOMENDADO no momento do
 > fechamento — o marco em si (§1–§7) não é reescrito.
 
 ```text
