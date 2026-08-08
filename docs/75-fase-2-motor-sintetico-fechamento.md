@@ -239,6 +239,12 @@ fechamento documental.
 
 ## 8. Próximo bloco recomendado
 
+> **Atualização (2026-08-08, não reabre este fechamento):** o acionador
+> abaixo foi implementado em
+> `src/server/automation/synthetic/admin/manualSyntheticDispatchTrigger.ts`.
+> Este §8 permanece como registro do que foi RECOMENDADO no momento do
+> fechamento — o marco em si (§1–§7) não é reescrito.
+
 ```text
 acionamento manual administrativo do dispatcher sintético
 ```

@@ -1,6 +1,8 @@
 /**
- * Log ESTRUTURADO do motor sintético — união fechada de 18 códigos de
- * evento, cada um com campos tipados e redigidos. Reusa `redactLabText` e
+ * Log ESTRUTURADO do motor sintético — união fechada de 24 códigos de
+ * evento (18 do motor + 6 do acionador administrativo manual,
+ * `admin/manualSyntheticDispatchTrigger.ts`), cada um com campos tipados e
+ * redigidos. Reusa `redactLabText` e
  * `scanSyntheticValue` já existentes (Fase 2/8D) — nenhuma regra de
  * segurança nova, nenhuma regex duplicada.
  *
@@ -32,6 +34,12 @@ export const SYNTHETIC_ENGINE_LOG_EVENT_CODES = [
   "SESSION_MISMATCH",
   "RECOVERY_DETECTED",
   "READINESS_CHANGED",
+  "MANUAL_DISPATCH_REQUESTED",
+  "MANUAL_DISPATCH_ALLOWED",
+  "MANUAL_DISPATCH_DENIED",
+  "MANUAL_DISPATCH_STARTED",
+  "MANUAL_DISPATCH_FINISHED",
+  "MANUAL_DISPATCH_REPLAYED",
 ] as const;
 
 export type SyntheticEngineLogEventCode = (typeof SYNTHETIC_ENGINE_LOG_EVENT_CODES)[number];
@@ -59,6 +67,12 @@ const DEFAULT_LEVEL_BY_CODE: Readonly<Record<SyntheticEngineLogEventCode, Synthe
   SESSION_MISMATCH: "WARN",
   RECOVERY_DETECTED: "WARN",
   READINESS_CHANGED: "INFO",
+  MANUAL_DISPATCH_REQUESTED: "INFO",
+  MANUAL_DISPATCH_ALLOWED: "INFO",
+  MANUAL_DISPATCH_DENIED: "WARN",
+  MANUAL_DISPATCH_STARTED: "INFO",
+  MANUAL_DISPATCH_FINISHED: "INFO",
+  MANUAL_DISPATCH_REPLAYED: "INFO",
 };
 
 /**
